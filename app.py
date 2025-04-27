@@ -25,11 +25,20 @@ camera_state = {
     "cameraName": None,
     "cameraModel": None,
     "properties": {},
-    "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400}
+    "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400},
+    "selectedAxisId": None
 }
 
 focus_thread = None
 stop_focus_flag = threading.Event()
+
+# --- 模拟 PLC 提供的轴数据 ---
+simulated_plc_axes = [
+    {"id": "Z1", "name": "主Z轴", "range_min": 5.0, "range_max": 25.0},
+    {"id": "Z2", "name": "副Z轴-A", "range_min": 0.0, "range_max": 20.0},
+    {"id": "Z3", "name": "Z轴-工位2", "range_min": 10.0, "range_max": 30.0},
+    {"id": "Z4", "name": "龙门Z轴", "range_min": 0.0, "range_max": 50.0}
+]
 
 # --- 辅助函数 ---
 def calculate_clarity(z):
@@ -124,34 +133,46 @@ def simulate_focus_process():
 @app.route('/connect', methods=['POST'])
 def connect_camera():
     global camera_state
-    if camera_state["isConnected"]:
-        return jsonify({"status": "error", "message": "相机已连接"}), 400
+    # --- Removed the check: --- 
+    # if camera_state["isConnected"]:
+    #     return jsonify({"status": "error", "message": "相机已连接"}), 400
+    # --- Now, always proceed with connection logic --- 
 
-    print("后端: 收到连接请求")
+    print("后端: 收到连接请求 (强制刷新状态)")
+    # Stop any ongoing focus if backend thinks it's running but frontend refreshed
+    global focus_thread
+    if camera_state["isFocusing"] and focus_thread and focus_thread.is_alive():
+        stop_focus_flag.set()
+        # Give it a moment to stop, but don't block excessively
+        focus_thread.join(timeout=0.5) 
+        print("后端: 停止了上次残留的对焦进程")
+
     time.sleep(0.5) # 模拟连接耗时
+    
+    # --- Always Reset/Initialize state on connect request --- 
     camera_state["isConnected"] = True
-    camera_state["serialNumber"] = request.json.get('serialNumber', 'SN_Backend_123')
+    camera_state["serialNumber"] = request.json.get('serialNumber', f'SN_Backend_{random.randint(100,999)}') # Add randomness for demo
     camera_state["configFile"] = "C:/CameraConfigs/backend_sim.cfg"
     camera_state["savePath"] = "D:/Captures/BackendSim/"
     camera_state["cameraName"] = f"模拟相机 {camera_state['serialNumber']}"
     camera_state["cameraModel"] = "FlaskSim v1.0"
-    # 模拟一些属性
     camera_state["properties"] = {
-        '曝光时间(us)': {'type': 'number', 'value': 12000, 'min': 10, 'max': 1000000, 'step': 10},
-        '增益': {'type': 'number', 'value': 1.5, 'min': 0, 'max': 16, 'step': 0.1},
+        '曝光时间(us)': {'type': 'number', 'value': random.randint(5000, 20000), 'min': 10, 'max': 1000000, 'step': 10},
+        '增益': {'type': 'number', 'value': round(random.uniform(1.0, 3.0), 1), 'min': 0, 'max': 16, 'step': 0.1},
         '触发模式': {'type': 'select', 'options': ['连续采集', '软件触发'], 'value': '连续采集'},
-         # 可以添加更多属性
     }
-    camera_state["currentZ"] = round(random.uniform(camera_state["zRange"]["min"], camera_state["zRange"]["max"]), 2) # 随机初始Z
+    camera_state["currentZ"] = round(random.uniform(camera_state["zRange"]["min"], camera_state["zRange"]["max"]), 2) 
     camera_state["clarity"] = calculate_clarity(camera_state["currentZ"])
     camera_state["focusStatus"] = "空闲"
     camera_state["isFocusing"] = False
     camera_state["isCapturing"] = False
     camera_state["isRecording"] = False
     camera_state["roiEnabled"] = False
+    camera_state["selectedAxisId"] = None # Reset axis selection on connect
+    # --------------------------------------------------------
 
-    print(f"后端: 相机 {camera_state['serialNumber']} 已连接")
-    return jsonify(camera_state)
+    print(f"后端: 相机 {camera_state['serialNumber']} 已连接 (状态已刷新)")
+    return jsonify(camera_state) # Return the fresh state
 
 @app.route('/disconnect', methods=['POST'])
 def disconnect_camera():
@@ -170,7 +191,8 @@ def disconnect_camera():
         "roiEnabled": False, "currentZ": 10.0, "bestZ": 15.5, # 可以保留上次的最佳Z
         "zRange": {"min": 5.0, "max": 25.0}, "clarity": 0.0, "focusStatus": "未连接",
         "serialNumber": None, "configFile": None, "savePath": None, "cameraName": None,
-        "cameraModel": None, "properties": {}, "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400}
+        "cameraModel": None, "properties": {}, "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400},
+        "selectedAxisId": None
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -288,6 +310,36 @@ def set_property():
     else:
         return jsonify({"status": "error", "message": f"未知属性: {prop_name}"}), 404
 
+@app.route('/api/axes', methods=['GET'])
+def get_axes():
+    """模拟从 PLC 获取可用轴列表"""
+    print("后端: 提供模拟轴列表")
+    # 在实际应用中，这里会包含与PLC通信获取数据的逻辑
+    return jsonify(simulated_plc_axes)
+
+@app.route('/set_axis_config', methods=['POST'])
+def set_axis_config():
+    """模拟将选择的轴配置保存到 PLC"""
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+
+    data = request.json
+    axis_id = data.get('axisId')
+    camera_sn = data.get('cameraSN') # 获取是哪个相机
+
+    if not axis_id or not camera_sn:
+         return jsonify({"status": "error", "message": "缺少 axisId 或 cameraSN"}), 400
+    
+    # 验证 axis_id 是否在可用列表中 (可选)
+    if not any(axis['id'] == axis_id for axis in simulated_plc_axes):
+         return jsonify({"status": "error", "message": f"无效的轴 ID: {axis_id}"}), 400
+
+    # 更新状态 (模拟保存到PLC)
+    camera_state['selectedAxisId'] = axis_id
+    print(f"后端: 模拟保存相机 '{camera_sn}' 的轴配置为 ID: {axis_id}")
+    
+    # 返回成功状态和当前配置 (可选)
+    return jsonify({"status": "ok", "selectedAxisId": axis_id})
 
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义

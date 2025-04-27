@@ -43,6 +43,17 @@
                         <button id="connect-btn" class="connect-button">连接</button>
                         <button id="config-axis-btn" class="select-button" title="配置相机Z轴" disabled>配置轴</button>
                     </div>
+                    <!-- 新增: 轴配置下拉菜单容器 -->
+                    <div id="axis-config-dropdown" class="axis-dropdown" >
+                         <div class="axis-dropdown-header">选择 Z 轴 (模拟PLC数据)</div>
+                         <ul id="axis-list" class="axis-list">
+                             <!-- 轴选项将由 JS 动态填充 -->
+                             <li class="axis-list-loading">加载中...</li>
+                         </ul>
+                         <div class="axis-dropdown-footer">
+                             <span id="dropdown-camera-sn"></span>
+                         </div>
+                    </div>
                 </div>
 
                 <div class="panel-section requires-connection">
@@ -108,15 +119,19 @@
                 </div>
                  <div class="panel-section requires-connection">
                     <h3>ROI区域</h3>
-                     <div class="input-group">
-                        <label style="width:30px">左X</label> <input type="number" value="--" style="flex-grow:1" disabled>
-                        <label style="width:30px">上Y</label> <input type="number" value="--" style="flex-grow:1" disabled>
+                     <div class="input-group roi-input-group"> 
+                        <label for="roi-left-x" class="roi-label">左X</label> 
+                        <input type="number" id="roi-left-x" value="--" class="roi-input" disabled>
+                        <label for="roi-top-y" class="roi-label">上Y</label> 
+                        <input type="number" id="roi-top-y" value="--" class="roi-input" disabled>
                     </div>
-                     <div class="input-group" style="margin-top: var(--spacing-small)">
-                        <label style="width:30px">右X</label> <input type="number" value="--" style="flex-grow:1" disabled>
-                        <label style="width:30px">下Y</label> <input type="number" value="--" style="flex-grow:1" disabled>
+                     <div class="input-group roi-input-group roi-input-group-second"> 
+                        <label for="roi-right-x" class="roi-label">右X</label> 
+                        <input type="number" id="roi-right-x" value="--" class="roi-input" disabled>
+                        <label for="roi-bottom-y" class="roi-label">下Y</label> 
+                        <input type="number" id="roi-bottom-y" value="--" class="roi-input" disabled>
                      </div>
-                     <button id="enable-roi-btn" style="margin-top: var(--spacing-medium); width: 100%;" disabled>启用ROI</button>
+                     <button id="enable-roi-btn" class="roi-button" disabled>启用ROI</button> 
                  </div>
 
             </aside>
@@ -130,29 +145,6 @@
             <span>图像: Pixmap(<span id="image-dims">---, ---</span>)</span>
             <span>缩放: 100%</span>
         </footer>
-
-        <!-- Z轴配置弹窗 -->
-        <div id="axis-config-modal" class="modal" >
-          <div class="modal-overlay"></div>
-          <div class="modal-content">
-            <h2>相机 Z 轴配置 (模拟)</h2>
-            <div class="modal-body">
-              <label for="modal-camera-sn">当前相机:</label>
-              <input type="text" id="modal-camera-sn" disabled>
-
-              <label for="axis-select">选择 Z 轴:</label>
-              <select id="axis-select">
-                <!-- 选项将由 JS 填充 -->
-                <option value="">--请选择--</option>
-              </select>
-              <p class="modal-note">注意: 轴列表由模拟数据提供。</p>
-            </div>
-            <div class="modal-footer">
-              <button id="modal-save-axis-btn">保存</button>
-              <button id="modal-cancel-axis-btn">取消</button>
-            </div>
-          </div>
-        </div>
 
         <script src="script.js"></script>
     </div>

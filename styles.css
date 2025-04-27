@@ -420,157 +420,109 @@ input[type=range]::-moz-range-thumb {
     }
 }
 
-/* --- Modal Styles --- */
-.modal {
-  /* display: none; */ /* Removed: Rely on opacity/visibility */
-  position: fixed; /* Stay in place */
-  z-index: 1000; /* Sit on top */
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  overflow: auto; /* Enable scroll if needed */
-  /* Add transition for fade effect */
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
+/* --- Axis Config Dropdown Styles --- */
+.axis-dropdown {
+    display: none; /* Hidden by default */
+    position: absolute; /* Position relative to the panel section */
+    background-color: var(--bg-medium); /* Darker background */
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100; /* Ensure it's above other panel content */
+    margin-top: var(--spacing-small); /* Space below the button group */
+    width: calc(100% - var(--spacing-large) * 2); /* Fit within panel padding */
+    max-height: 250px; /* Limit height */
+    overflow: hidden; /* Needed for potential slide effect */
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease, max-height 0.2s ease;
 }
 
-/* Style for when modal is shown (JS will toggle this class) */
-.modal.show {
-    display: block; /* Explicitly set display */
+.axis-dropdown.show {
+    display: block;
     opacity: 1;
-    visibility: visible;
+    transform: translateY(0);
+    max-height: 250px; /* Ensure max-height allows content */
 }
 
-.modal-overlay {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7); /* Slightly darker overlay */
-  z-index: 1001;
-}
-
-.modal-content {
-  position: relative; /* To allow z-index stacking within modal */
-  z-index: 1002; /* Above overlay */
-  background-color: var(--bg-dark); /* Match panel background */
-  color: var(--text-light);
-  margin: 10% auto; /* Adjust vertical margin */
-  padding: 0; /* Remove padding, control internally */
-  border: 1px solid var(--border-dark); /* Thinner border */
-  border-radius: var(--border-radius);
-  width: 90%; /* More responsive width */
-  max-width: 450px; /* Slightly wider max */
-  box-shadow: 0 5px 15px rgba(0,0,0,0.5); /* Enhanced shadow */
-  /* Add transform for subtle scale effect */
-  transform: scale(0.95);
-  transition: transform 0.3s ease;
-}
-
-.modal.show .modal-content {
-    transform: scale(1);
-}
-
-.modal-header {
-    padding: var(--spacing-medium) var(--spacing-large);
+.axis-dropdown-header {
+    padding: var(--spacing-small) var(--spacing-medium);
+    font-size: 0.9em;
+    color: var(--text-medium);
     border-bottom: 1px solid var(--border-dark);
-    background-color: var(--bg-medium); /* Header background */
-    border-top-left-radius: var(--border-radius);
-    border-top-right-radius: var(--border-radius);
+    background-color: var(--bg-darker); /* Slightly different header */
 }
 
-.modal-header h2 {
-  margin: 0;
-  color: var(--text-light);
-  font-size: 1.2em; /* Slightly larger title */
-  font-weight: 500;
-  border: none; /* Remove previous border */
-  padding: 0;
+.axis-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 180px; /* Limit list height specifically */
+    overflow-y: auto;
 }
 
-.modal-body {
-  padding: var(--spacing-large); /* Consistent padding */
+.axis-list li {
+    padding: var(--spacing-medium);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-dark);
+    color: var(--text-light);
+    transition: background-color 0.15s ease;
+    font-size: 0.95em;
 }
 
-.modal-body .form-group { /* Group label and input */
-    margin-bottom: var(--spacing-medium);
+.axis-list li:last-child {
+    border-bottom: none;
 }
 
-.modal-body label {
-  display: block;
-  margin-bottom: var(--spacing-small);
-  color: var(--text-medium);
-  font-size: 0.95em;
-}
-
-.modal-body input[type="text"],
-.modal-body select {
-  width: 100%; /* Take full width */
-  padding: var(--spacing-medium);
-  background-color: var(--bg-medium);
-  color: var(--text-light);
-  border: 1px solid var(--border-dark);
-  border-radius: var(--border-radius);
-  font-size: 1em;
-  height: auto; /* Let padding define height */
-}
-
-.modal-body input[disabled] {
-    background-color: var(--bg-darker);
-    color: var(--text-medium);
-    cursor: not-allowed;
-}
-
-.modal-note {
-    font-size: 0.85em;
-    color: var(--text-medium);
-    margin-top: var(--spacing-medium);
-    text-align: center;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding: var(--spacing-medium) var(--spacing-large);
-  border-top: 1px solid var(--border-dark);
-  background-color: var(--bg-darker); /* Footer background */
-  border-bottom-left-radius: var(--border-radius);
-  border-bottom-right-radius: var(--border-radius);
-}
-
-.modal-footer button {
-  background-color: var(--bg-medium); /* Match panel buttons */
-  color: var(--text-light);
-  border: 1px solid var(--border-dark);
-  padding: var(--spacing-small) var(--spacing-large);
-  font-size: 0.95em;
-  border-radius: var(--border-radius);
-  cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
-  margin-left: var(--spacing-medium);
-  height: auto; /* Let padding define height */
-  line-height: 1.5;
-}
-
-.modal-footer button:hover {
-  background-color: #4a4a4a;
-  border-color: var(--border-medium);
-}
-
-/* Primary button style in modal */
-.modal-footer button#modal-save-axis-btn {
+.axis-list li:hover {
     background-color: var(--accent-blue);
-    border-color: var(--accent-blue);
-}
-.modal-footer button#modal-save-axis-btn:hover {
-    background-color: #157acf;
-    border-color: #157acf;
+    color: var(--text-light);
 }
 
-/* Style for cancel button perhaps */
-/* Optional: Add icons to buttons if desired */
-/* .modal-footer button#modal-save-axis-btn::before { content: '\f0c7'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: var(--spacing-small); } */
-/* .modal-footer button#modal-cancel-axis-btn::before { content: '\f00d'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: var(--spacing-small); } */ 
+.axis-list li.axis-list-loading,
+.axis-list li.axis-list-empty,
+.axis-list li.axis-list-error {
+    color: var(--text-medium);
+    font-style: italic;
+    cursor: default;
+    text-align: center;
+    padding: var(--spacing-large);
+}
+.axis-list li.axis-list-loading:hover,
+.axis-list li.axis-list-empty:hover,
+.axis-list li.axis-list-error:hover{
+     background-color: transparent; /* No hover effect for status items */
+}
+
+.axis-dropdown-footer {
+    padding: var(--spacing-small) var(--spacing-medium);
+    font-size: 0.8em;
+    color: var(--text-medium);
+    border-top: 1px solid var(--border-dark);
+    background-color: var(--bg-darker);
+    text-align: right;
+}
+
+
+.roi-input-group-second {
+    margin-top: var(--spacing-small);
+}
+
+.roi-label {
+    width: 30px;         /* From inline style */
+    flex-shrink: 0;    /* Prevent shrinking */
+    text-align: right;   /* Optional: align text */
+    margin-right: var(--spacing-small); /* Optional: space before input */
+    /* Ensure vertical alignment if needed */
+    display: inline-flex; 
+    align-items: center; 
+}
+
+.roi-input {
+    flex-grow: 1;        /* From inline style */
+}
+
+.roi-button {
+    margin-top: var(--spacing-medium); /* From inline style */
+    width: 100%;                       /* From inline style */
+} 

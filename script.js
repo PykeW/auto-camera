@@ -74,13 +74,10 @@ class CameraController {
         this.enableRoiBtn = document.getElementById('enable-roi-btn');
         this.roiOverlay = document.getElementById('focus-roi-overlay'); // Get ROI overlay element
 
-        // Modal elements
-        this.axisConfigModal = document.getElementById('axis-config-modal');
-        this.modalOverlay = this.axisConfigModal.querySelector('.modal-overlay');
-        this.modalCameraSNInput = document.getElementById('modal-camera-sn');
-        this.axisSelectDropdown = document.getElementById('axis-select');
-        this.modalSaveAxisBtn = document.getElementById('modal-save-axis-btn');
-        this.modalCancelAxisBtn = document.getElementById('modal-cancel-axis-btn');
+        // Dropdown elements
+        this.axisDropdown = document.getElementById('axis-config-dropdown');
+        this.axisListUl = document.getElementById('axis-list');
+        this.dropdownCameraSN = document.getElementById('dropdown-camera-sn');
 
         // --- Simulation Parameters ---
         this.SIMULATED_BEST_Z = 15.5; // mm
@@ -97,11 +94,7 @@ class CameraController {
         this.CALIBRATION_DELAY = 300; // ms for simulated calibration
         // ---------------------------
 
-        // --- Simulated PLC Data ---
-        this.simulatedAxes = ["主Z轴", "副Z轴-A", "Z轴-工位2", "龙门Z轴"];
-        this.selectedAxis = null; // Store the selected axis for the "connected" camera
-        // ---------------------------
-
+        this.selectedAxisId = null; // Store the selected axis ID
         this.currentZ = 10.0;
         this.isFocusing = false;
         this.focusProcessId = null; // Stores timeout/interval ID for stopping
@@ -112,6 +105,9 @@ class CameraController {
         this.isCapturing = false;
         this.isRecording = false;
         this.roiEnabled = false;
+        this.isAxisDropdownVisible = false; // Track dropdown visibility
+
+        this.backendUrl = 'http://localhost:5000'; 
 
         this.initializeEventListeners();
         this.initUI();
@@ -184,56 +180,121 @@ class CameraController {
 
     // --- Connection and Initialization --- 
     async connectCamera() {
-        if (this.isConnected || this.connectionProcessId) return; // Prevent multiple connections
-        console.log("开始连接相机...");
+        if (this.isConnected || this.connectionProcessId) return; 
+        console.log("开始连接相机 (请求后端)..." );
         this.connectBtn.textContent = "连接中...";
         this.connectBtn.disabled = true;
         this.footerStatus.textContent = "状态: 连接中...";
+        this.connectionProcessId = true; // Use simple flag for locking during request
 
         try {
-            await this.wait(this.CONNECT_DELAY, 'connectionProcessId'); // Simulate connection time
+            // --- Call Backend Connect Endpoint --- 
+            const connectResponse = await fetch(`${this.backendUrl}/connect`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                 // We don't have a selected SN before connect in this UI,
+                 // so send empty body or a default? Backend uses its own default.
+                body: JSON.stringify({})
+            });
+
+            if (!connectResponse.ok) {
+                // Try to get error message from backend response
+                let errorMsg = `连接请求失败，状态码: ${connectResponse.status}`;
+                try {
+                    const errorData = await connectResponse.json();
+                    errorMsg = errorData.message || errorMsg;
+                } catch (parseError) { /* Ignore if response is not JSON */ }
+                throw new Error(errorMsg);
+            }
             
-            // Simulate successful connection
-            this.isConnected = true;
-            console.log("相机连接成功");
+            // Backend /connect now returns the initial state
+            const backendState = await connectResponse.json(); 
+            console.log("后端连接成功，状态:", backendState);
+
+            // Update frontend state based on backend response
+            this.isConnected = backendState.isConnected;
+            this.selectedAxisId = backendState.selectedAxisId; // Get initial axis if set
+
+            // Populate UI using the state received from /connect
+            // (We might not need populateSimulatedData separately anymore)
+            this.updateUIFromState(backendState);
+            this.updateControlStates(true); 
+            this.updateFocusStatus(backendState.focusStatus || '空闲'); 
+
             this.footerStatus.textContent = "状态: 已连接";
             this.connectBtn.textContent = "断开连接";
-            this.selectedAxis = null; // Reset axis selection on new connection
-            
-            // Populate data and enable controls *after* connection
-            this.populateSimulatedData();
-            this.updateControlStates(true); 
-            this.updateUI(); // Update Z, clarity, blur
-            this.updateFocusStatus('空闲'); // Set focus status to Idle after connection
 
         } catch(error) {
-             console.error("连接中断或失败:", error);
-             this.footerStatus.textContent = "状态: 连接失败";
+             console.error("连接相机时出错:", error);
+             this.footerStatus.textContent = `状态: 连接失败 (${error.message})`;
              this.connectBtn.textContent = "连接";
+             this.isConnected = false; // Ensure state is false on error
+             this.updateControlStates(false);
         } finally {
             this.connectBtn.disabled = false;
-             this.connectionProcessId = null;
+            this.connectionProcessId = null;
         }
     }
 
-    disconnectCamera() {
+    async disconnectCamera() {
+        // Prevent multiple disconnects or disconnect while busy
         if (!this.isConnected || this.connectionProcessId) return;
-        console.log("断开相机连接...");
-        this.stopAutofocus(); // Stop any ongoing focus process
-        this.stopCapture(); // Stop any ongoing capture/record
-        this.isConnected = false;
-        this.isCapturing = false;
-        this.isRecording = false;
-        this.roiEnabled = false;
-        this.connectBtn.textContent = "连接";
-        this.footerStatus.textContent = "状态: 未连接";
-        this.updateControlStates(false); // Disable controls
-        this.resetUIData(); // Clear simulated data
-        this.updateFocusStatus('未连接');
-        if (this.roiOverlay) this.roiOverlay.style.display = 'none'; // Hide ROI on disconnect
-        if (this.enableRoiBtn) this.enableRoiBtn.textContent = "启用ROI";
-        this.selectedAxis = null; // Clear axis selection on disconnect
-        console.log("相机已断开");
+        console.log("断开相机连接 (请求后端)...");
+        // Indicate disconnecting process (optional)
+        this.connectBtn.textContent = "断开中..."; 
+        this.connectBtn.disabled = true;
+        this.connectionProcessId = true; // Lock during request
+
+        try {
+            // --- Call Backend Disconnect Endpoint --- 
+            const response = await fetch(`${this.backendUrl}/disconnect`, {
+                method: 'POST' // No body needed usually for disconnect
+            });
+
+            if (!response.ok) {
+                // Handle backend error during disconnect
+                let errorMsg = `断开连接请求失败，状态码: ${response.status}`;
+                try {
+                     const errorData = await response.json();
+                     errorMsg = errorData.message || errorMsg;
+                } catch (parseError) { /* Ignore if response is not JSON */ }
+                throw new Error(errorMsg);
+            }
+
+            // Backend confirmed disconnect, now update frontend state
+            const backendState = await response.json(); // Backend returns the new state
+            console.log("后端确认断开连接，状态:", backendState);
+
+            // Stop frontend processes first
+            this.stopAutofocus(); 
+            this.stopCapture();   
+
+             // Update UI based on the state returned by the backend
+            this.updateUIFromState(backendState); // Should handle isConnected = false
+            this.updateControlStates(false); // Ensure controls are disabled
+            this.updateFocusStatus('未连接');
+            if (this.roiOverlay) this.roiOverlay.style.display = 'none'; 
+            if (this.enableRoiBtn) this.enableRoiBtn.textContent = "启用ROI";
+            this.hideAxisDropdown(); 
+            console.log("前端状态已更新为断开");
+
+        } catch (error) {
+            console.error("断开相机时出错:", error);
+            alert(`断开连接时出错: ${error.message}`);
+            // Should we force frontend state to disconnected even if backend failed?
+            // Or leave it as connected but show error?
+            // For simplicity, let's attempt to revert button state if possible
+            if (this.isConnected) { // If frontend *thought* it was connected
+                 this.connectBtn.textContent = "断开连接"; // Revert button text
+            } else {
+                 this.connectBtn.textContent = "连接";
+            }
+        } finally {
+             this.connectBtn.disabled = this.isFocusing || this.isCapturing || this.isRecording; // Re-evaluate button disable state
+             this.connectionProcessId = null; // Unlock
+        }
     }
 
     // Enables/disables controls based on connection status AND other states
@@ -266,12 +327,12 @@ class CameraController {
         if(this.selectFolderBtn) this.selectFolderBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
 
         // Focus buttons
-        this.startFocusBtn.disabled = !isIdle;
+        this.startFocusBtn.disabled = !isIdle || !this.selectedAxisId;
         this.stopFocusBtn.disabled = !this.isFocusing;
 
         // Calibration button
         const focusComplete = connected && this.focusStatusText.textContent === '已对焦';
-        this.calibrateBtn.disabled = !focusComplete || this.isCapturing || this.isRecording;
+        this.calibrateBtn.disabled = !focusComplete || !this.selectedAxisId || this.isCapturing || this.isRecording;
 
         // ROI Button
         if(this.enableRoiBtn) this.enableRoiBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
@@ -312,86 +373,106 @@ class CameraController {
     }
 
     // Populates controls with simulated data (called after connection)
-    populateSimulatedData() {
-        console.log("正在填充模拟数据...");
-        // Basic Settings
-        this.serialNumberSelect.innerHTML = '<option value="SN12345678">SN12345678</option><option value="SN98765432">SN98765432</option>';
-        this.serialNumberSelect.value = "SN12345678";
-        this.configFileInput.value = "C:/CameraConfigs/default_定焦.cfg";
-        this.savePathInput.value = "D:/Captures/定焦相机/";
-        this.cameraNameInput.value = "前置定焦相机";
-        this.cameraModelInput.value = "模拟相机 (XYZ-100)";
+    async populateSimulatedData() {
+        console.log("正在填充模拟数据 (来自后端)...");
+        if (!this.isConnected) return; // Check backend state if available
 
-        // Camera Properties Table
-        const properties = [
-             { name: 'Y反转', type: 'select', options: ['否', '是'], value: '否' },
-             { name: 'X反转', type: 'select', options: ['否', '是'], value: '否' },
-             { name: '触发模式', type: 'select', options: ['连续采集', '外部触发', '软件触发'], value: '连续采集' },
-             { name: '触发信号', type: 'select', options: ['上升', '下降', '任意边缘'], value: '上升' },
-             { name: '触发源', type: 'select', options: ['通道0', '通道1', '软件'], value: '通道0' },
-             { name: '图像格式', type: 'select', options: ['MONO8', 'MONO10', 'RGB8', 'BAYER_RG8'], value: 'MONO8' },
-             { name: '曝光时间(us)', type: 'number', value: 15000, min: 10, max: 1000000, step: 10 },
-             { name: '增益', type: 'number', value: 1.2, min: 0, max: 16, step: 0.1 },
-             { name: '白平衡', type: 'select', options: ['自动', '手动', '关闭'], value: '自动' },
-             { name: '红(R)', type: 'range', value: 55, min: 0, max: 100 },
-             { name: '绿(G)', type: 'range', value: 50, min: 0, max: 100 },
-             { name: '蓝(B)', type: 'range', value: 60, min: 0, max: 100 }
-        ];
-        this.propertyTableBody.innerHTML = '';
-        properties.forEach(prop => {
-            const row = this.propertyTableBody.insertRow();
-            const nameCell = row.insertCell();
-            const valueCell = row.insertCell();
-            nameCell.textContent = prop.name;
-            let control;
-            if (prop.type === 'select') {
-                control = document.createElement('select');
-                prop.options.forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.textContent = opt;
-                    control.appendChild(option);
-                });
-                control.value = prop.value;
-            } else if (prop.type === 'number' || prop.type === 'range') {
-                 control = document.createElement('input');
-                 control.type = prop.type;
-                 control.value = prop.value;
-                 if (prop.min !== undefined) control.min = prop.min;
-                 if (prop.max !== undefined) control.max = prop.max;
-                 if (prop.step !== undefined) control.step = prop.step;
-            }
-             if (control) {
-                 valueCell.appendChild(control);
-                 control.disabled = !this.isConnected; // Ensure new controls are disabled if created while disconnected (edge case)
-                 control.addEventListener('change', (e) => {
-                     console.log(`属性更改: ${prop.name} = ${e.target.value}`);
-                     // Add specific actions here if needed, e.g., update camera settings
-                 });
-             }
-        });
-
-        // ROI Area
+        // --- Fetch full state from backend after connect ---
+        // It's often better to get the full state from backend after connecting
+        // instead of relying on the connect response alone.
         try {
-             // Check if the ROI input references were found in the constructor
-             if (this.roiLeftX && this.roiTopY && this.roiRightX && this.roiBottomY) {
-                 // Use the stored references instead of querying again
-                 this.roiLeftX.value = 150;
-                 this.roiTopY.value = 100;
-                 this.roiRightX.value = 450;
-                 this.roiBottomY.value = 400;
-            } else {
-                // Log a warning if the elements weren't found initially
-                if (!this.warnedAboutRoiNotFound) { // Prevent repeated warnings
-                     console.warn("警告: 未能在构造函数中完全找到 ROI 输入框引用，无法填充模拟值。");
-                     this.warnedAboutRoiNotFound = true; // Set flag
-                 }
+            const statusResponse = await fetch(`${this.backendUrl}/status`);
+            if (!statusResponse.ok) throw new Error(`HTTP ${statusResponse.status}`);
+            const backendState = await statusResponse.json();
+            
+            // Update local state (or directly use backendState if structure matches)
+            this.serialNumberSelect.innerHTML = `<option value="${backendState.serialNumber}">${backendState.serialNumber}</option>`;
+            this.configFileInput.value = backendState.configFile || '';
+            this.savePathInput.value = backendState.savePath || '';
+            this.cameraNameInput.value = backendState.cameraName || '';
+            this.cameraModelInput.value = backendState.cameraModel || '';
+
+            // Populate Properties Table from Backend
+            this.propertyTableBody.innerHTML = '';
+            const properties = backendState.properties || {};
+            for (const propName in properties) {
+                const prop = properties[propName];
+                const row = this.propertyTableBody.insertRow();
+                const nameCell = row.insertCell();
+                const valueCell = row.insertCell();
+                nameCell.textContent = propName;
+                let control;
+
+                if (prop.type === 'select') {
+                    control = document.createElement('select');
+                    prop.options.forEach(opt => {
+                         const option = document.createElement('option');
+                         option.value = opt; option.textContent = opt; control.appendChild(option);
+                    });
+                    control.value = prop.value;
+                } else if (prop.type === 'number' || prop.type === 'range') {
+                    control = document.createElement('input');
+                    control.type = prop.type; control.value = prop.value;
+                    if (prop.min !== undefined) control.min = prop.min;
+                    if (prop.max !== undefined) control.max = prop.max;
+                    if (prop.step !== undefined) control.step = prop.step;
+                }
+                 if (control) {
+                    valueCell.appendChild(control);
+                    control.disabled = !this.isConnected; // Should be enabled now
+                }
             }
-        } catch (e) {
-            // This catch might still be useful for unexpected errors during value setting
-            console.error("填充 ROI 区域时发生意外错误:", e);
+
+            // ROI Area - Use backend state if available, otherwise keep frontend sim
+            const roi = backendState.roiCoords || {l: 150, t: 100, r: 450, b: 400}; // Default
+             if (this.roiLeftX && this.roiTopY && this.roiRightX && this.roiBottomY) {
+                 this.roiLeftX.value = roi.l; this.roiTopY.value = roi.t;
+                 this.roiRightX.value = roi.r; this.roiBottomY.value = roi.b;
+            } else {
+                 // Warning already handled in constructor check if needed
+            }
+             // Update selected Axis display if already configured
+             if (backendState.selectedAxisId) {
+                 this.selectedAxisId = backendState.selectedAxisId;
+                 // We need the name, fetch axes again or store names locally?
+                 // Simple solution: just show ID for now, or update button after selection
+                 const axisInfo = simulated_plc_axes.find(a => a.id === this.selectedAxisId); // Use backend data directly
+                 if (axisInfo) {
+                    this.configAxisBtn.textContent = `轴:${axisInfo.name}`;
+                    this.configAxisBtn.title = `当前配置轴: ${axisInfo.name} (ID: ${this.selectedAxisId})`;
+                 } else {
+                     this.configAxisBtn.textContent = `配置轴`; // Reset if ID invalid?
+                     this.configAxisBtn.title = `配置相机Z轴`;
+                 }
+
+             } else {
+                  this.configAxisBtn.textContent = `配置轴`; // Reset button text
+                  this.configAxisBtn.title = `配置相机Z轴`;
+             }
+
+
+            console.log("模拟数据(后端)填充完成。");
+
+        } catch (error) {
+             console.error("从后端获取状态或填充数据时出错:", error);
+             // Handle error - maybe show message to user or use defaults
+             this.populateSimulatedDataFallback(); // Use old hardcoded data as fallback
         }
-        console.log("模拟数据填充完成。");
+    }
+
+    // Fallback if backend fetch fails
+    populateSimulatedDataFallback() {
+        console.warn("警告: 使用前端硬编码数据作为后备。");
+        // (此处可以粘贴你之前 populateSimulatedData 中填充属性表格等的代码)
+        // Basic Settings
+       this.serialNumberSelect.innerHTML = '<option value="SN12345678_FB">SN12345678_FB</option><option value="SN98765432_FB">SN98765432_FB</option>';
+       this.serialNumberSelect.value = "SN12345678_FB";
+       this.configFileInput.value = "C:/CameraConfigs/fallback.cfg";
+       this.savePathInput.value = "D:/Captures/Fallback/";
+       this.cameraNameInput.value = "前置定焦相机 (后备)";
+       this.cameraModelInput.value = "模拟相机 (Fallback)";
+       // ... (填充属性表格等) ...
+        this.propertyTableBody.innerHTML = `<tr><td>曝光时间(us)</td><td><input type='number' value='15000'></td></tr><tr><td>增益</td><td><input type='number' value='1.2'></td></tr>`; // 简化版后备
     }
 
     // --- Autofocus Simulation Logic --- (Refined)
@@ -624,59 +705,143 @@ class CameraController {
         this.updateControlStates(true);
     }
 
-    // --- Axis Configuration Modal Logic ---
-    openAxisConfigModal() {
-        if (!this.isConnected || !this.axisConfigModal) return;
+    // --- Axis Configuration Dropdown Logic ---
 
-        console.log("打开轴配置弹窗...");
-        // Populate dropdown
-        this.axisSelectDropdown.innerHTML = '<option value="">--请选择--</option>'; // Clear existing
-        this.simulatedAxes.forEach(axis => {
-            const option = document.createElement('option');
-            option.value = axis;
-            option.textContent = axis;
-            this.axisSelectDropdown.appendChild(option);
-        });
+    async fetchAndShowAxisDropdown() {
+        if (!this.isConnected || !this.axisDropdown) return;
 
-        // Set current selection if available
-        this.axisSelectDropdown.value = this.selectedAxis || "";
-        this.modalCameraSNInput.value = this.serialNumberSelect.value || "N/A"; // Show current camera SN
-
-        // Use classList to show modal with transition
-        this.axisConfigModal.classList.add('show');
-    }
-
-    closeAxisConfigModal() {
-         if (!this.axisConfigModal) return;
-         // Use classList to hide modal with transition
-         this.axisConfigModal.classList.remove('show');
-         console.log("关闭轴配置弹窗");
-    }
-
-    saveAxisConfiguration() {
-        if (!this.axisConfigModal) return;
-        const newlySelectedAxis = this.axisSelectDropdown.value;
-        if (!newlySelectedAxis) {
-            alert("请选择一个有效的Z轴！");
+        // Toggle visibility
+        if (this.isAxisDropdownVisible) {
+            this.hideAxisDropdown();
             return;
         }
-        this.selectedAxis = newlySelectedAxis;
-        console.log(`模拟: 保存相机 ${this.modalCameraSNInput.value} 的 Z 轴配置为: ${this.selectedAxis}`);
-        alert(`模拟：配置已保存: ${this.selectedAxis}`); // Give user feedback
-        this.closeAxisConfigModal();
-        // In a real app, you might trigger other actions here
+
+        console.log("获取轴配置...");
+        this.axisListUl.innerHTML = '<li class="axis-list-loading">加载中...</li>'; // Show loading
+        this.dropdownCameraSN.textContent = `相机: ${this.serialNumberSelect.value || 'N/A'}`;
+        this.axisDropdown.classList.add('show'); // Show container early
+        this.isAxisDropdownVisible = true;
+
+        try {
+            // --- FETCH FROM BACKEND ---
+            console.log('准备发送请求到 /api/axes');
+            const response = await fetch(`${this.backendUrl}/api/axes`); // Use backendUrl
+            console.log(`收到 /api/axes 响应: Status=${response.status}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const axesData = await response.json();
+            console.log('成功解析轴数据:', axesData);
+            // --------------------------
+
+            // 检查 this.axisListUl 是否有效
+            console.log('检查 this.axisListUl:', this.axisListUl);
+            if (!this.axisListUl) {
+                console.error('错误：无法找到 axis-list UL 元素!');
+                return; // 无法继续
+            }
+
+            this.axisListUl.innerHTML = ''; // Clear loading/previous items
+            console.log('清空 axisListUl 内容');
+
+            if (axesData && axesData.length > 0) {
+                console.log(`开始填充 ${axesData.length} 个轴项目...`);
+                axesData.forEach((axis, index) => {
+                    console.log(`  处理第 ${index + 1} 个轴:`, axis);
+                    try {
+                        const li = document.createElement('li');
+                        // 基本检查确保属性存在
+                        const axisName = axis.name || '未知名称';
+                        const axisId = axis.id || '未知ID';
+                        const rangeMin = axis.range_min !== undefined ? axis.range_min : '--';
+                        const rangeMax = axis.range_max !== undefined ? axis.range_max : '--';
+
+                        li.textContent = `${axisName} (ID: ${axisId}, Range: ${rangeMin}-${rangeMax}mm)`;
+                        li.dataset.axisId = axisId;
+                        li.addEventListener('click', () => this.selectAxis(axisId, axisName));
+                        this.axisListUl.appendChild(li);
+                        console.log(`    > 成功添加 li: ${axisName}`);
+                    } catch (loopError) {
+                        console.error(`    > 添加轴 ${axis ? axis.id : '未知'} 时出错:`, loopError);
+                        // 可以在这里决定是否中断循环或继续
+                    }
+                });
+                console.log('轴项目填充完成。');
+            } else {
+                console.log('收到的轴数据为空或无效，显示空消息。');
+                this.axisListUl.innerHTML = '<li class="axis-list-empty">无可用轴数据</li>';
+            }
+
+        } catch (error) {
+            console.error("获取轴列表失败:", error);
+            this.axisListUl.innerHTML = '<li class="axis-list-error">加载失败</li>';
+        }
+    }
+
+    hideAxisDropdown() {
+        if (!this.axisDropdown) return;
+        this.axisDropdown.classList.remove('show');
+        this.isAxisDropdownVisible = false;
+        console.log("关闭轴配置下拉菜单");
+    }
+
+    async selectAxis(axisId, axisName) {
+        if (!this.isConnected) return;
+        console.log(`选择轴: ${axisName} (ID: ${axisId})`);
+        this.selectedAxisId = axisId;
+        this.hideAxisDropdown(); // Hide dropdown after selection
+
+        // --- SIMULATE SAVING TO BACKEND ---
+        try {
+            console.log(`模拟: 将配置保存到后端... (相机: ${this.serialNumberSelect.value}, 轴ID: ${axisId})`);
+            const response = await fetch(`${this.backendUrl}/set_axis_config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    cameraSN: this.serialNumberSelect.value,
+                    axisId: axisId
+                })
+            });
+            if (!response.ok) {
+                 throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            if (result.status === 'ok') {
+                console.log("后端确认配置已保存:", result);
+                alert(`模拟: 相机 ${this.serialNumberSelect.value} 已配置使用轴 ${axisName}`);
+                 // Update button text or add indicator? (Optional)
+                this.configAxisBtn.textContent = `轴:${axisName}`; // Example: update button text
+                this.configAxisBtn.title = `当前配置轴: ${axisName} (ID: ${axisId})`;
+            } else {
+                 console.error("后端保存配置失败:", result.message);
+                 alert("模拟: 保存轴配置到后端失败!");
+                 this.selectedAxisId = null; // Revert selection on failure?
+            }
+        } catch (error) {
+             console.error("保存轴配置时出错:", error);
+             alert("模拟: 保存轴配置时发生网络或处理错误!");
+             this.selectedAxisId = null; // Revert selection on failure?
+        }
+        // ---------------------------------
+        this.updateControlStates(this.isConnected);
     }
 
     // --- Event Listeners ---
     initializeEventListeners() {
         this.connectBtn.addEventListener('click', () => {
+            // Restore the logic: call disconnect if connected, otherwise connect
             if (this.isConnected) {
-                this.disconnectCamera();
+                this.disconnectCamera(); 
             } else {
-                this.connectCamera();
+                this.connectCamera(); 
             }
+            // Removed the old logic that checked this.isConnected here
+            // because connectCamera now handles both connect and potential errors.
         });
-        this.configAxisBtn.addEventListener('click', () => this.openAxisConfigModal());
+        this.configAxisBtn.addEventListener('click', (e) => {
+             e.stopPropagation(); // Prevent body click from closing immediately
+             this.fetchAndShowAxisDropdown()
+         });
         this.startFocusBtn.addEventListener('click', () => this.startAutofocus());
         this.stopFocusBtn.addEventListener('click', () => this.stopAutofocus());
 
@@ -701,10 +866,14 @@ class CameraController {
          });
         this.enableRoiBtn?.addEventListener('click', () => this.toggleROI());
 
-        // Modal listeners
-        this.modalSaveAxisBtn.addEventListener('click', () => this.saveAxisConfiguration());
-        this.modalCancelAxisBtn.addEventListener('click', () => this.closeAxisConfigModal());
-        this.modalOverlay.addEventListener('click', () => this.closeAxisConfigModal()); // Close on overlay click
+        // Close dropdown if clicking outside
+        document.body.addEventListener('click', (e) => {
+            if (this.isAxisDropdownVisible &&
+                !this.axisDropdown.contains(e.target) &&
+                e.target !== this.configAxisBtn) {
+                this.hideAxisDropdown();
+            }
+        });
 
         this.simulatedImage.addEventListener('mousemove', (e) => {
             const rect = this.simulatedImage.getBoundingClientRect();
@@ -720,6 +889,40 @@ class CameraController {
         });
         this.simulatedImage.addEventListener('mouseleave', () => {
              this.statusBarMouse.textContent = `---, ---`;
+        });
+
+        // Property Table Change Listener (Example - Needs connecting to backend)
+        this.propertyTableBody.addEventListener('change', async (e) => {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
+                const row = e.target.closest('tr');
+                if (!row) return;
+                const propName = row.cells[0].textContent;
+                const propValue = e.target.value;
+                console.log(`前端: 属性更改: ${propName} = ${propValue}`);
+
+                // --- Call Backend to Set Property ---
+                try {
+                    const response = await fetch(`${this.backendUrl}/set_property`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ name: propName, value: propValue })
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const result = await response.json();
+                    if (result.status === 'ok') {
+                         console.log(`后端确认: ${propName} 设置为 ${result.value}`);
+                         // Optionally update UI element again if backend modified the value
+                         // e.target.value = result.value;
+                    } else {
+                         console.error(`后端设置属性失败: ${result.message}`);
+                         // Revert UI? Show error?
+                    }
+                } catch (error) {
+                     console.error(`设置属性时网络错误: ${error}`);
+                     // Revert UI? Show error?
+                }
+                // ------------------------------------
+            }
         });
     }
 
@@ -746,9 +949,134 @@ class CameraController {
             };
         }
     }
+
+    // New helper function to update UI from state object
+    updateUIFromState(state) {
+        if (!state) return;
+
+        this.isConnected = state.isConnected;
+
+        if (this.isConnected) {
+            this.serialNumberSelect.innerHTML = `<option value="${state.serialNumber}">${state.serialNumber}</option>`;
+            this.configFileInput.value = state.configFile || '';
+            this.savePathInput.value = state.savePath || '';
+            this.cameraNameInput.value = state.cameraName || '';
+            this.cameraModelInput.value = state.cameraModel || '';
+            this.currentZ = state.currentZ;
+            this.currentClarity = state.clarity;
+            this.footerZPos.textContent = this.currentZ.toFixed(2);
+            this.currentZInput.value = this.currentZ.toFixed(2);
+            this.clarityValueInput.value = this.currentClarity.toFixed(3);
+            this.applyBlur(this.currentClarity);
+
+            // Populate Properties Table 
+            this.propertyTableBody.innerHTML = '';
+            const properties = state.properties || {};
+            for (const propName in properties) {
+                const prop = properties[propName];
+                const row = this.propertyTableBody.insertRow();
+                const nameCell = row.insertCell();
+                const valueCell = row.insertCell();
+                nameCell.textContent = propName;
+                let control; 
+                if (prop.type === 'select') {
+                    control = document.createElement('select');
+                    (prop.options || []).forEach(opt => { 
+                        const option = document.createElement('option'); 
+                        option.value = opt; option.textContent = opt; control.appendChild(option); 
+                    });
+                    control.value = prop.value;
+                } else if (prop.type === 'number' || prop.type === 'range') {
+                    control = document.createElement('input');
+                    control.type = prop.type; control.value = prop.value;
+                    if (prop.min !== undefined) control.min = prop.min;
+                    if (prop.max !== undefined) control.max = prop.max;
+                    if (prop.step !== undefined) control.step = prop.step;
+                } 
+                if (control) { 
+                    valueCell.appendChild(control);
+                    control.disabled = !this.isConnected; 
+                } 
+            }
+            this.populatePropertiesTable(properties); // Extracted logic
+
+            // ROI Area
+            const roi = state.roiCoords || {l: 150, t: 100, r: 450, b: 400}; 
+            if (this.roiLeftX && this.roiTopY && this.roiRightX && this.roiBottomY) {
+                this.roiLeftX.value = roi.l; this.roiTopY.value = roi.t;
+                this.roiRightX.value = roi.r; this.roiBottomY.value = roi.b;
+            }
+            // Update selected Axis display
+            this.updateConfigAxisButtonDisplay(state.selectedAxisId);
+
+        } else {
+            // Handle disconnected state (similar to resetUIData)
+            this.resetUIData();
+            this.applyBlur(1);
+        }
+    }
+
+    // Extracted function to populate the properties table
+    populatePropertiesTable(properties) {
+        this.propertyTableBody.innerHTML = '';
+        properties = properties || {};
+        for (const propName in properties) {
+            const prop = properties[propName];
+            const row = this.propertyTableBody.insertRow();
+            const nameCell = row.insertCell();
+            const valueCell = row.insertCell();
+            nameCell.textContent = propName;
+            let control; 
+            if (prop.type === 'select') {
+                control = document.createElement('select');
+                (prop.options || []).forEach(opt => { 
+                    const option = document.createElement('option'); 
+                    option.value = opt; option.textContent = opt; control.appendChild(option); 
+                });
+                control.value = prop.value;
+            } else if (prop.type === 'number' || prop.type === 'range') {
+                control = document.createElement('input');
+                control.type = prop.type; control.value = prop.value;
+                if (prop.min !== undefined) control.min = prop.min;
+                if (prop.max !== undefined) control.max = prop.max;
+                if (prop.step !== undefined) control.step = prop.step;
+            } 
+            if (control) { 
+                valueCell.appendChild(control);
+                control.disabled = !this.isConnected; 
+            } 
+        }
+    }
+
+    // Helper to update config axis button text/title
+    async updateConfigAxisButtonDisplay(axisId) {
+        this.selectedAxisId = axisId;
+        if (this.selectedAxisId) {
+            try {
+                const axesResp = await fetch(`${this.backendUrl}/api/axes`);
+                if (axesResp.ok) {
+                    const axesList = await axesResp.json();
+                    const axisInfo = axesList.find(a => a.id === this.selectedAxisId);
+                    if (axisInfo) {
+                        this.configAxisBtn.textContent = `轴:${axisInfo.name}`;
+                        this.configAxisBtn.title = `当前配置轴: ${axisInfo.name} (ID: ${this.selectedAxisId})`;
+                    } else { throw new Error('Axis ID not found in list'); }
+                } else { throw new Error('Failed to fetch axes for name'); }
+            } catch (axesError) {
+                console.warn('Could not fetch axis name for display:', axesError);
+                this.configAxisBtn.textContent = `轴:${this.selectedAxisId}`;
+                this.configAxisBtn.title = `当前配置轴 ID: ${this.selectedAxisId}`;
+            }
+        } else {
+            this.configAxisBtn.textContent = `配置轴`; 
+            this.configAxisBtn.title = `配置相机Z轴`;
+        }
+    }
 }
 
 // Initialize the controller when the DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    // Modify this if your CameraController relies on backend data for init
+    // Maybe fetch initial status here or inside the constructor
     new CameraController();
 }); 
