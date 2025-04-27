@@ -58,6 +58,7 @@ class CameraController {
         // --- End of ROI element finding ---
 
         this.connectBtn = document.getElementById('connect-btn');
+        this.configAxisBtn = document.getElementById('config-axis-btn');
         this.headerButtons = document.querySelectorAll('.header-controls .header-button:not(#btn-settings)'); // Exclude settings button
         this.panelControls = document.querySelectorAll('.requires-connection input, .requires-connection select, .requires-connection button, .requires-connection table input, .requires-connection table select');
         this.stationSelect = document.getElementById('station-select');
@@ -73,6 +74,14 @@ class CameraController {
         this.enableRoiBtn = document.getElementById('enable-roi-btn');
         this.roiOverlay = document.getElementById('focus-roi-overlay'); // Get ROI overlay element
 
+        // Modal elements
+        this.axisConfigModal = document.getElementById('axis-config-modal');
+        this.modalOverlay = this.axisConfigModal.querySelector('.modal-overlay');
+        this.modalCameraSNInput = document.getElementById('modal-camera-sn');
+        this.axisSelectDropdown = document.getElementById('axis-select');
+        this.modalSaveAxisBtn = document.getElementById('modal-save-axis-btn');
+        this.modalCancelAxisBtn = document.getElementById('modal-cancel-axis-btn');
+
         // --- Simulation Parameters ---
         this.SIMULATED_BEST_Z = 15.5; // mm
         this.Z_RANGE = { min: 5, max: 25 }; // mm
@@ -86,6 +95,11 @@ class CameraController {
         this.CONNECT_DELAY = 500; // ms
         this.MAX_BLUR = 5; // px
         this.CALIBRATION_DELAY = 300; // ms for simulated calibration
+        // ---------------------------
+
+        // --- Simulated PLC Data ---
+        this.simulatedAxes = ["主Z轴", "副Z轴-A", "Z轴-工位2", "龙门Z轴"];
+        this.selectedAxis = null; // Store the selected axis for the "connected" camera
         // ---------------------------
 
         this.currentZ = 10.0;
@@ -184,6 +198,7 @@ class CameraController {
             console.log("相机连接成功");
             this.footerStatus.textContent = "状态: 已连接";
             this.connectBtn.textContent = "断开连接";
+            this.selectedAxis = null; // Reset axis selection on new connection
             
             // Populate data and enable controls *after* connection
             this.populateSimulatedData();
@@ -217,6 +232,7 @@ class CameraController {
         this.updateFocusStatus('未连接');
         if (this.roiOverlay) this.roiOverlay.style.display = 'none'; // Hide ROI on disconnect
         if (this.enableRoiBtn) this.enableRoiBtn.textContent = "启用ROI";
+        this.selectedAxis = null; // Clear axis selection on disconnect
         console.log("相机已断开");
     }
 
@@ -270,6 +286,9 @@ class CameraController {
         if (!connected && this.stationSelect) {
              this.stationSelect.disabled = true;
         }
+
+        // Config Axis Button
+        if (this.configAxisBtn) this.configAxisBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
     }
 
     // Clears data when disconnected
@@ -354,14 +373,23 @@ class CameraController {
 
         // ROI Area
         try {
-             if (this.roiSection) { // Check if section exists
-                 this.roiSection.querySelector('input[type="number"]:nth-of-type(1)').value = 150;
-                 this.roiSection.querySelector('input[type="number"]:nth-of-type(2)').value = 100;
-                 this.roiSection.querySelector('input[type="number"]:nth-of-type(3)').value = 450;
-                 this.roiSection.querySelector('input[type="number"]:nth-of-type(4)').value = 400;
+             // Check if the ROI input references were found in the constructor
+             if (this.roiLeftX && this.roiTopY && this.roiRightX && this.roiBottomY) {
+                 // Use the stored references instead of querying again
+                 this.roiLeftX.value = 150;
+                 this.roiTopY.value = 100;
+                 this.roiRightX.value = 450;
+                 this.roiBottomY.value = 400;
+            } else {
+                // Log a warning if the elements weren't found initially
+                if (!this.warnedAboutRoiNotFound) { // Prevent repeated warnings
+                     console.warn("警告: 未能在构造函数中完全找到 ROI 输入框引用，无法填充模拟值。");
+                     this.warnedAboutRoiNotFound = true; // Set flag
+                 }
             }
         } catch (e) {
-            console.warn("无法填充 ROI 区域，选择器可能需要调整。", e);
+            // This catch might still be useful for unexpected errors during value setting
+            console.error("填充 ROI 区域时发生意外错误:", e);
         }
         console.log("模拟数据填充完成。");
     }
@@ -596,6 +624,49 @@ class CameraController {
         this.updateControlStates(true);
     }
 
+    // --- Axis Configuration Modal Logic ---
+    openAxisConfigModal() {
+        if (!this.isConnected || !this.axisConfigModal) return;
+
+        console.log("打开轴配置弹窗...");
+        // Populate dropdown
+        this.axisSelectDropdown.innerHTML = '<option value="">--请选择--</option>'; // Clear existing
+        this.simulatedAxes.forEach(axis => {
+            const option = document.createElement('option');
+            option.value = axis;
+            option.textContent = axis;
+            this.axisSelectDropdown.appendChild(option);
+        });
+
+        // Set current selection if available
+        this.axisSelectDropdown.value = this.selectedAxis || "";
+        this.modalCameraSNInput.value = this.serialNumberSelect.value || "N/A"; // Show current camera SN
+
+        // Use classList to show modal with transition
+        this.axisConfigModal.classList.add('show');
+    }
+
+    closeAxisConfigModal() {
+         if (!this.axisConfigModal) return;
+         // Use classList to hide modal with transition
+         this.axisConfigModal.classList.remove('show');
+         console.log("关闭轴配置弹窗");
+    }
+
+    saveAxisConfiguration() {
+        if (!this.axisConfigModal) return;
+        const newlySelectedAxis = this.axisSelectDropdown.value;
+        if (!newlySelectedAxis) {
+            alert("请选择一个有效的Z轴！");
+            return;
+        }
+        this.selectedAxis = newlySelectedAxis;
+        console.log(`模拟: 保存相机 ${this.modalCameraSNInput.value} 的 Z 轴配置为: ${this.selectedAxis}`);
+        alert(`模拟：配置已保存: ${this.selectedAxis}`); // Give user feedback
+        this.closeAxisConfigModal();
+        // In a real app, you might trigger other actions here
+    }
+
     // --- Event Listeners ---
     initializeEventListeners() {
         this.connectBtn.addEventListener('click', () => {
@@ -605,6 +676,7 @@ class CameraController {
                 this.connectCamera();
             }
         });
+        this.configAxisBtn.addEventListener('click', () => this.openAxisConfigModal());
         this.startFocusBtn.addEventListener('click', () => this.startAutofocus());
         this.stopFocusBtn.addEventListener('click', () => this.stopAutofocus());
 
@@ -628,6 +700,11 @@ class CameraController {
              }
          });
         this.enableRoiBtn?.addEventListener('click', () => this.toggleROI());
+
+        // Modal listeners
+        this.modalSaveAxisBtn.addEventListener('click', () => this.saveAxisConfiguration());
+        this.modalCancelAxisBtn.addEventListener('click', () => this.closeAxisConfigModal());
+        this.modalOverlay.addEventListener('click', () => this.closeAxisConfigModal()); // Close on overlay click
 
         this.simulatedImage.addEventListener('mousemove', (e) => {
             const rect = this.simulatedImage.getBoundingClientRect();

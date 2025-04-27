@@ -41,6 +41,7 @@
                      <div class="input-group">
                         <select id="serial-number" disabled><option>请连接...</option></select>
                         <button id="connect-btn" class="connect-button">连接</button>
+                        <button id="config-axis-btn" class="select-button" title="配置相机Z轴" disabled>配置轴</button>
                     </div>
                 </div>
 
@@ -129,8 +130,31 @@
             <span>图像: Pixmap(<span id="image-dims">---, ---</span>)</span>
             <span>缩放: 100%</span>
         </footer>
-    </div>
 
-    <script src="script.js"></script>
+        <!-- Z轴配置弹窗 -->
+        <div id="axis-config-modal" class="modal" >
+          <div class="modal-overlay"></div>
+          <div class="modal-content">
+            <h2>相机 Z 轴配置 (模拟)</h2>
+            <div class="modal-body">
+              <label for="modal-camera-sn">当前相机:</label>
+              <input type="text" id="modal-camera-sn" disabled>
+
+              <label for="axis-select">选择 Z 轴:</label>
+              <select id="axis-select">
+                <!-- 选项将由 JS 填充 -->
+                <option value="">--请选择--</option>
+              </select>
+              <p class="modal-note">注意: 轴列表由模拟数据提供。</p>
+            </div>
+            <div class="modal-footer">
+              <button id="modal-save-axis-btn">保存</button>
+              <button id="modal-cancel-axis-btn">取消</button>
+            </div>
+          </div>
+        </div>
+
+        <script src="script.js"></script>
+    </div>
 </body>
 </html> 

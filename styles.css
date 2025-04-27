@@ -418,4 +418,159 @@ input[type=range]::-moz-range-thumb {
     .camera-controls {
         width: 100%;
     }
-} 
+}
+
+/* --- Modal Styles --- */
+.modal {
+  /* display: none; */ /* Removed: Rely on opacity/visibility */
+  position: fixed; /* Stay in place */
+  z-index: 1000; /* Sit on top */
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto; /* Enable scroll if needed */
+  /* Add transition for fade effect */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* Style for when modal is shown (JS will toggle this class) */
+.modal.show {
+    display: block; /* Explicitly set display */
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-overlay {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7); /* Slightly darker overlay */
+  z-index: 1001;
+}
+
+.modal-content {
+  position: relative; /* To allow z-index stacking within modal */
+  z-index: 1002; /* Above overlay */
+  background-color: var(--bg-dark); /* Match panel background */
+  color: var(--text-light);
+  margin: 10% auto; /* Adjust vertical margin */
+  padding: 0; /* Remove padding, control internally */
+  border: 1px solid var(--border-dark); /* Thinner border */
+  border-radius: var(--border-radius);
+  width: 90%; /* More responsive width */
+  max-width: 450px; /* Slightly wider max */
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5); /* Enhanced shadow */
+  /* Add transform for subtle scale effect */
+  transform: scale(0.95);
+  transition: transform 0.3s ease;
+}
+
+.modal.show .modal-content {
+    transform: scale(1);
+}
+
+.modal-header {
+    padding: var(--spacing-medium) var(--spacing-large);
+    border-bottom: 1px solid var(--border-dark);
+    background-color: var(--bg-medium); /* Header background */
+    border-top-left-radius: var(--border-radius);
+    border-top-right-radius: var(--border-radius);
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: var(--text-light);
+  font-size: 1.2em; /* Slightly larger title */
+  font-weight: 500;
+  border: none; /* Remove previous border */
+  padding: 0;
+}
+
+.modal-body {
+  padding: var(--spacing-large); /* Consistent padding */
+}
+
+.modal-body .form-group { /* Group label and input */
+    margin-bottom: var(--spacing-medium);
+}
+
+.modal-body label {
+  display: block;
+  margin-bottom: var(--spacing-small);
+  color: var(--text-medium);
+  font-size: 0.95em;
+}
+
+.modal-body input[type="text"],
+.modal-body select {
+  width: 100%; /* Take full width */
+  padding: var(--spacing-medium);
+  background-color: var(--bg-medium);
+  color: var(--text-light);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  font-size: 1em;
+  height: auto; /* Let padding define height */
+}
+
+.modal-body input[disabled] {
+    background-color: var(--bg-darker);
+    color: var(--text-medium);
+    cursor: not-allowed;
+}
+
+.modal-note {
+    font-size: 0.85em;
+    color: var(--text-medium);
+    margin-top: var(--spacing-medium);
+    text-align: center;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--spacing-medium) var(--spacing-large);
+  border-top: 1px solid var(--border-dark);
+  background-color: var(--bg-darker); /* Footer background */
+  border-bottom-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+}
+
+.modal-footer button {
+  background-color: var(--bg-medium); /* Match panel buttons */
+  color: var(--text-light);
+  border: 1px solid var(--border-dark);
+  padding: var(--spacing-small) var(--spacing-large);
+  font-size: 0.95em;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  margin-left: var(--spacing-medium);
+  height: auto; /* Let padding define height */
+  line-height: 1.5;
+}
+
+.modal-footer button:hover {
+  background-color: #4a4a4a;
+  border-color: var(--border-medium);
+}
+
+/* Primary button style in modal */
+.modal-footer button#modal-save-axis-btn {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+.modal-footer button#modal-save-axis-btn:hover {
+    background-color: #157acf;
+    border-color: #157acf;
+}
+
+/* Style for cancel button perhaps */
+/* Optional: Add icons to buttons if desired */
+/* .modal-footer button#modal-save-axis-btn::before { content: '\f0c7'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: var(--spacing-small); } */
+/* .modal-footer button#modal-cancel-axis-btn::before { content: '\f00d'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: var(--spacing-small); } */ 
