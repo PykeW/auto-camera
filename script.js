@@ -73,6 +73,8 @@ class CameraController {
         this.selectFolderBtn = document.getElementById('select-folder-btn');
         this.enableRoiBtn = document.getElementById('enable-roi-btn');
         this.roiOverlay = document.getElementById('focus-roi-overlay'); // Get ROI overlay element
+        this.confirmRoiBtn = document.getElementById('confirm-roi-btn');
+        this.redrawRoiBtn = document.getElementById('redraw-roi-btn');
 
         // Dropdown elements
         this.axisDropdown = document.getElementById('axis-config-dropdown');
@@ -107,6 +109,15 @@ class CameraController {
         this.roiEnabled = false;
         this.isAxisDropdownVisible = false; // Track dropdown visibility
 
+        // ROI Drawing State
+        this.isDrawingRoi = false;
+        this.roiStartX = 0;
+        this.roiStartY = 0;
+        this.currentRoiX = 0;
+        this.currentRoiY = 0;
+        this.finalRoiRect = null; // Stores { x, y, width, height } in image coordinates
+        this.pendingRoiRect = null; // Stores drawn ROI before confirmation
+
         this.backendUrl = 'http://localhost:5000'; 
 
         this.initializeEventListeners();
@@ -115,7 +126,10 @@ class CameraController {
 
     // --- Utility Functions ---
     calculateClarity(z) {
-        const diff = z - this.SIMULATED_BEST_Z;
+        // Simulate ROI having a slightly different optimal focus point
+        // Only apply if ROI is enabled AND a valid ROI has been drawn
+        const effectiveBestZ = (this.roiEnabled && this.finalRoiRect) ? this.SIMULATED_BEST_Z + 0.5 : this.SIMULATED_BEST_Z;
+        const diff = z - effectiveBestZ;
         const focusSharpness = 2.0;
         const clarity = Math.exp(-(diff * diff) / (2 * focusSharpness * focusSharpness));
         return clarity;
@@ -335,8 +349,22 @@ class CameraController {
         this.calibrateBtn.disabled = !focusComplete || !this.selectedAxisId || this.isCapturing || this.isRecording;
 
         // ROI Button
-        if(this.enableRoiBtn) this.enableRoiBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
-        if(this.enableRoiBtn) this.enableRoiBtn.textContent = this.roiEnabled ? "禁用ROI" : "启用ROI";
+        const showEnableBtn = connected && !this.isFocusing && !this.isCapturing && !this.isRecording && !this.pendingRoiRect;
+        const showConfirmRedrawBtns = connected && this.roiEnabled && this.pendingRoiRect && !this.isDrawingRoi;
+
+        if(this.enableRoiBtn) {
+             this.enableRoiBtn.disabled = !showEnableBtn;
+             this.enableRoiBtn.style.display = showConfirmRedrawBtns ? 'none' : 'inline-block';
+             this.enableRoiBtn.textContent = this.roiEnabled ? "禁用ROI" : "启用ROI";
+        }
+        if (this.confirmRoiBtn) {
+            this.confirmRoiBtn.disabled = !showConfirmRedrawBtns;
+            this.confirmRoiBtn.style.display = showConfirmRedrawBtns ? 'inline-block' : 'none';
+        }
+        if (this.redrawRoiBtn) {
+            this.redrawRoiBtn.disabled = !showConfirmRedrawBtns;
+            this.redrawRoiBtn.style.display = showConfirmRedrawBtns ? 'inline-block' : 'none';
+        }
 
         // Table controls
         document.querySelectorAll('#property-table input, #property-table select').forEach(ctrl => {
@@ -507,8 +535,8 @@ class CameraController {
             while (z_rough <= this.Z_RANGE.max) {
                  console.log(`模拟: [控制器->通信层] 移动 Z 轴到 ${z_rough.toFixed(2)}`);
                  await this.simulateZMovement(z_rough);
-                 console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度`);
-                 console.log(` > 粗扫: Z=${z_rough.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}`);
+                 console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${(this.roiEnabled && this.finalRoiRect) ? ' (ROI区域)' : ''}`); // Indicate ROI usage only if drawn
+                 console.log(` > 粗扫: Z=${z_rough.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${(this.roiEnabled && this.finalRoiRect) ? ' (ROI)' : ''}`);
                  if (this.currentClarity > maxClarityFound) {
                      maxClarityFound = this.currentClarity;
                      this.bestZFound = z_rough;
@@ -530,8 +558,8 @@ class CameraController {
              while (z_fine <= fineEnd) {
                  console.log(`模拟: [控制器->通信层] 移动 Z 轴到 ${z_fine.toFixed(2)}`);
                  await this.simulateZMovement(z_fine);
-                  console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度`);
-                 console.log(` > 精扫: Z=${z_fine.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}`);
+                  console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${(this.roiEnabled && this.finalRoiRect) ? ' (ROI区域)' : ''}`); // Indicate ROI usage only if drawn
+                 console.log(` > 精扫: Z=${z_fine.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${(this.roiEnabled && this.finalRoiRect) ? ' (ROI)' : ''}`);
                  if (this.currentClarity > maxClarityFound) {
                      maxClarityFound = this.currentClarity;
                      finalBestZ = z_fine;
@@ -671,37 +699,22 @@ class CameraController {
     toggleROI() {
         if (!this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
         this.roiEnabled = !this.roiEnabled;
-        console.log(`模拟: ROI 已 ${this.roiEnabled ? '启用' : '禁用'}`);
-        if (this.roiOverlay) {
-            this.roiOverlay.style.display = this.roiEnabled ? 'block' : 'none';
-            if (this.roiEnabled) {
-                 // Simulate setting ROI overlay position based on inputs (or fixed for demo)
-                 const l = parseInt(document.querySelector('.panel-section:has(h3:contains("ROI区域")) input[type="number"]:nth-of-type(1)').value) || 150;
-                 const t = parseInt(document.querySelector('.panel-section:has(h3:contains("ROI区域")) input[type="number"]:nth-of-type(2)').value) || 100;
-                 const r = parseInt(document.querySelector('.panel-section:has(h3:contains("ROI区域")) input[type="number"]:nth-of-type(3)').value) || 450;
-                 const b = parseInt(document.querySelector('.panel-section:has(h3:contains("ROI区域")) input[type="number"]:nth-of-type(4)').value) || 400;
+        console.log(`ROI 功能: ${this.roiEnabled ? '启用，请在图像上绘制' : '禁用'}`);
 
-                // IMPORTANT: Calculation needs to be relative to the *displayed* image size
-                const imgRect = this.simulatedImage.getBoundingClientRect();
-                const scaleX = imgRect.width / this.simulatedImage.naturalWidth;
-                const scaleY = imgRect.height / this.simulatedImage.naturalHeight;
-
-                // Calculate position relative to the image's top-left corner within the camera-view container
-                const containerRect = this.simulatedImage.parentElement.getBoundingClientRect();
-                const imgOffsetX = imgRect.left - containerRect.left;
-                const imgOffsetY = imgRect.top - containerRect.top;
-
-                const dispL = imgOffsetX + (l * scaleX);
-                const dispT = imgOffsetY + (t * scaleY);
-                const dispW = (r - l) * scaleX;
-                const dispH = (b - t) * scaleY;
-
-                this.roiOverlay.style.left = `${dispL}px`;
-                this.roiOverlay.style.top = `${dispT}px`;
-                this.roiOverlay.style.width = `${dispW}px`;
-                this.roiOverlay.style.height = `${dispH}px`;
-            }
+        if (this.roiEnabled) {
+            this.enableRoiBtn.textContent = "禁用ROI";
+            this.simulatedImage.style.cursor = 'crosshair'; // Indicate drawing mode
+            // Don't show overlay until drawing starts
+        } else {
+            this.enableRoiBtn.textContent = "启用ROI";
+            this.simulatedImage.style.cursor = 'default';
+            this.roiOverlay.style.display = 'none'; // Hide overlay
+            this.isDrawingRoi = false; // Ensure drawing stops if disabled mid-draw
+            this.finalRoiRect = null; // Clear stored ROI when disabled
+            this.pendingRoiRect = null; // Clear pending ROI
+            console.log('ROI 已禁用并清除');
         }
+
         this.updateControlStates(true);
     }
 
@@ -865,6 +878,24 @@ class CameraController {
              }
          });
         this.enableRoiBtn?.addEventListener('click', () => this.toggleROI());
+        this.confirmRoiBtn?.addEventListener('click', () => {
+            if (this.pendingRoiRect) {
+                this.finalRoiRect = this.pendingRoiRect;
+                this.pendingRoiRect = null;
+                console.log('ROI 已确认:', this.finalRoiRect);
+                this.updateControlStates(this.isConnected);
+                 // Keep overlay showing the confirmed ROI
+                 this.drawFinalRoiOverlay();
+            }
+        });
+        this.redrawRoiBtn?.addEventListener('click', () => {
+             this.pendingRoiRect = null;
+             this.finalRoiRect = null; // Also clear confirmed ROI if redraw is chosen?
+             this.roiOverlay.style.display = 'none';
+             console.log('请求重新绘制 ROI');
+             this.updateControlStates(this.isConnected);
+             // User can now click and drag again
+         });
 
         // Close dropdown if clicking outside
         document.body.addEventListener('click', (e) => {
@@ -924,6 +955,55 @@ class CameraController {
                 // ------------------------------------
             }
         });
+
+        // --- ROI Drawing Listeners ---
+        this.simulatedImage.addEventListener('mousedown', (e) => {
+            if (!this.roiEnabled || !this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
+            e.preventDefault(); // Prevent default image drag behavior
+
+            this.isDrawingRoi = true;
+            const coords = this.getImageCoordinates(e);
+            this.roiStartX = coords.x;
+            this.roiStartY = coords.y;
+            this.currentRoiX = coords.x; // Initialize current pos
+            this.currentRoiY = coords.y;
+            this.finalRoiRect = null; // Clear previous final ROI
+            this.updateRoiOverlay(); // Show initial small dot or update overlay
+            console.log(`开始绘制 ROI @ (${this.roiStartX.toFixed(0)}, ${this.roiStartY.toFixed(0)})`);
+        });
+
+        document.addEventListener('mousemove', (e) => { // Listen on document to capture mouse leaving image
+            if (!this.isDrawingRoi || !this.roiEnabled) return;
+            
+            const coords = this.getImageCoordinates(e);
+            this.currentRoiX = coords.x;
+            this.currentRoiY = coords.y;
+            this.updateRoiOverlay(); // Update overlay during drag
+        });
+
+        document.addEventListener('mouseup', (e) => { // Listen on document
+            if (!this.isDrawingRoi || !this.roiEnabled) return;
+
+            this.isDrawingRoi = false;
+            const finalCoords = this.getImageCoordinates(e);
+            const x = Math.min(this.roiStartX, finalCoords.x);
+            const y = Math.min(this.roiStartY, finalCoords.y);
+            const width = Math.abs(this.roiStartX - finalCoords.x);
+            const height = Math.abs(this.roiStartY - finalCoords.y);
+
+            if (width > 5 && height > 5) { // Require a minimum size
+                this.pendingRoiRect = { x, y, width, height };
+                console.log(`ROI 绘制完成，等待确认:`, this.pendingRoiRect);
+                // Keep overlay visible, update buttons
+                this.updateControlStates(this.isConnected);
+            } else {
+                console.log('ROI 绘制无效 (太小)，已取消。');
+                this.roiOverlay.style.display = 'none';
+                this.pendingRoiRect = null;
+                this.updateControlStates(this.isConnected); // Reset buttons
+            }
+        });
+        // -----------------------------
     }
 
     // --- Initial Setup ---
@@ -1001,10 +1081,38 @@ class CameraController {
             this.populatePropertiesTable(properties); // Extracted logic
 
             // ROI Area
-            const roi = state.roiCoords || {l: 150, t: 100, r: 450, b: 400}; 
-            if (this.roiLeftX && this.roiTopY && this.roiRightX && this.roiBottomY) {
-                this.roiLeftX.value = roi.l; this.roiTopY.value = roi.t;
-                this.roiRightX.value = roi.r; this.roiBottomY.value = roi.b;
+            // No longer setting input values. If backend sends ROI, store it.
+            const roi = state.roiCoords; // Assuming backend sends {x, y, width, height}
+            if (roi && typeof roi === 'object' && roi.width > 0 && roi.height > 0) {
+                 this.finalRoiRect = roi; // Store it
+                 // If ROI is also enabled in state, draw the initial overlay
+                 if (state.roiEnabled) {
+                     this.roiEnabled = true; // Make sure frontend knows
+                     this.enableRoiBtn.textContent = "禁用ROI";
+                     this.simulatedImage.style.cursor = 'crosshair';
+                     // Need to calculate display coords and show overlay
+                     // We need a function to draw based on finalRoiRect
+                     this.drawFinalRoiOverlay();
+                 } else {
+                     this.roiEnabled = false;
+                     this.enableRoiBtn.textContent = "启用ROI";
+                     this.simulatedImage.style.cursor = 'default';
+                     this.roiOverlay.style.display = 'none';
+                 }
+            } else {
+                // No ROI from backend or invalid
+                 this.finalRoiRect = null;
+                 this.pendingRoiRect = null; // Ensure pending is also null
+                 this.roiEnabled = state.roiEnabled || false; // Use backend state or default false
+                 if (this.roiEnabled) {
+                     this.enableRoiBtn.textContent = "禁用ROI";
+                     this.simulatedImage.style.cursor = 'crosshair';
+                     this.roiOverlay.style.display = 'none'; // Hide until drawn
+                 } else {
+                     this.enableRoiBtn.textContent = "启用ROI";
+                     this.simulatedImage.style.cursor = 'default';
+                     this.roiOverlay.style.display = 'none';
+                 }
             }
             // Update selected Axis display
             this.updateConfigAxisButtonDisplay(state.selectedAxisId);
@@ -1071,6 +1179,95 @@ class CameraController {
             this.configAxisBtn.textContent = `配置轴`; 
             this.configAxisBtn.title = `配置相机Z轴`;
         }
+    }
+
+    // --- Helper for coordinate calculation relative to image --- 
+    getImageCoordinates(event) {
+        const rect = this.simulatedImage.getBoundingClientRect();
+        const scaleX = this.simulatedImage.naturalWidth / rect.width;
+        const scaleY = this.simulatedImage.naturalHeight / rect.height;
+
+        // Calculate mouse position relative to the image element's top-left corner
+        let clientX = event.clientX;
+        let clientY = event.clientY;
+
+        // Adjust for touch events if necessary (basic example)
+        if (event.touches && event.touches.length > 0) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        }
+
+        const x = (clientX - rect.left) * scaleX;
+        const y = (clientY - rect.top) * scaleY;
+
+        // Clamp coordinates to image bounds
+        const clampedX = Math.max(0, Math.min(x, this.simulatedImage.naturalWidth));
+        const clampedY = Math.max(0, Math.min(y, this.simulatedImage.naturalHeight));
+
+        return { x: clampedX, y: clampedY };
+    }
+
+    updateRoiOverlay() {
+        if (!this.isDrawingRoi || !this.roiOverlay) return;
+
+        const imgRect = this.simulatedImage.getBoundingClientRect();
+        const scaleX = imgRect.width / this.simulatedImage.naturalWidth;
+        const scaleY = imgRect.height / this.simulatedImage.naturalHeight;
+
+        const containerRect = this.simulatedImage.parentElement.getBoundingClientRect();
+        const imgOffsetX = imgRect.left - containerRect.left;
+        const imgOffsetY = imgRect.top - containerRect.top;
+
+        // Calculate display coordinates based on start and current *image* coordinates
+        const startDispX = this.roiStartX * scaleX;
+        const startDispY = this.roiStartY * scaleY;
+        const currentDispX = this.currentRoiX * scaleX;
+        const currentDispY = this.currentRoiY * scaleY;
+
+        // Handle drawing in any direction
+        const dispL = Math.min(startDispX, currentDispX);
+        const dispT = Math.min(startDispY, currentDispY);
+        const dispW = Math.abs(startDispX - currentDispX);
+        const dispH = Math.abs(startDispY - currentDispY);
+
+        // Position relative to the container
+        this.roiOverlay.style.left = `${imgOffsetX + dispL}px`;
+        this.roiOverlay.style.top = `${imgOffsetY + dispT}px`;
+        this.roiOverlay.style.width = `${dispW}px`;
+        this.roiOverlay.style.height = `${dispH}px`;
+        this.roiOverlay.style.display = 'block';
+    }
+
+    // New helper function to draw the overlay based on finalRoiRect OR pendingRoiRect
+    drawFinalRoiOverlay() {
+        // Determine which ROI to draw (confirmed takes precedence)
+        const rectToDraw = this.finalRoiRect || this.pendingRoiRect;
+
+        if (!rectToDraw || !this.roiOverlay || !this.roiEnabled) {
+            if(this.roiOverlay) this.roiOverlay.style.display = 'none';
+            return;
+        }
+
+        const imgRect = this.simulatedImage.getBoundingClientRect();
+        const scaleX = imgRect.width / this.simulatedImage.naturalWidth;
+        const scaleY = imgRect.height / this.simulatedImage.naturalHeight;
+
+        const containerRect = this.simulatedImage.parentElement.getBoundingClientRect();
+        const imgOffsetX = imgRect.left - containerRect.left;
+        const imgOffsetY = imgRect.top - containerRect.top;
+
+        // Calculate display coordinates from stored finalRoiRect
+        const dispL = rectToDraw.x * scaleX;
+        const dispT = rectToDraw.y * scaleY;
+        const dispW = rectToDraw.width * scaleX;
+        const dispH = rectToDraw.height * scaleY;
+
+        // Position relative to the container
+        this.roiOverlay.style.left = `${imgOffsetX + dispL}px`;
+        this.roiOverlay.style.top = `${imgOffsetY + dispT}px`;
+        this.roiOverlay.style.width = `${dispW}px`;
+        this.roiOverlay.style.height = `${dispH}px`;
+        this.roiOverlay.style.display = 'block';
     }
 }
 

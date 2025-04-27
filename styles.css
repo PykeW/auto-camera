@@ -503,26 +503,37 @@ input[type=range]::-moz-range-thumb {
     text-align: right;
 }
 
-
-.roi-input-group-second {
-    margin-top: var(--spacing-small);
-}
-
-.roi-label {
-    width: 30px;         /* From inline style */
-    flex-shrink: 0;    /* Prevent shrinking */
-    text-align: right;   /* Optional: align text */
-    margin-right: var(--spacing-small); /* Optional: space before input */
-    /* Ensure vertical alignment if needed */
-    display: inline-flex; 
-    align-items: center; 
-}
-
-.roi-input {
-    flex-grow: 1;        /* From inline style */
-}
-
 .roi-button {
-    margin-top: var(--spacing-medium); /* From inline style */
-    width: 100%;                       /* From inline style */
+    margin-top: var(--spacing-medium);
+    width: 100%;
+}
+
+.roi-button-group {
+    display: flex; /* Arrange buttons horizontally */
+    gap: var(--spacing-medium); /* Space between buttons */
+    margin-top: var(--spacing-medium);
+}
+
+.roi-button-group .roi-button {
+    margin-top: 0; /* Override previous margin */
+    flex-grow: 1; /* Make buttons share space */
+}
+
+/* Optional: Style confirm/redraw buttons differently */
+.confirm-button {
+    background-color: var(--accent-green);
+    border-color: var(--accent-green);
+    color: var(--text-dark);
+}
+.confirm-button:hover:not(:disabled) {
+    background-color: #49aa19; /* Slightly darker green */
+}
+
+.redraw-button {
+    background-color: var(--accent-yellow);
+    border-color: var(--accent-yellow);
+    color: var(--text-dark);
+}
+.redraw-button:hover:not(:disabled) {
+    background-color: #d48806; /* Slightly darker yellow */
 } 
