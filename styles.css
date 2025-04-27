@@ -67,13 +67,15 @@ body {
 
 .header-button {
     background: none;
-    border: 1px solid transparent; /* For consistent size */
+    border: 1px solid transparent;
     color: var(--text-light);
     font-size: 16px;
     padding: var(--spacing-small) var(--spacing-medium);
     cursor: pointer;
     border-radius: var(--border-radius);
     line-height: 1;
+    width: 30px;
+    text-align: center;
 }
 
 .header-button:hover {
@@ -84,6 +86,11 @@ body {
 .header-title {
     font-weight: normal;
     font-size: 1.1em;
+}
+
+.header-button i {
+    margin-right: 0;
+    vertical-align: middle;
 }
 
 /* Main Content */
@@ -148,6 +155,13 @@ body {
     border-bottom: 1px solid var(--border-medium);
     padding-bottom: var(--spacing-medium);
     font-weight: normal;
+}
+
+.panel-section p.description {
+    font-size: 0.9em;
+    color: var(--text-medium);
+    margin-top: var(--spacing-small);
+    line-height: 1.4;
 }
 
 .control-item {
@@ -279,12 +293,50 @@ button:disabled {
 
 .property-table select,
 .property-table input {
-    border: none; /* Remove border inside table */
+    border: none;
     border-radius: 0;
-    height: 100%; /* Fill cell height */
+    height: 100%;
     padding: var(--spacing-small) var(--spacing-medium);
+    background-color: inherit;
+    color: inherit;
+    width: 100%;
 }
 
+.property-table input[type="range"] {
+    padding: 0;
+    cursor: pointer;
+    height: auto;
+    vertical-align: middle;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+  background: var(--border-dark);
+  height: 4px;
+  border-radius: 2px;
+}
+input[type=range]::-moz-range-track {
+  background: var(--border-dark);
+  height: 4px;
+  border-radius: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -5px;
+}
+input[type=range]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
 
 .focus-controls {
     display: flex;
@@ -306,13 +358,19 @@ button:disabled {
     margin-left: var(--spacing-small);
     padding: 2px 6px;
     border-radius: var(--border-radius);
+    display: inline-block; /* Ensure background covers text */
 }
 
 /* Status-specific coloring */
-.status-空闲 { background-color: var(--bg-medium); color: var(--text-medium); }
-.status-粗对焦中, .status-精细对焦中, .status-移动到最佳位置 { background-color: var(--accent-yellow); color: var(--text-dark); }
-.status-已对焦 { background-color: var(--accent-green); color: var(--text-dark); }
-.status-已停止, .status-错误 { background-color: var(--accent-red); color: var(--text-light); }
+.status-未连接 { background-color: var(--bg-medium); color: var(--text-medium); } /* Grey when disconnected */
+.status-空闲 { background-color: var(--bg-medium); color: var(--text-medium); } /* Grey for idle */
+.status-初始化-检查 { background-color: var(--accent-blue); color: var(--text-light); } /* Blue for init */
+.status-请求Z轴控制权 { background-color: var(--accent-blue); color: var(--text-light); } /* Blue for request */
+.status-粗对焦中, .status-精细对焦中, .status-移动到最佳位置 { background-color: var(--accent-yellow); color: var(--text-dark); } /* Yellow for active focus */
+.status-当量计算-模拟- { background-color: var(--accent-yellow); color: var(--text-dark); } /* Yellow also for calibration */
+.status-保存参数中 { background-color: var(--accent-blue); color: var(--text-light); } /* Blue for saving */
+.status-已对焦 { background-color: var(--accent-green); color: var(--text-dark); } /* Green for success */
+.status-已停止, .status-错误 { background-color: var(--accent-red); color: var(--text-light); } /* Red for stop/error */
 
 
 /* Status Bar */
@@ -346,6 +404,10 @@ button:disabled {
     margin-right: var(--spacing-small);
     width: 1em; /* Ensure icons take consistent space */
     text-align: center;
+}
+
+#calibrate-btn i {
+    margin-right: var(--spacing-small);
 }
 
 @media (max-width: 768px) {
