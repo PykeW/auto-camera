@@ -59,9 +59,9 @@ class CameraController {
 
         this.connectBtn = document.getElementById('connect-btn');
         this.configAxisBtn = document.getElementById('config-axis-btn');
+        this.clearAxisBtn = document.getElementById('clear-axis-btn');
         this.headerButtons = document.querySelectorAll('.header-controls .header-button:not(#btn-settings)'); // Exclude settings button
         this.panelControls = document.querySelectorAll('.requires-connection input, .requires-connection select, .requires-connection button, .requires-connection table input, .requires-connection table select');
-        this.stationSelect = document.getElementById('station-select');
         this.calibrateBtn = document.getElementById('calibrate-btn');
         // Header Buttons
         this.btnPlay = document.getElementById('btn-play');
@@ -75,6 +75,13 @@ class CameraController {
         this.roiOverlay = document.getElementById('focus-roi-overlay'); // Get ROI overlay element
         this.confirmRoiBtn = document.getElementById('confirm-roi-btn');
         this.redrawRoiBtn = document.getElementById('redraw-roi-btn');
+
+        // Calibration elements
+        this.calibrationPatternDisplay = document.getElementById('calibration-pattern-display');
+        this.calibrationResultValue = document.getElementById('calibration-result-value');
+        this.cameraDisplayContainer = document.getElementById('camera-display-container'); // Container
+        this.toggleViewBtn = document.getElementById('toggle-view-btn');
+        this.calibSquareSizeInput = document.getElementById('calib-square-size');
 
         // Dropdown elements
         this.axisDropdown = document.getElementById('axis-config-dropdown');
@@ -93,7 +100,9 @@ class CameraController {
         this.SAVE_DELAY = 100; // ms
         this.CONNECT_DELAY = 500; // ms
         this.MAX_BLUR = 5; // px
-        this.CALIBRATION_DELAY = 300; // ms for simulated calibration
+        this.CALIBRATION_DELAY = 1500; // ms total for simulated calibration steps
+        this.SIMULATED_SQUARE_SIZE_PX = 37.5; // Simulated pixel size of square at best focus
+        this.CHECKERBOARD_SVG = `<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="checkerboard" width="75" height="75" patternUnits="userSpaceOnUse"><rect width="37.5" height="37.5" fill="black"/><rect x="37.5" y="37.5" width="37.5" height="37.5" fill="black"/></pattern></defs><rect width="300" height="300" fill="white"/><rect width="300" height="300" fill="url(#checkerboard)"/><style>rect { stroke: grey; stroke-width: 0.5; }</style></svg>`;
         // ---------------------------
 
         this.selectedAxisId = null; // Store the selected axis ID
@@ -108,6 +117,9 @@ class CameraController {
         this.isRecording = false;
         this.roiEnabled = false;
         this.isAxisDropdownVisible = false; // Track dropdown visibility
+        this.isCalibrating = false; // Track calibration state
+        this.calibrationRatio = null; // Store calibration result
+        this.isShowingCalibrationPattern = false; // Track view state
 
         // ROI Drawing State
         this.isDrawingRoi = false;
@@ -243,12 +255,17 @@ class CameraController {
         } catch(error) {
              console.error("连接相机时出错:", error);
              this.footerStatus.textContent = `状态: 连接失败 (${error.message})`;
-             this.connectBtn.textContent = "连接";
              this.isConnected = false; // Ensure state is false on error
              this.updateControlStates(false);
+             // Re-enable dropdown if connection fails?
+             this.serialNumberSelect.disabled = false;
         } finally {
-            this.connectBtn.disabled = false;
-            this.connectionProcessId = null;
+             this.connectBtn.disabled = this.isFocusing || this.isCapturing || this.isRecording; // Re-evaluate button disable state
+             this.connectionProcessId = null;
+        }
+        // After successful connection, try loading saved state
+        if (this.isConnected) {
+            this.loadState();
         }
     }
 
@@ -293,6 +310,8 @@ class CameraController {
             if (this.enableRoiBtn) this.enableRoiBtn.textContent = "启用ROI";
             this.hideAxisDropdown(); 
             console.log("前端状态已更新为断开");
+            // Fetch available cameras again after disconnecting
+            this.fetchAvailableCameras();
 
         } catch (error) {
             console.error("断开相机时出错:", error);
@@ -309,6 +328,7 @@ class CameraController {
              this.connectBtn.disabled = this.isFocusing || this.isCapturing || this.isRecording; // Re-evaluate button disable state
              this.connectionProcessId = null; // Unlock
         }
+        this.saveState(); // Save state after disconnecting
     }
 
     // Enables/disables controls based on connection status AND other states
@@ -317,40 +337,53 @@ class CameraController {
         const canStartActivity = connected && !this.isFocusing; // Can start capture/record if connected and not focusing
 
         // Connect Button
-        if(this.connectBtn) this.connectBtn.disabled = this.isFocusing || this.isCapturing || this.isRecording; // Cannot disconnect while busy
-        if(this.connectBtn) this.connectBtn.textContent = connected ? "断开连接" : "连接";
+        const hasSelectedCamera = this.serialNumberSelect && this.serialNumberSelect.value !== '';
+        const canConnect = !this.isConnected && hasSelectedCamera && !this.connectionProcessId;
+        if(this.connectBtn) this.connectBtn.disabled = !(canConnect || this.isConnected) || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
+        if(this.connectBtn) this.connectBtn.textContent = this.isConnected ? "断开" : "连接";
+
+        // Serial Number Dropdown
+        if(this.serialNumberSelect) this.serialNumberSelect.disabled = this.isConnected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating; // Disable when connected or busy
 
         // Header Buttons
-        if(this.btnPlay) this.btnPlay.disabled = !canStartActivity || this.isCapturing || this.isRecording;
+        const isIdleAndConnected = this.isConnected && !this.isFocusing && !this.isCapturing && !this.isRecording && !this.isCalibrating;
+        if(this.btnPlay) this.btnPlay.disabled = !canStartActivity || this.isCapturing || this.isRecording || this.isCalibrating;
         if(this.btnStop) this.btnStop.disabled = !(this.isCapturing || this.isRecording);
-        if(this.btnCapture) this.btnCapture.disabled = !canStartActivity || this.isCapturing || this.isRecording;
-        if(this.btnRecord) this.btnRecord.disabled = !canStartActivity || this.isCapturing || this.isRecording;
-        if(this.btnTrigger) this.btnTrigger.disabled = !canStartActivity || this.isCapturing || this.isRecording;
+        if(this.btnCapture) this.btnCapture.disabled = !canStartActivity || this.isCapturing || this.isRecording || this.isCalibrating;
+        if(this.btnRecord) this.btnRecord.disabled = !canStartActivity || this.isCapturing || this.isRecording || this.isCalibrating;
+        if(this.btnTrigger) this.btnTrigger.disabled = !canStartActivity || this.isCapturing || this.isRecording || this.isCalibrating;
         // Settings button might always be enabled or have its own logic
 
         // Panel controls requiring connection (General)
         this.panelControls.forEach(ctrl => {
-             if (!['connect-btn', 'start-focus-btn', 'stop-focus-btn', 'calibrate-btn'].includes(ctrl.id) && !ctrl.classList.contains('header-button')) {
-                  ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
+             // Exclude buttons with their own specific logic handled below
+             const excludedIds = ['connect-btn', 'start-focus-btn', 'stop-focus-btn', 'calibrate-btn', 'toggle-view-btn', 'enable-roi-btn', 'confirm-roi-btn', 'redraw-roi-btn', 'calib-square-size'];
+             if (!excludedIds.includes(ctrl.id) && !ctrl.classList.contains('header-button')) {
+                  ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
              }
         });
-        if(this.stationSelect) this.stationSelect.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
 
         // File/Folder Select Buttons
-        if(this.selectConfigBtn) this.selectConfigBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
-        if(this.selectFolderBtn) this.selectFolderBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
+        if(this.selectConfigBtn) this.selectConfigBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
+        if(this.selectFolderBtn) this.selectFolderBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
 
         // Focus buttons
-        this.startFocusBtn.disabled = !isIdle || !this.selectedAxisId;
+        this.startFocusBtn.disabled = !isIdle || !this.selectedAxisId || this.isCalibrating;
         this.stopFocusBtn.disabled = !this.isFocusing;
 
         // Calibration button
         const focusComplete = connected && this.focusStatusText.textContent === '已对焦';
-        this.calibrateBtn.disabled = !focusComplete || !this.selectedAxisId || this.isCapturing || this.isRecording;
+        this.calibrateBtn.disabled = !focusComplete || !this.selectedAxisId || this.isCapturing || this.isRecording || this.isCalibrating || this.isFocusing;
+
+        // Toggle View Button
+        if(this.toggleViewBtn) this.toggleViewBtn.disabled = !connected || this.isCalibrating || this.isFocusing; // Disable if not connected or calibrating/focusing
+
+        // Calibration Input
+        if(this.calibSquareSizeInput) this.calibSquareSizeInput.disabled = !connected || this.isCalibrating || this.isFocusing; // Disable if not connected or calibrating/focusing
 
         // ROI Button
-        const showEnableBtn = connected && !this.isFocusing && !this.isCapturing && !this.isRecording && !this.pendingRoiRect;
-        const showConfirmRedrawBtns = connected && this.roiEnabled && this.pendingRoiRect && !this.isDrawingRoi;
+        const showEnableBtn = connected && !this.isFocusing && !this.isCapturing && !this.isRecording && !this.pendingRoiRect && !this.isCalibrating;
+        const showConfirmRedrawBtns = connected && this.roiEnabled && this.pendingRoiRect && !this.isDrawingRoi && !this.isCalibrating;
 
         if(this.enableRoiBtn) {
              this.enableRoiBtn.disabled = !showEnableBtn;
@@ -368,16 +401,14 @@ class CameraController {
 
         // Table controls
         document.querySelectorAll('#property-table input, #property-table select').forEach(ctrl => {
-             ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
+             ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
          });
 
-        // Reset station select if disconnected
-        if (!connected && this.stationSelect) {
-             this.stationSelect.disabled = true;
-        }
-
         // Config Axis Button
-        if (this.configAxisBtn) this.configAxisBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
+        if (this.configAxisBtn) this.configAxisBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
+
+        // Axis Config Buttons
+        if (this.clearAxisBtn) this.clearAxisBtn.disabled = !connected || !this.selectedAxisId || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating; // Enable only if axis is selected and idle
     }
 
     // Clears data when disconnected
@@ -392,12 +423,10 @@ class CameraController {
         this.clarityValueInput.value = '--';
         this.currentZInput.value = '--';
         this.footerZPos.textContent = '--';
-        if (this.roiSection) { // Reset ROI if selectors worked
-             try {
-                 this.roiSection.querySelectorAll('input').forEach(input => input.value = '--');
-             } catch(e) { /* ignore */ }
-        }
+        if (this.calibSquareSizeInput) this.calibSquareSizeInput.value = '1.0'; // Reset calibration input
+        if (this.calibrationResultValue) this.calibrationResultValue.textContent = '-- pixels/mm'; // Reset calibration result
         this.applyBlur(1); // Apply max blur
+        this.switchToCameraView(); // Ensure camera view is shown
     }
 
     // Populates controls with simulated data (called after connection)
@@ -602,6 +631,7 @@ class CameraController {
              this.updateFocusStatus('已对焦'); // Final success state
              console.log("--------- 自动对焦流程完成 --------- ");
              console.log("模拟: [控制器] 可选择继续下一工位");
+             this.saveState(); // Save state after successful focus
 
         } catch (error) {
             if (error.message.startsWith("Stopped")) {
@@ -618,13 +648,8 @@ class CameraController {
              this.focusProcessId = null;
               // Update controls based on final state (connected but idle/error/stopped)
              this.updateControlStates(this.isConnected);
-             // Optionally revert to idle after a delay if focus was successful
-             if (this.focusStatusText.textContent === '已对焦') {
-                 setTimeout(() => {
-                     if(this.isConnected && !this.isFocusing) this.updateFocusStatus('空闲');
-                 }, 2000);
-             }
         }
+        this.saveState(); // Save state after selecting axis
     }
 
     stopAutofocus() {
@@ -837,6 +862,7 @@ class CameraController {
         }
         // ---------------------------------
         this.updateControlStates(this.isConnected);
+        this.saveState(); // Save state after selecting axis
     }
 
     // --- Event Listeners ---
@@ -869,14 +895,6 @@ class CameraController {
         // Panel Buttons
         this.selectConfigBtn?.addEventListener('click', () => alert("模拟：打开文件选择器选择配置文件"));
         this.selectFolderBtn?.addEventListener('click', () => alert("模拟：打开文件夹选择器选择保存路径"));
-        this.calibrateBtn?.addEventListener('click', () => {
-            if (this.isConnected && this.focusStatusText.textContent === '已对焦' && !this.isCapturing && !this.isRecording) {
-                 console.log("模拟: 手动触发当量计算...");
-                 alert("模拟：执行当量计算（未实现详细逻辑）");
-             } else {
-                 console.warn("请先连接、成功对焦且停止采集/录制后再执行当量计算");
-             }
-         });
         this.enableRoiBtn?.addEventListener('click', () => this.toggleROI());
         this.confirmRoiBtn?.addEventListener('click', () => {
             if (this.pendingRoiRect) {
@@ -896,6 +914,27 @@ class CameraController {
              this.updateControlStates(this.isConnected);
              // User can now click and drag again
          });
+
+        // --- Calibration Listener ---
+        this.calibrateBtn?.addEventListener('click', () => {
+            if (this.calibrateBtn.disabled) return;
+            this.startCalibration();
+        });
+        // ------------------------
+
+        // --- Clear Axis Listener ---
+        this.clearAxisBtn?.addEventListener('click', () => {
+            if (this.clearAxisBtn.disabled) return;
+            this.clearAxisConfig();
+        });
+        // -------------------------
+
+        // --- View Toggle Listener ---
+        this.toggleViewBtn?.addEventListener('click', () => {
+            if (this.toggleViewBtn.disabled) return;
+            this.toggleCalibrationView();
+        });
+        // --------------------------
 
         // Close dropdown if clicking outside
         document.body.addEventListener('click', (e) => {
@@ -1004,6 +1043,12 @@ class CameraController {
             }
         });
         // -----------------------------
+
+        // --- Serial Number Selection Listener ---
+        this.serialNumberSelect?.addEventListener('change', () => {
+            this.updateControlStates(this.isConnected); // Update connect button state based on selection
+        });
+        // ----------------------------------
     }
 
     // --- Initial Setup ---
@@ -1011,6 +1056,8 @@ class CameraController {
         this.updateUI();
         this.updateFocusStatus('未连接');
         this.updateControlStates(false); // Ensure controls start disabled
+        this.fetchAvailableCameras(); // Fetch cameras on init
+
         const updateImageDims = () => {
             if (this.simulatedImage.naturalWidth > 0) {
                 this.statusBarImageDims.textContent = `${this.simulatedImage.naturalWidth}, ${this.simulatedImage.naturalHeight}`;
@@ -1238,6 +1285,90 @@ class CameraController {
         this.roiOverlay.style.display = 'block';
     }
 
+    // --- New Calibration Simulation Logic ---
+    async startCalibration() {
+        if (this.isCalibrating || this.isFocusing || this.isCapturing || this.isRecording || !this.isConnected || this.focusStatusText.textContent !== '已对焦') {
+            console.warn('无法开始当量计算：状态不满足 (需要连接、已对焦、空闲)');
+            return;
+        }
+
+        console.log("--------- 开始当量计算流程 --------- ");
+        this.isCalibrating = true;
+        this.footerStatus.textContent = "状态: 当量计算中...";
+        this.updateControlStates(true); // Disable other controls
+        this.calibrationResultValue.textContent = "计算中...";
+
+        try {
+            // 1. Show Checkerboard
+            console.log("模拟: 显示标准棋盘格图像");
+            this.simulatedImage.style.display = 'none';
+            this.calibrationPatternDisplay.innerHTML = this.CHECKERBOARD_SVG;
+            this.calibrationPatternDisplay.style.display = 'block';
+            await this.wait(this.CALIBRATION_DELAY / 3, 'calibrationProcessId'); // Use a unique process ID ref if needed
+
+            // 2. Simulate Analysis
+            console.log("模拟: 捕获图像并分析棋盘格特征...");
+            await this.wait(this.CALIBRATION_DELAY / 3, 'calibrationProcessId');
+            // In a real scenario, image processing would happen here to find pixel distance
+            console.log(`模拟: 检测到特征间距为 ${this.SIMULATED_SQUARE_SIZE_PX} 像素`);
+
+            // 3. Calculate Ratio
+            const knownSquareSizeMm = parseFloat(this.calibSquareSizeInput.value);
+            if (isNaN(knownSquareSizeMm) || knownSquareSizeMm <= 0) {
+                console.error("输入的方格尺寸无效:", this.calibSquareSizeInput.value);
+                throw new Error("输入的方格尺寸无效");
+            }
+
+            this.calibrationRatio = this.SIMULATED_SQUARE_SIZE_PX / knownSquareSizeMm;
+            console.log(`计算当量: ${this.SIMULATED_SQUARE_SIZE_PX} px / ${knownSquareSizeMm} mm = ${this.calibrationRatio.toFixed(2)} pixels/mm`);
+            this.calibrationResultValue.textContent = `${this.calibrationRatio.toFixed(2)} pixels/mm`;
+            await this.wait(this.CALIBRATION_DELAY / 3, 'calibrationProcessId');
+
+            console.log("--------- 当量计算流程完成 --------- ");
+
+        } catch (error) {
+            console.error("当量计算过程中出错:", error);
+            this.calibrationResultValue.textContent = `计算失败 (${error.message})`; // Show error message
+        } finally {
+            // 4. Restore State (Don't automatically switch view back)
+            console.log("模拟: 当量计算状态结束");
+            this.isCalibrating = false;
+            this.footerStatus.textContent = "状态: 已连接"; // Or Idle?
+            this.updateControlStates(this.isConnected);
+        }
+        this.saveState(); // Save state after selecting axis
+    }
+    // ----------------------------------------
+
+    // --- View Toggling Logic ---
+    toggleCalibrationView() {
+        this.isShowingCalibrationPattern = !this.isShowingCalibrationPattern;
+        if (this.isShowingCalibrationPattern) {
+            this.switchToPatternView();
+        } else {
+            this.switchToCameraView();
+        }
+    }
+
+    switchToPatternView() {
+        console.log("切换到标定板视图");
+        this.simulatedImage.style.display = 'none';
+        this.calibrationPatternDisplay.innerHTML = this.CHECKERBOARD_SVG;
+        this.calibrationPatternDisplay.style.display = 'block';
+        this.toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示相机视图';
+        this.isShowingCalibrationPattern = true;
+    }
+
+    switchToCameraView() {
+        console.log("切换到相机视图");
+        this.calibrationPatternDisplay.style.display = 'none';
+        this.calibrationPatternDisplay.innerHTML = ''; // Clear SVG
+        this.simulatedImage.style.display = 'block';
+        this.toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示标定板';
+        this.isShowingCalibrationPattern = false;
+    }
+    // -------------------------
+
     // New helper function to draw the overlay based on finalRoiRect OR pendingRoiRect
     drawFinalRoiOverlay() {
         // Determine which ROI to draw (confirmed takes precedence)
@@ -1269,6 +1400,129 @@ class CameraController {
         this.roiOverlay.style.height = `${dispH}px`;
         this.roiOverlay.style.display = 'block';
     }
+
+    // --- Clear Axis Configuration ---
+    async clearAxisConfig() {
+        console.log("清空轴配置...");
+        const oldAxisId = this.selectedAxisId;
+        this.selectedAxisId = null;
+        this.updateConfigAxisButtonDisplay(null); // Update button text/title
+        this.updateControlStates(this.isConnected); // Update button disables
+
+        // --- SIMULATE SAVING TO BACKEND --- 
+        // (Optional: Add a backend call to clear the saved config)
+        try {
+            console.log(`模拟: 通知后端清空轴配置 (相机: ${this.serialNumberSelect.value}, 原轴ID: ${oldAxisId})`);
+            // Example: fetch(`${this.backendUrl}/clear_axis_config`, { method: 'POST', ... });
+            // We'll just log for now
+            // const response = await fetch(...); etc.
+             alert("模拟: 轴配置已清空");
+        } catch (error) {
+            console.error("模拟: 清空轴配置时后端通信出错:", error);
+            // Should we revert frontend state if backend fails?
+            // this.selectedAxisId = oldAxisId; // Revert
+            // this.updateConfigAxisButtonDisplay(oldAxisId);
+            // this.updateControlStates(this.isConnected);
+            alert("模拟: 清空轴配置时发生错误");
+        }
+        // ---------------------------------
+        this.saveState(); // Save state after clearing axis
+    }
+
+    // --- Save and Load State using localStorage ---
+    saveState() {
+        if (!this.isConnected || !this.serialNumberSelect.value) return;
+        const cameraSN = this.serialNumberSelect.value;
+        const stateToSave = {
+            selectedAxisId: this.selectedAxisId,
+            bestZFound: this.bestZFound,
+            calibrationRatio: this.calibrationRatio
+        };
+        try {
+            localStorage.setItem(`cameraState_${cameraSN}`, JSON.stringify(stateToSave));
+            console.log(`状态已保存到 localStorage (相机: ${cameraSN}):`, stateToSave);
+        } catch (e) {
+            console.error("保存状态到 localStorage 时出错:", e);
+        }
+    }
+
+    loadState() {
+        if (!this.isConnected || !this.serialNumberSelect.value) return;
+        const cameraSN = this.serialNumberSelect.value;
+        try {
+            const savedStateJSON = localStorage.getItem(`cameraState_${cameraSN}`);
+            if (savedStateJSON) {
+                const savedState = JSON.parse(savedStateJSON);
+                console.log(`从 localStorage 加载状态 (相机: ${cameraSN}):`, savedState);
+
+                // Restore values, checking if they exist in the saved object
+                if (savedState.hasOwnProperty('selectedAxisId')) {
+                    this.selectedAxisId = savedState.selectedAxisId;
+                    this.updateConfigAxisButtonDisplay(this.selectedAxisId); // Update UI
+                }
+                if (savedState.hasOwnProperty('bestZFound')) {
+                    this.bestZFound = savedState.bestZFound;
+                    // Update relevant UI if needed, e.g., display last best focus Z
+                    // if (this.bestZFound !== null) { ... }
+                }
+                if (savedState.hasOwnProperty('calibrationRatio')) {
+                    this.calibrationRatio = savedState.calibrationRatio;
+                    if (this.calibrationRatio !== null && this.calibrationResultValue) {
+                        this.calibrationResultValue.textContent = `${this.calibrationRatio.toFixed(2)} pixels/mm`;
+                    }
+                }
+                this.updateControlStates(this.isConnected); // Update button states based on loaded axis
+            } else {
+                console.log(`未找到相机 ${cameraSN} 的已保存状态。`);
+            }
+        } catch (e) {
+            console.error("从 localStorage 加载状态时出错:", e);
+        }
+    }
+    // ---------------------------------------------
+
+    // --- Fetch Available Cameras ---
+    async fetchAvailableCameras() {
+        console.log("正在获取可用相机列表...");
+        this.serialNumberSelect.innerHTML = '<option value="">加载中...</option>';
+        this.serialNumberSelect.disabled = true;
+        this.connectBtn.disabled = true;
+
+        try {
+            // --- Replace with actual backend call --- 
+            // const response = await fetch(`${this.backendUrl}/api/cameras`);
+            // if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            // const cameraList = await response.json();
+
+            // --- Simulation --- 
+            await this.wait(300); // Simulate network delay
+            const cameraList = ['SN_Sim_1', 'SN_Sim_2', 'SN_Backend_123', 'SN_Backend_456']; // Example list
+            // const cameraList = []; // Test empty list
+            console.log("模拟: 获取到相机列表:", cameraList);
+            // -------------------
+
+            this.serialNumberSelect.innerHTML = ''; // Clear loading message
+
+            if (cameraList && cameraList.length > 0) {
+                this.serialNumberSelect.appendChild(new Option('请选择相机...', ''));
+                cameraList.forEach(sn => {
+                    this.serialNumberSelect.appendChild(new Option(sn, sn));
+                });
+                this.serialNumberSelect.disabled = false; // Enable dropdown
+            } else {
+                this.serialNumberSelect.appendChild(new Option('未找到相机', ''));
+                this.serialNumberSelect.disabled = true; // Keep disabled
+            }
+
+        } catch (error) {
+            console.error("获取可用相机列表失败:", error);
+            this.serialNumberSelect.innerHTML = '<option value="">加载失败</option>';
+            this.serialNumberSelect.disabled = true;
+        } finally {
+            // Connect button state depends on selection, handled by change listener and updateControlStates
+        }
+    }
+    // -------------------------------
 }
 
 // Initialize the controller when the DOM is ready

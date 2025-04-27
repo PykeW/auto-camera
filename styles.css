@@ -536,4 +536,35 @@ input[type=range]::-moz-range-thumb {
 }
 .redraw-button:hover:not(:disabled) {
     background-color: #d48806; /* Slightly darker yellow */
+}
+
+/* --- Axis Config Group specific styles --- */
+.axis-config-group {
+    display: flex;
+    flex-direction: column; /* Stack rows vertically */
+    gap: var(--spacing-small);
+}
+
+.axis-config-row {
+    display: flex;
+    gap: var(--spacing-small);
+    align-items: center; /* Vertically align items in a row */
+}
+
+.axis-config-row select {
+    flex-grow: 1; /* Allow select to take available space */
+}
+
+.axis-config-row button {
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+}
+
+/* Ensure buttons in the second row take equal width */
+.axis-config-row.button-row button {
+    flex-grow: 1;
+}
+/* --- End Axis Config Group styles --- */
+
+.input-group input {
+    flex-grow: 1;
 } 
