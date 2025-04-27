@@ -1,0 +1,359 @@
+:root {
+    --bg-darker: #1e1e1e; /* Deepest background */
+    --bg-dark: #2d2d2d;   /* Panel backgrounds, header, footer */
+    --bg-medium: #3d3d3d; /* Input, button, table header background */
+    --text-light: #e0e0e0; /* Main text color */
+    --text-medium: #b0b0b0;/* Lighter text, labels */
+    --text-dark: #111;    /* Not used much in dark theme */
+    --border-dark: #444;  /* Dark borders */
+    --border-medium: #555;/* Medium borders */
+    --accent-blue: #1890ff; /* Primary action color */
+    --accent-red: #ff4d4f;   /* Danger color */
+    --accent-yellow: #faad14;/* Warning/Highlight color */
+    --accent-green: #52c41a; /* Success color */
+
+    --header-height: 40px;
+    --statusbar-height: 24px;
+    --panel-width: 320px; /* Slightly wider based on image */
+    --border-radius: 4px;
+    --spacing-small: 4px;
+    --spacing-medium: 8px;
+    --spacing-large: 16px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden; /* Prevent scrolling on body */
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--bg-darker);
+    color: var(--text-light);
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    height: 100vh; /* Ensure container takes full height */
+}
+
+/* Header */
+.header {
+    background-color: var(--bg-dark);
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--spacing-medium);
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.header-controls {
+    display: flex;
+    gap: var(--spacing-small);
+}
+
+.header-button {
+    background: none;
+    border: 1px solid transparent; /* For consistent size */
+    color: var(--text-light);
+    font-size: 16px;
+    padding: var(--spacing-small) var(--spacing-medium);
+    cursor: pointer;
+    border-radius: var(--border-radius);
+    line-height: 1;
+}
+
+.header-button:hover {
+    background-color: var(--bg-medium);
+    border-color: var(--border-dark);
+}
+
+.header-title {
+    font-weight: normal;
+    font-size: 1.1em;
+}
+
+/* Main Content */
+.main-content {
+    display: flex;
+    flex-grow: 1;
+    overflow: hidden; /* Important: prevent this level from scrolling */
+}
+
+/* Camera View */
+.camera-view {
+    flex-grow: 1;
+    background-color: #666; /* Grey background for preview based on image */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+#simulated-image {
+    display: block; /* Remove extra space below image */
+    max-width: 95%; /* Add some padding */
+    max-height: 95%;
+    object-fit: contain;
+    transition: filter 0.1s linear;
+    background-color: var(--bg-dark); /* Add bg to image if it has transparency */
+    border: 1px solid var(--border-dark);
+}
+
+.focus-overlay {
+    position: absolute;
+    border: 2px dashed var(--accent-yellow);
+    pointer-events: none;
+    /* JS will set left, top, width, height */
+}
+
+/* Control Panel */
+.control-panel {
+    width: var(--panel-width);
+    background-color: var(--bg-dark);
+    padding: 0; /* Remove padding, use section padding */
+    overflow-y: auto; /* Allow only panel to scroll */
+    flex-shrink: 0;
+    color: var(--text-light);
+    border-left: 1px solid var(--border-dark);
+}
+
+.panel-section {
+    padding: var(--spacing-large);
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.panel-section:last-child {
+    border-bottom: none;
+}
+
+.panel-section h3 {
+    margin-bottom: var(--spacing-medium);
+    font-size: 1.1em;
+    color: var(--text-light);
+    border-bottom: 1px solid var(--border-medium);
+    padding-bottom: var(--spacing-medium);
+    font-weight: normal;
+}
+
+.control-item {
+    margin-bottom: var(--spacing-medium);
+}
+
+label {
+    display: block;
+    margin-bottom: var(--spacing-small);
+    color: var(--text-medium);
+}
+
+input[type="text"],
+input[type="number"],
+select {
+    width: 100%;
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    color: var(--text-light);
+    padding: var(--spacing-small) var(--spacing-medium);
+    border-radius: var(--border-radius);
+    font-size: inherit;
+    height: 28px; /* Match button height */
+}
+
+input:read-only {
+    background-color: #4a4a4a;
+    cursor: default;
+}
+
+input:disabled,
+select:disabled {
+    background-color: #4a4a4a;
+    color: var(--text-medium);
+    cursor: not-allowed;
+}
+
+select {
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E'); /* Darker arrow */
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-medium) center;
+    background-size: .65em auto;
+    padding-right: 2.5em; /* Make more space for arrow */
+}
+
+.input-group {
+    display: flex;
+    gap: var(--spacing-small);
+}
+
+.input-group input {
+    flex-grow: 1;
+}
+
+.input-group button {
+    flex-shrink: 0;
+    padding: var(--spacing-small) var(--spacing-medium);
+    height: 28px; /* Match input height */
+}
+
+button {
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    color: var(--text-light);
+    padding: var(--spacing-small) var(--spacing-medium);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: inherit;
+    height: 28px; /* Default button height */
+    line-height: 1;
+    vertical-align: middle; /* Align icons better */
+}
+
+button:hover {
+    background-color: #4a4a4a;
+    border-color: var(--border-medium);
+}
+
+button:disabled {
+    background-color: #4a4a4a;
+    color: var(--text-medium);
+    cursor: not-allowed;
+    border-color: var(--border-dark);
+    opacity: 0.7;
+}
+
+.primary-button {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+
+.primary-button:hover:not(:disabled) {
+    background-color: #157acf;
+}
+
+.danger-button {
+    background-color: var(--accent-red);
+    border-color: var(--accent-red);
+}
+.danger-button:hover:not(:disabled) {
+    background-color: #d9363e;
+}
+
+.property-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--spacing-medium);
+}
+
+.property-table th,
+.property-table td {
+    border: 1px solid var(--border-dark);
+    padding: var(--spacing-small) var(--spacing-medium);
+    text-align: left;
+    height: 28px; /* Match other controls */
+}
+
+.property-table th {
+    background-color: var(--bg-medium);
+    font-weight: normal;
+    color: var(--text-medium);
+    width: 40%; /* Give more space to value */
+}
+
+.property-table td {
+     padding: 0; /* Remove padding, let control fill cell */
+}
+
+.property-table select,
+.property-table input {
+    border: none; /* Remove border inside table */
+    border-radius: 0;
+    height: 100%; /* Fill cell height */
+    padding: var(--spacing-small) var(--spacing-medium);
+}
+
+
+.focus-controls {
+    display: flex;
+    gap: var(--spacing-medium);
+}
+
+.focus-controls button {
+    flex-grow: 1;
+    height: 32px; /* Make focus buttons slightly larger */
+}
+
+.focus-status label {
+    display: inline-block;
+    margin-bottom: 0;
+}
+
+#focus-status-text {
+    font-weight: bold;
+    margin-left: var(--spacing-small);
+    padding: 2px 6px;
+    border-radius: var(--border-radius);
+}
+
+/* Status-specific coloring */
+.status-空闲 { background-color: var(--bg-medium); color: var(--text-medium); }
+.status-粗对焦中, .status-精细对焦中, .status-移动到最佳位置 { background-color: var(--accent-yellow); color: var(--text-dark); }
+.status-已对焦 { background-color: var(--accent-green); color: var(--text-dark); }
+.status-已停止, .status-错误 { background-color: var(--accent-red); color: var(--text-light); }
+
+
+/* Status Bar */
+.status-bar {
+    background-color: var(--bg-dark);
+    height: var(--statusbar-height);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-medium);
+    gap: var(--spacing-large);
+    font-size: 12px;
+    color: var(--text-medium);
+    flex-shrink: 0;
+    border-top: 1px solid var(--border-dark);
+}
+
+.status-bar span {
+    white-space: nowrap;
+    border-right: 1px solid var(--border-dark);
+    padding-right: var(--spacing-large);
+}
+
+.status-bar span:last-child {
+    border-right: none;
+    padding-right: 0;
+}
+
+/* Font Awesome Icon Adjustments */
+.header-button i,
+.focus-controls button i {
+    margin-right: var(--spacing-small);
+    width: 1em; /* Ensure icons take consistent space */
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+    
+    .camera-controls {
+        width: 100%;
+    }
+} 
