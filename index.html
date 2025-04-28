@@ -188,9 +188,10 @@
                         <h4 class="roi-heading">对焦ROI区域</h4>
                         <!-- Draw button now IN the header line -->
                         <button id="draw-roi-focus-btn" class="roi-button" style="display: flex;" disabled=""><i class="fas fa-pencil-alt"></i> 绘制</button>
-                        <div class="roi-button-group control-item">
+                        <div id="focus-roi-button-group" class="roi-button-group control-item" style="display: none;">
                             <button id="confirm-roi-focus-btn" class="roi-button" style="display: none;" disabled="">确认</button>
                             <button id="redraw-roi-focus-btn" class="roi-button" style="display: none;" disabled="">重绘</button>
+                            <button id="clear-roi-focus-btn" class="roi-button danger-button" style="display: none;" disabled="">清除</button>
                             <button id="toggle-focus-roi-visibility-btn" class="roi-button mini-button" disabled="" title="切换对焦ROI可见性" style="display: none;"><i class="fas fa-eye"></i></button>
                         </div>
                     </div>
