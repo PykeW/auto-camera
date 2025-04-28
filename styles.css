@@ -104,10 +104,10 @@ body {
 .camera-view {
     flex-grow: 1;
     background-color: #666; /* Grey background for preview based on image */
-    display: flex;
+    position: relative;
+    display: flex; /* Keep flex for centering the image container */
     justify-content: center;
     align-items: center;
-    position: relative;
     overflow: hidden;
 }
 
@@ -561,32 +561,88 @@ input[type=range]::-moz-range-thumb {
 
 .roi-button-group {
     display: flex; /* Arrange buttons horizontally */
-    gap: var(--spacing-medium); /* Space between buttons */
+    align-items: center; /* Vertically align items */
+    gap: var(--spacing-small); /* Reduce gap slightly */
     margin-top: var(--spacing-medium);
 }
 
 .roi-button-group .roi-button {
     margin-top: 0; /* Override previous margin */
-    flex-grow: 1; /* Make buttons share space */
+    flex-shrink: 0; /* Prevent shrinking initially */
+    padding: var(--spacing-small) var(--spacing-medium); /* Consistent padding */
+    /* Ensure reasonable minimum width for main action buttons */
+    width: auto; /* Override potential width: 100% */
+}
+
+.roi-button-group .roi-button i {
+    margin-right: var(--spacing-small); /* Consistent icon margin */
+}
+
+/* Remove flex-grow: 1 to allow natural width based on content */
+/* min-width: 60px; /* Keep or adjust min-width if needed */
+
+/* Ensure mini-button (like visibility toggle) doesn't grow */
+.roi-button-group .mini-button {
+    flex-grow: 0;
+    flex-shrink: 0;
+    width: auto; /* Let mini button size naturally */
+    padding: var(--spacing-small); /* Adjust padding for square-ish look */
+    text-align: center;
+}
+
+.roi-button-group .mini-button i {
+    margin-right: 0; /* No margin needed if text is removed */
 }
 
 /* Optional: Style confirm/redraw buttons differently */
 .confirm-button {
-    background-color: var(--accent-green);
-    border-color: var(--accent-green);
-    color: var(--text-dark);
+    /* background-color: var(--accent-green); */
+    /* border-color: var(--accent-green); */
+    color: var(--text-dark); /* Keep dark text for contrast maybe? Adjust if needed */
 }
 .confirm-button:hover:not(:disabled) {
-    background-color: #49aa19; /* Slightly darker green */
+    /* background-color: #49aa19; */ /* Slightly darker green */
 }
 
 .redraw-button {
-    background-color: var(--accent-yellow);
-    border-color: var(--accent-yellow);
+    /* background-color: var(--accent-yellow); */
+    /* border-color: var(--accent-yellow); */
     color: var(--text-dark);
 }
 .redraw-button:hover:not(:disabled) {
-    background-color: #d48806; /* Slightly darker yellow */
+    /* background-color: #d48806; */ /* Slightly darker yellow */
+}
+
+/* Style for the line containing ROI heading and action buttons */
+.roi-header-line {
+    display: flex;
+    justify-content: flex-start; /* Align items to the start */
+    align-items: center;
+    margin-bottom: var(--spacing-small); /* Space below the header line */
+}
+
+/* Ensure heading doesn't take extra margin */
+.roi-header-line h4 {
+    flex-grow: 1; /* Allow heading to take up space */
+    margin-bottom: 0;
+    margin-right: var(--spacing-medium); /* Add space between heading and buttons */
+}
+
+/* Style the initial draw/enable button when in the header */
+.roi-header-line > .roi-button, /* Apply to initial button */
+.roi-header-line .roi-button-group .roi-button { /* And buttons in the group */
+    flex-shrink: 0; /* Prevent shrinking */
+    margin-left: auto; /* Push this single button to the right */
+    padding-left: var(--spacing-medium); /* Slightly reduce padding */
+    padding-right: var(--spacing-medium);
+    width: auto; /* Override width: 100% from .roi-button */
+}
+
+/* Adjust button group margin when it's in the header line */
+.roi-header-line .roi-button-group {
+    margin-left: auto; /* Push the group to the right */
+    flex-shrink: 0; /* Prevent button group from shrinking */
+    margin-top: 0;
 }
 
 /* --- Axis Config Group specific styles --- */
@@ -628,7 +684,6 @@ input[type=range]::-moz-range-thumb {
 
 .single-row-buttons button,
 .axis-config-row.button-row button { /* Apply to both button rows now */
-    flex-grow: 1;           /* Distribute space */
     flex-shrink: 1;         /* Allow shrinking if needed */
     white-space: nowrap;    /* Prevent button text wrapping */
     /* min-width: 60px;        Optional: Set a minimum width */
@@ -679,9 +734,10 @@ input[type=range]::-moz-range-thumb {
 .calibration-buttons {
     display: flex;
     gap: var(--spacing-medium);
+    /* Ensure remaining button takes full width if needed, or adjust as necessary */
 }
-.calibration-buttons button {
-    flex-grow: 1;
+.calibration-buttons #calibrate-btn {
+    flex-grow: 1; /* Let the remaining calculation button fill the space */
 }
 
 /* Make range input thumb smaller */
@@ -855,4 +911,16 @@ input:checked + .slider:before {
     flex-grow: 1;
     display: inline-block;
     width: auto; /* Allow it to size naturally but align right */
+}
+
+/* Position the toggle button in the top-left corner */
+#toggle-view-btn {
+    position: absolute;
+    top: var(--spacing-medium); /* 8px from top */
+    left: var(--spacing-medium); /* 8px from left */
+    z-index: 10; /* Ensure it's above image/overlay */
+    /* Override flex-grow if previously applied by .calibration-buttons */
+    flex-grow: 0;
+    /* Optional: Set a specific width if needed */
+    /* width: 150px; */
 } 

@@ -24,6 +24,9 @@
 
         <main class="main-content">
             <section class="camera-view">
+                <!-- Moved Toggle Button Here -->
+                <button id="toggle-view-btn" class="select-button" disabled="" style="position: absolute; z-index: 10;"><i class="fas fa-sync-alt"></i> 显示标定板</button>
+
                 <!-- Container for image/svg -->
                 <div id="camera-display-container">
                     <img id="simulated-image" src="favicon.png" alt="模拟相机图像">
@@ -179,25 +182,25 @@
                         <label>对焦状态:</label>
                         <span id="focus-status-text" class="status-未连接">未连接</span>
                     </div>
+
+                    <!-- Focus ROI Controls (Moved Here) -->
+                    <div class="roi-header-line">
+                        <h4 class="roi-heading">对焦ROI区域</h4>
+                        <!-- Draw button now IN the header line -->
+                        <button id="draw-roi-focus-btn" class="roi-button" style="display: flex;" disabled=""><i class="fas fa-pencil-alt"></i> 绘制</button>
+                        <div class="roi-button-group control-item">
+                            <button id="confirm-roi-focus-btn" class="roi-button" style="display: none;" disabled="">确认</button>
+                            <button id="redraw-roi-focus-btn" class="roi-button" style="display: none;" disabled="">重绘</button>
+                            <button id="toggle-focus-roi-visibility-btn" class="roi-button mini-button" disabled="" title="切换对焦ROI可见性" style="display: none;"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+
                     <div class="control-item focus-controls">
                         <button id="start-focus-btn" class="primary-button" disabled=""><i class="fas fa-crosshairs"></i> 开始自动对焦</button>
                         <button id="stop-focus-btn" class="danger-button" disabled=""><i class="fas fa-stop-circle"></i> 停止</button>
                     </div>
 
-                    <!-- Focus ROI Controls (Moved Here) -->
-                     <h4 class="roi-heading">对焦ROI区域</h4>
-                     <p class="description small-description">启用后在相机图像上绘制选区。</p>
-                     <div class="roi-button-group control-item">
-                        <!-- ADDED Draw Button -->
-                        <button id="draw-roi-focus-btn" class="roi-button" disabled=""><i class="fas fa-pencil-alt"></i> 绘制</button>
-                        <button id="confirm-roi-focus-btn" class="roi-button confirm-button" style="display: none;" disabled="">确认</button>
-                        <button id="redraw-roi-focus-btn" class="roi-button redraw-button" style="display: none;" disabled="">重绘</button>
-                    </div>
-                    <!-- End Focus ROI -->
-
                     <hr class="separator">
-
-                    <!-- REMOVED Original ROI Section -->
 
                     <!-- Calibration Controls -->
                     <h4>当量计算</h4>
@@ -210,23 +213,25 @@
                       <div class="control-item side-by-side">
                          <label>计算结果:</label>
                          <span id="calibration-result-value">-- px/mm</span>
-                     </div>
-                     <div class="control-item calibration-buttons">
-                         <button id="toggle-view-btn" class="select-button" disabled=""><i class="fas fa-sync-alt"></i> 显示标定板</button>
-                         <button id="calibrate-btn" disabled=""><i class="fas fa-ruler-combined"></i> 执行计算</button>
-                     </div>
+                      </div>
 
-                     <!-- Calibration ROI Controls (Moved Here) -->
-                     <h4 class="roi-heading">校准ROI区域</h4>
-                     <p class="description small-description">启用后在标定板视图上绘制选区。</p>
-                     <div class="roi-button-group control-item">
-                        <button id="enable-roi-calib-btn" class="roi-button" disabled="" style="display: inline-block;">启用校准ROI</button>
-                        <button id="confirm-roi-calib-btn" class="roi-button confirm-button" style="display: none;" disabled="">确认</button>
-                        <button id="redraw-roi-calib-btn" class="roi-button redraw-button" style="display: none;" disabled="">重绘</button>
+                      <!-- Calibration ROI Controls (Moved Here) -->
+                      <div class="roi-header-line">
+                         <h4 class="roi-heading">校准ROI区域</h4>
+                         <!-- Enable/Draw button now IN the header line -->
+                         <button id="draw-roi-calib-btn" class="roi-button" style="display: none;" disabled=""><i class="fas fa-pencil-alt"></i> 启用校准ROI</button>
+                         <div class="roi-button-group control-item">
+                            <button id="confirm-roi-calib-btn" class="roi-button" style="display: none;" disabled="">确认</button>
+                            <button id="redraw-roi-calib-btn" class="roi-button" style="display: none;" disabled="">重绘</button>
+                            <button id="toggle-calib-roi-visibility-btn" class="roi-button mini-button" disabled="" title="切换校准ROI可见性" style="display: none;"><i class="fas fa-eye"></i></button>
+                        </div>
                     </div>
-                    <!-- End Calibration ROI -->
-                </div>
-            </aside>
+
+                     <div class="control-item calibration-buttons">
+                          <button id="calibrate-btn" disabled=""><i class="fas fa-ruler-combined"></i> 执行计算</button>
+                     </div>
+                  </div>
+             </aside>
         </main>
 
         <footer class="status-bar">

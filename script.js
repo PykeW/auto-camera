@@ -41,12 +41,14 @@ class CameraController {
         this.confirmFocusRoiBtn = document.getElementById('confirm-roi-focus-btn');
         this.redrawFocusRoiBtn = document.getElementById('redraw-roi-focus-btn');
         this.drawRoiFocusBtn = document.getElementById('draw-roi-focus-btn');
+        this.toggleFocusRoiVisibilityBtn = document.getElementById('toggle-focus-roi-visibility-btn');
 
         // --- Calibration ROI Elements ---
-        this.enableCalibRoiBtn = document.getElementById('enable-roi-calib-btn');
+        this.drawCalibRoiBtn = document.getElementById('draw-roi-calib-btn'); // Renamed from enableCalibRoiBtn
         this.calibRoiOverlay = document.getElementById('calibration-roi-overlay');
         this.confirmCalibRoiBtn = document.getElementById('confirm-roi-calib-btn');
         this.redrawCalibRoiBtn = document.getElementById('redraw-roi-calib-btn');
+        this.toggleCalibRoiVisibilityBtn = document.getElementById('toggle-calib-roi-visibility-btn');
 
         // Calibration elements
         this.calibrationPatternDisplay = document.getElementById('calibration-pattern-display');
@@ -111,6 +113,10 @@ class CameraController {
         this.currentCalibRoiY = 0;
         this.finalCalibRoiRect = null;     // The confirmed calibration ROI
         this.pendingCalibRoiRect = null;    // The drawn calibration ROI waiting for confirmation
+
+        // --- ROI Visibility State ---
+        this.isFocusRoiVisible = true; // Default to visible when exists
+        this.isCalibRoiVisible = true; // Default to visible when exists
 
         this.backendUrl = 'http://localhost:5000';
 
@@ -374,28 +380,37 @@ class CameraController {
         // Calibration Input
         if(this.calibSquareSizeInput) this.calibSquareSizeInput.disabled = !connected || this.isCalibrating || this.isFocusing; // Disable if not connected or calibrating/focusing
 
-        // --- Focus ROI Button States (Simplified Logic) ---
+        // --- Focus ROI Button States ---
         const isFocusRoiPending = connected && this.pendingRoiRect;
         const hasFocusRoiConfirmed = connected && this.finalRoiRect;
-
-        // Draw Button State
         const canDrawRoi = isIdle && !this.isInRoiDrawMode && !hasFocusRoiConfirmed && !isFocusRoiPending;
+
+        // Initial Draw Button (Below Heading)
         if (this.drawRoiFocusBtn) {
             this.drawRoiFocusBtn.disabled = !canDrawRoi;
-            // Visibility: Show if idle and no ROI exists, or after Redraw. Hide during draw/pending/confirmed.
-            this.drawRoiFocusBtn.style.display = (isIdle && !hasFocusRoiConfirmed && !isFocusRoiPending && !this.isInRoiDrawMode) ? 'inline-block' : 'none';
+            this.drawRoiFocusBtn.style.display = (!isFocusRoiPending && !hasFocusRoiConfirmed) ? 'inline-block' : 'none';
         }
 
-        // Show Confirm button only when ROI is pending
-        if (this.confirmFocusRoiBtn) {
-            this.confirmFocusRoiBtn.disabled = !isFocusRoiPending;
-            this.confirmFocusRoiBtn.style.display = isFocusRoiPending ? 'inline-block' : 'none';
-        }
-        // Show Redraw button if ROI is pending OR confirmed
-        if (this.redrawFocusRoiBtn) {
-            const canRedraw = isIdle && (isFocusRoiPending || hasFocusRoiConfirmed);
-            this.redrawFocusRoiBtn.disabled = !canRedraw;
-            this.redrawFocusRoiBtn.style.display = (isFocusRoiPending || hasFocusRoiConfirmed) ? 'inline-block' : 'none';
+        // Button Group (Confirm/Redraw/Toggle in Header Line)
+        const focusRoiGroup = this.confirmFocusRoiBtn?.closest('.roi-button-group');
+        if (focusRoiGroup) {
+             focusRoiGroup.style.display = (isFocusRoiPending || hasFocusRoiConfirmed) ? 'flex' : 'none';
+             // Individual buttons inside the group
+             if (this.confirmFocusRoiBtn) {
+                 this.confirmFocusRoiBtn.disabled = !isFocusRoiPending;
+                 this.confirmFocusRoiBtn.style.display = isFocusRoiPending ? 'inline-block' : 'none';
+             }
+             if (this.redrawFocusRoiBtn) {
+                 const canRedraw = isIdle && (isFocusRoiPending || hasFocusRoiConfirmed);
+                 this.redrawFocusRoiBtn.disabled = !canRedraw;
+                 this.redrawFocusRoiBtn.style.display = (isFocusRoiPending || hasFocusRoiConfirmed) ? 'inline-block' : 'none';
+             }
+             if (this.toggleFocusRoiVisibilityBtn) {
+                 this.toggleFocusRoiVisibilityBtn.disabled = !hasFocusRoiConfirmed;
+                 this.toggleFocusRoiVisibilityBtn.style.display = hasFocusRoiConfirmed ? 'inline-block' : 'none';
+                 this.toggleFocusRoiVisibilityBtn.innerHTML = this.isFocusRoiVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+                 this.toggleFocusRoiVisibilityBtn.title = this.isFocusRoiVisible ? '隐藏对焦ROI' : '显示对焦ROI';
+             }
         }
         // --------------------------------------------------
 
@@ -404,23 +419,35 @@ class CameraController {
         const hasCalibRoiConfirmed = connected && this.finalCalibRoiRect;
         const canEnableCalibRoi = isIdle && this.isShowingCalibrationPattern && !this.isInCalibRoiDrawMode && !hasCalibRoiConfirmed && !isCalibRoiPending;
 
-        if (this.enableCalibRoiBtn) {
-            this.enableCalibRoiBtn.disabled = !canEnableCalibRoi;
-            // Visibility: Show if idle on calib view and no ROI exists. Hide during draw/pending/confirmed.
-            this.enableCalibRoiBtn.style.display = (canEnableCalibRoi) ? 'inline-block' : 'none';
-            // Set text based on state
-            this.enableCalibRoiBtn.innerHTML = this.isInCalibRoiDrawMode ? '<i class="fas fa-pencil-alt"></i> 绘制中...' : '<i class="fas fa-pencil-alt"></i> 启用校准ROI';
-            if(this.isInCalibRoiDrawMode) this.enableCalibRoiBtn.disabled = true; // Disable while drawing
+        // Initial Enable/Draw Button (Below Heading)
+        if (this.drawCalibRoiBtn) {
+            this.drawCalibRoiBtn.disabled = !canEnableCalibRoi;
+            // Show only on calib view when no ROI exists
+            this.drawCalibRoiBtn.style.display = (this.isShowingCalibrationPattern && !isCalibRoiPending && !hasCalibRoiConfirmed) ? 'inline-block' : 'none';
+            if(this.isInCalibRoiDrawMode) this.drawCalibRoiBtn.disabled = true; // Disable while drawing
         }
-        if (this.confirmCalibRoiBtn) {
-            this.confirmCalibRoiBtn.disabled = !isCalibRoiPending;
-            this.confirmCalibRoiBtn.style.display = isCalibRoiPending ? 'inline-block' : 'none';
-        }
-        if (this.redrawCalibRoiBtn) {
-             const canRedrawCalib = isIdle && this.isShowingCalibrationPattern && (isCalibRoiPending || hasCalibRoiConfirmed);
-             this.redrawCalibRoiBtn.disabled = !canRedrawCalib;
-            this.redrawCalibRoiBtn.style.display = (isCalibRoiPending || hasCalibRoiConfirmed) ? 'inline-block' : 'none';
-        }
+
+        // Button Group (Confirm/Redraw/Toggle in Header Line)
+        const calibRoiGroup = this.confirmCalibRoiBtn?.closest('.roi-button-group');
+         if (calibRoiGroup) {
+             calibRoiGroup.style.display = (isCalibRoiPending || hasCalibRoiConfirmed) ? 'flex' : 'none';
+             // Individual buttons inside the group
+             if (this.confirmCalibRoiBtn) {
+                 this.confirmCalibRoiBtn.disabled = !isCalibRoiPending;
+                 this.confirmCalibRoiBtn.style.display = isCalibRoiPending ? 'inline-block' : 'none';
+             }
+             if (this.redrawCalibRoiBtn) {
+                  const canRedrawCalib = isIdle && this.isShowingCalibrationPattern && (isCalibRoiPending || hasCalibRoiConfirmed);
+                  this.redrawCalibRoiBtn.disabled = !canRedrawCalib;
+                 this.redrawCalibRoiBtn.style.display = (isCalibRoiPending || hasCalibRoiConfirmed) ? 'inline-block' : 'none';
+             }
+              if (this.toggleCalibRoiVisibilityBtn) {
+                 this.toggleCalibRoiVisibilityBtn.disabled = !hasCalibRoiConfirmed;
+                 this.toggleCalibRoiVisibilityBtn.style.display = hasCalibRoiConfirmed ? 'inline-block' : 'none';
+                 this.toggleCalibRoiVisibilityBtn.innerHTML = this.isCalibRoiVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+                 this.toggleCalibRoiVisibilityBtn.title = this.isCalibRoiVisible ? '隐藏校准ROI' : '显示校准ROI';
+             }
+         }
         // ----------------------------------------------------------
 
         // Table controls
@@ -433,6 +460,21 @@ class CameraController {
 
         // Axis Config Buttons
         if (this.clearAxisBtn) this.clearAxisBtn.disabled = !connected || !this.selectedAxisId || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating; // Enable only if axis is selected and idle
+
+        // --- Focus ROI Visibility Toggle Button State ---
+        if (this.toggleFocusRoiVisibilityBtn) {
+            this.toggleFocusRoiVisibilityBtn.disabled = !hasFocusRoiConfirmed;
+            this.toggleFocusRoiVisibilityBtn.style.display = hasFocusRoiConfirmed ? 'inline-block' : 'none'; // Show only when confirmed
+            this.toggleFocusRoiVisibilityBtn.innerHTML = this.isFocusRoiVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+            this.toggleFocusRoiVisibilityBtn.title = this.isFocusRoiVisible ? '隐藏对焦ROI' : '显示对焦ROI';
+        }
+        // --- Calibration ROI Visibility Toggle Button State ---
+        if (this.toggleCalibRoiVisibilityBtn) {
+            this.toggleCalibRoiVisibilityBtn.disabled = !hasCalibRoiConfirmed;
+            this.toggleCalibRoiVisibilityBtn.style.display = hasCalibRoiConfirmed ? 'inline-block' : 'none'; // Show only when confirmed
+            this.toggleCalibRoiVisibilityBtn.innerHTML = this.isCalibRoiVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+            this.toggleCalibRoiVisibilityBtn.title = this.isCalibRoiVisible ? '隐藏校准ROI' : '显示校准ROI';
+        }
     }
 
     // --- Event Listeners ---
@@ -575,10 +617,26 @@ class CameraController {
         });
 
         // --- Calibration ROI Listeners ---
-        this.enableCalibRoiBtn?.addEventListener('click', () => this.enableCalibRoi());
+        this.drawCalibRoiBtn?.addEventListener('click', () => this.enableCalibRoi()); // Renamed button
         this.confirmCalibRoiBtn?.addEventListener('click', () => this.confirmCalibRoi());
         this.redrawCalibRoiBtn?.addEventListener('click', () => this.redrawCalibRoi());
         // Mouse listeners for drawing calib ROI will be added dynamically
+
+        // --- ROI Visibility Toggle Listeners ---
+        this.toggleFocusRoiVisibilityBtn?.addEventListener('click', () => {
+            if(this.toggleFocusRoiVisibilityBtn.disabled) return;
+            this.isFocusRoiVisible = !this.isFocusRoiVisible;
+            console.log(`对焦 ROI 可见性切换为: ${this.isFocusRoiVisible}`);
+            this.updateRoiOverlay();
+            this.updateControlStates(this.isConnected); // Update button icon/title
+        });
+        this.toggleCalibRoiVisibilityBtn?.addEventListener('click', () => {
+            if(this.toggleCalibRoiVisibilityBtn.disabled) return;
+            this.isCalibRoiVisible = !this.isCalibRoiVisible;
+             console.log(`校准 ROI 可见性切换为: ${this.isCalibRoiVisible}`);
+            this.updateRoiOverlay();
+            this.updateControlStates(this.isConnected); // Update button icon/title
+        });
     }
 
     getEffectiveBestZ() { // Uses Focus ROI state
@@ -861,7 +919,9 @@ class CameraController {
         const currentY = isCalibView ? this.currentCalibRoiY : this.currentRoiY;
 
         // Simpler logic: If drawing OR pending OR final, display it. Otherwise hide.
-        const shouldDisplay = isDrawing || pendingRect || finalRect;
+        // Also check the user visibility toggle
+        const isVisibleByUser = isCalibView ? this.isCalibRoiVisible : this.isFocusRoiVisible;
+        const shouldDisplay = (isDrawing || pendingRect || finalRect) && isVisibleByUser;
         if (!shouldDisplay) {
             overlayElement.style.display = 'none';
             return;
@@ -1369,7 +1429,7 @@ class CameraController {
 
     // --- Calibration ROI Logic ---
     enableCalibRoi() {
-        if (this.enableCalibRoiBtn.disabled || !this.isConnected || !this.isShowingCalibrationPattern) return;
+        if (this.drawCalibRoiBtn.disabled || !this.isConnected || !this.isShowingCalibrationPattern) return; // Use renamed button
         console.log('启用校准 ROI 绘制模式');
         this.isInCalibRoiDrawMode = true;
         if (this.calibrationPatternDisplay) {
