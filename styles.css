@@ -141,15 +141,26 @@ body {
     flex-shrink: 0;
     color: var(--text-light);
     border-left: 1px solid var(--border-dark);
+
+    /* Hide scrollbar for IE, Edge */
+    -ms-overflow-style: none;
+    /* Hide scrollbar for Firefox */
+    scrollbar-width: none;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.control-panel::-webkit-scrollbar {
+    display: none;
 }
 
 .panel-section {
-    padding: var(--spacing-large);
+    padding: var(--spacing-medium) var(--spacing-large); /* Reduced vertical padding */
     border-bottom: 1px solid var(--border-dark);
 }
 
 .panel-section:last-child {
     border-bottom: none;
+    margin-top: var(--spacing-small);
 }
 
 .panel-section h3 {
@@ -169,13 +180,37 @@ body {
 }
 
 .control-item {
-    margin-bottom: var(--spacing-medium);
+    margin-bottom: var(--spacing-medium); /* Keep some bottom margin */
+}
+
+/* Tighter vertical spacing for items within the property grid */
+.property-grid .control-item {
+    margin-bottom: var(--spacing-small);
+    display: flex; /* Align label and control */
+    align-items: center; /* Center items vertically */
+    gap: var(--spacing-medium);
+}
+
+.property-grid .control-item label {
+    flex-shrink: 0; /* Prevent label from shrinking */
+    width: auto; /* Adjust width as needed or use min-width */
+    min-width: 80px; /* Example minimum width */
+    text-align: left; /* Change text alignment to left */
+    margin-bottom: 0; /* Remove bottom margin for flex alignment */
+}
+
+.property-grid .control-item select,
+.property-grid .control-item input[type="number"],
+.property-grid .control-item input[type="text"] {
+    flex-grow: 1; /* Allow control to fill remaining space */
+    width: auto; /* Override default width */
 }
 
 label {
     display: block;
     margin-bottom: var(--spacing-small);
     color: var(--text-medium);
+    font-size: 0.9em; /* Slightly smaller labels */
 }
 
 input[type="text"],
@@ -571,4 +606,205 @@ input[type=range]::-moz-range-thumb {
 
 .input-group input {
     flex-grow: 1;
+}
+
+/* Style for the new single row button group */
+.single-row-buttons {
+    display: flex;
+    gap: var(--spacing-small);
+}
+
+.single-row-buttons button,
+.axis-config-row.button-row button { /* Apply to both button rows now */
+    flex-grow: 1;           /* Distribute space */
+    flex-shrink: 1;         /* Allow shrinking if needed */
+    white-space: nowrap;    /* Prevent button text wrapping */
+    /* min-width: 60px;        Optional: Set a minimum width */
+    padding: var(--spacing-small) var(--spacing-small); /* Reduce padding slightly */
+}
+
+/* Make file/folder select buttons smaller */
+.mini-button {
+    padding: var(--spacing-small) var(--spacing-medium);
+    flex-grow: 0 !important; /* Don't let them grow */
+    flex-shrink: 0;
+}
+
+/* Style for compact selects */
+.compact-select {
+    height: 24px; /* Smaller height */
+    padding: 2px var(--spacing-medium);
+}
+
+/* Property Grid Layout */
+.property-grid {
+    display: flex; /* Change to flex */
+    flex-direction: column; /* Stack items vertically */
+    gap: var(--spacing-small); /* Adjust gap for vertical layout */
+    align-items: center; /* Align items within grid cells */
+}
+
+.property-grid .control-item {
+    /* Ensure items take full width in flex column */
+    width: 100%;
+}
+
+/* Separator Line */
+.separator {
+    border: none;
+    border-top: 1px solid var(--border-dark);
+    margin: var(--spacing-large) 0;
+}
+
+/* Small description text */
+.small-description {
+    font-size: 0.85em;
+    color: var(--text-medium);
+    margin-bottom: var(--spacing-small);
+}
+
+/* Adjust calibration button layout */
+.calibration-buttons {
+    display: flex;
+    gap: var(--spacing-medium);
+}
+.calibration-buttons button {
+    flex-grow: 1;
+}
+
+/* Make range input thumb smaller */
+input[type=range]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px; /* Adjust vertical centering */
+}
+input[type=range]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+}
+
+/* --- New styles for Camera Info grid --- */
+.camera-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two equal columns */
+    gap: var(--spacing-medium);
+}
+
+/* Make labels in camera info grid span less width */
+.camera-info-grid .control-item label {
+    min-width: auto; /* Override default */
+    flex-grow: 0;
+}
+.camera-info-grid .control-item input {
+    flex-grow: 1;
+}
+/* --- End Camera Info grid styles --- */
+
+/* --- Toggle Switch Styles --- */
+.toggle-item {
+    display: flex;
+    align-items: center; /* Ensure vertical alignment */
+    justify-content: space-between; /* Align label left, switch right */
+}
+
+.toggle-item label:first-child { /* The text label */
+    flex-grow: 1; /* Allow label to take up space */
+    min-width: auto; /* Reset min-width */
+    text-align: left;
+    margin-right: var(--spacing-medium);
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 38px; /* Reduced width */
+    height: 24px; /* Height of the switch */
+    flex-shrink: 0; /* Prevent switch from shrinking */
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-darker); /* Darker inactive background */
+    border: 1px solid var(--border-dark);
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px; /* Size of the knob */
+    width: 16px;
+    left: 3px; /* Adjusted padding */
+    bottom: 3px; /* Adjusted padding */
+    background-color: var(--text-light); /* Keep knob light */
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-blue); /* Active background */
+    border-color: var(--accent-blue); /* Keep border same as bg */
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px var(--accent-blue);
+}
+
+input:checked + .slider:before {
+    transform: translateX(16px); /* Adjusted move distance */
+}
+
+/* Rounded sliders */
+.slider.round {
+    border-radius: 24px; /* Make background rounded */
+}
+
+.slider.round:before {
+    border-radius: 50%; /* Make knob round */
+}
+
+.switch input:disabled + .slider {
+    cursor: not-allowed;
+    background-color: #3a3a3a; /* Slightly darker disabled bg */
+    border-color: var(--border-dark);
+    opacity: 0.7;
+}
+
+.switch input:disabled + .slider:before {
+    background-color: #777; /* Dimmer disabled knob color */
+}
+
+.switch input:checked:disabled + .slider {
+    background-color: #105a9e; /* Darker disabled checked color */
+    opacity: 0.6;
+}
+/* --- End Toggle Switch Styles --- */
+
+/* Restore range specific styles */
+.property-grid .range-item label {
+    min-width: 40px; /* Shorter label for RGB */
+    text-align: left; /* Keep left align */
+}
+.property-grid .range-item input[type="range"] {
+    flex-grow: 1;
+    padding: 0;
+    height: auto;
+    vertical-align: middle;
+}
+/* Style for the range value display */
+.range-value {
+    font-size: 0.9em;
+    color: var(--text-medium);
+    min-width: 35px; /* Ensure space for (255) */
+    text-align: right;
 } 

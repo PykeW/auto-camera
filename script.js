@@ -19,42 +19,29 @@ class CameraController {
         this.savePathInput = document.getElementById('save-path');
         this.cameraNameInput = document.getElementById('camera-name');
         this.cameraModelInput = document.getElementById('camera-model');
-        this.propertyTableBody = document.querySelector('#property-table tbody');
+        // REMOVED: this.propertyTableBody reference
 
         // --- Find ROI elements using standard JS ---
-        const allPanelSections = document.querySelectorAll('.panel-section');
-        let roiSectionElement = null;
-        for (const section of allPanelSections) {
-            const h3 = section.querySelector('h3');
-            // Check if h3 exists and its text content includes "ROI区域"
-            if (h3 && h3.textContent.includes("ROI区域")) {
-                roiSectionElement = section;
-                break; // Found the section, stop searching
+        // New logic: Find the button first, then its parent panel section
+        const roiButton = document.getElementById('enable-roi-btn');
+        this.roiSection = null; // Initialize roiSection
+        if (roiButton) {
+            this.roiSection = roiButton.closest('.panel-section'); // Find the closest ancestor panel section
+            if (this.roiSection) {
+                console.log('通过按钮找到 ROI 区域所在的 Panel Section:', this.roiSection);
+            } else {
+                console.error("错误: 找到了 ROI 按钮 (#enable-roi-btn)，但未能找到其父级 .panel-section。请检查 index.html 结构。");
             }
+        } else {
+            console.error("错误: 未能找到 ID 为 'enable-roi-btn' 的 ROI 按钮。请检查 index.html ID。");
         }
-        this.roiSection = roiSectionElement; // Store the found section element
 
-        // Initialize ROI inputs to null
+        // Initialize ROI inputs to null (Keep this part)
         this.roiLeftX = null;
         this.roiTopY = null;
         this.roiRightX = null;
         this.roiBottomY = null;
 
-        if (this.roiSection) {
-            // Find number inputs within the found ROI section
-            const roiInputs = this.roiSection.querySelectorAll('input[type="number"]');
-            if (roiInputs.length >= 4) {
-                // Assign inputs based on their order
-                this.roiLeftX = roiInputs[0];
-                this.roiTopY = roiInputs[1];
-                this.roiRightX = roiInputs[2];
-                this.roiBottomY = roiInputs[3];
-            } else {
-                console.warn("警告: 在ROI区域部分未找到预期的4个数字输入框。");
-            }
-        } else {
-            console.warn("警告: 未能找到包含 'ROI区域' 的 .panel-section。");
-        }
         // --- End of ROI element finding ---
 
         this.connectBtn = document.getElementById('connect-btn');
@@ -158,28 +145,6 @@ class CameraController {
     applyBlur(clarity) {
         const blurValue = (1 - clarity) * this.MAX_BLUR;
         this.simulatedImage.style.filter = `blur(${blurValue.toFixed(2)}px)`;
-
-        // Adjust ROI overlay opacity based on clarity and whether ROI is confirmed
-        if (this.roiOverlay) {
-            if (this.roiEnabled && this.finalRoiRect) {
-                // ROI is confirmed, make overlay more visible when clarity is high
-                // Map clarity [0, 1] to opacity [0.1, 0.9] (example mapping)
-                 const minOpacity = 0.1;
-                 const maxOpacity = 0.7; // Keep it somewhat transparent even when sharp
-                 this.roiOverlay.style.opacity = minOpacity + clarity * (maxOpacity - minOpacity);
-                 this.roiOverlay.style.display = 'block'; // Ensure it's visible
-                 this.roiOverlay.style.backgroundColor = 'rgba(255, 255, 0, 0.08)'; // Ensure background is set
-             } else if (this.roiEnabled && this.pendingRoiRect) {
-                 // ROI is pending confirmation, keep it fully visible but without background effect yet
-                 this.roiOverlay.style.opacity = 1; // Full dashed border visibility
-                 this.roiOverlay.style.backgroundColor = 'transparent'; // No background while drawing/pending
-                 this.roiOverlay.style.display = 'block';
-             } else {
-                 // No ROI active or drawing
-                 this.roiOverlay.style.opacity = 0;
-                 this.roiOverlay.style.display = 'none';
-             }
-        }
     }
 
     updateUI() {
@@ -450,7 +415,6 @@ class CameraController {
         this.savePathInput.value = '';
         this.cameraNameInput.value = '';
         this.cameraModelInput.value = '';
-        this.propertyTableBody.innerHTML = ''; // Clear table
         this.clarityValueInput.value = '--';
         this.currentZInput.value = '--';
         this.footerZPos.textContent = '--';
@@ -900,16 +864,39 @@ class CameraController {
 
     // --- Event Listeners ---
     initializeEventListeners() {
-        this.connectBtn.addEventListener('click', () => {
-            // Restore the logic: call disconnect if connected, otherwise connect
-            if (this.isConnected) {
-                this.disconnectCamera(); 
-            } else {
-                this.connectCamera(); 
-            }
-            // Removed the old logic that checked this.isConnected here
-            // because connectCamera now handles both connect and potential errors.
-        });
+        // Connect Button Listener (Example - keep existing listeners)
+        if (this.connectBtn) {
+             this.connectBtn.addEventListener('click', () => {
+                if (this.isConnected) {
+                    this.disconnectCamera(); 
+                } else {
+                    this.connectCamera(); 
+                }
+            });
+        }
+        // Add other existing listeners back here (configAxisBtn, startFocusBtn, etc.)
+        // ... (Keep existing listeners)
+
+        // --- ROI Drawing Listeners ---
+        if (this.simulatedImage) {
+             this.simulatedImage.addEventListener('mousedown', this.handleRoiMouseDown.bind(this));
+            // mousemove and mouseup listeners are added dynamically to the window during mousedown
+            // mouseleave is handled by the existing listener, but we modify its handler
+            // Find and potentially remove the old mouseleave if needed, or ensure only one is active
+             // REMOVED: this.simulatedImage.addEventListener('mouseleave', this.handleRoiMouseLeave.bind(this)); // Add the new one
+        } else {
+            console.error("错误：无法找到 simulatedImage 元素来附加 ROI 监听器！");
+        }
+        // ---------------------------
+
+        // --- Serial Number Selection Listener (Example - keep existing listener) ---
+        if (this.serialNumberSelect) {
+             this.serialNumberSelect.addEventListener('change', () => {
+                this.updateControlStates(this.isConnected); // Update connect button state based on selection
+            });
+        }
+        // ----------------------------------
+
         this.configAxisBtn.addEventListener('click', (e) => {
              e.stopPropagation(); // Prevent body click from closing immediately
              this.fetchAndShowAxisDropdown()
@@ -997,95 +984,6 @@ class CameraController {
         this.simulatedImage.addEventListener('mouseleave', () => {
              this.statusBarMouse.textContent = `---, ---`;
         });
-
-        // Property Table Change Listener (Example - Needs connecting to backend)
-        this.propertyTableBody.addEventListener('change', async (e) => {
-            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) {
-                const row = e.target.closest('tr');
-                if (!row) return;
-                const propName = row.cells[0].textContent;
-                const propValue = e.target.value;
-                console.log(`前端: 属性更改: ${propName} = ${propValue}`);
-
-                // --- Call Backend to Set Property ---
-                try {
-                    const response = await fetch(`${this.backendUrl}/set_property`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ name: propName, value: propValue })
-                    });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const result = await response.json();
-                    if (result.status === 'ok') {
-                         console.log(`后端确认: ${propName} 设置为 ${result.value}`);
-                         // Optionally update UI element again if backend modified the value
-                         // e.target.value = result.value;
-                    } else {
-                         console.error(`后端设置属性失败: ${result.message}`);
-                         // Revert UI? Show error?
-                    }
-                } catch (error) {
-                     console.error(`设置属性时网络错误: ${error}`);
-                     // Revert UI? Show error?
-                }
-                // ------------------------------------
-            }
-        });
-
-        // --- ROI Drawing Listeners ---
-        this.simulatedImage.addEventListener('mousedown', (e) => {
-            if (!this.roiEnabled || !this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
-            e.preventDefault(); // Prevent default image drag behavior
-
-            this.isDrawingRoi = true;
-            const coords = this.getImageCoordinates(e);
-            this.roiStartX = coords.x;
-            this.roiStartY = coords.y;
-            this.currentRoiX = coords.x; // Initialize current pos
-            this.currentRoiY = coords.y;
-            this.finalRoiRect = null; // Clear previous final ROI
-            this.updateRoiOverlay(); // Show initial small dot or update overlay
-            console.log(`开始绘制 ROI @ (${this.roiStartX.toFixed(0)}, ${this.roiStartY.toFixed(0)})`);
-        });
-
-        document.addEventListener('mousemove', (e) => { // Listen on document to capture mouse leaving image
-            if (!this.isDrawingRoi || !this.roiEnabled) return;
-            
-            const coords = this.getImageCoordinates(e);
-            this.currentRoiX = coords.x;
-            this.currentRoiY = coords.y;
-            this.updateRoiOverlay(); // Update overlay during drag
-        });
-
-        document.addEventListener('mouseup', (e) => { // Listen on document
-            if (!this.isDrawingRoi || !this.roiEnabled) return;
-
-            this.isDrawingRoi = false;
-            const finalCoords = this.getImageCoordinates(e);
-            const x = Math.min(this.roiStartX, finalCoords.x);
-            const y = Math.min(this.roiStartY, finalCoords.y);
-            const width = Math.abs(this.roiStartX - finalCoords.x);
-            const height = Math.abs(this.roiStartY - finalCoords.y);
-
-            if (width > 5 && height > 5) { // Require a minimum size
-                this.pendingRoiRect = { x, y, width, height };
-                console.log(`ROI 绘制完成，等待确认:`, this.pendingRoiRect);
-                // Keep overlay visible, update buttons
-                this.updateControlStates(this.isConnected);
-            } else {
-                console.log('ROI 绘制无效 (太小)，已取消。');
-                this.roiOverlay.style.display = 'none';
-                this.pendingRoiRect = null;
-                this.updateControlStates(this.isConnected); // Reset buttons
-            }
-        });
-        // -----------------------------
-
-        // --- Serial Number Selection Listener ---
-        this.serialNumberSelect?.addEventListener('change', () => {
-            this.updateControlStates(this.isConnected); // Update connect button state based on selection
-        });
-        // ----------------------------------
     }
 
     // --- Initial Setup ---
@@ -1117,90 +1015,111 @@ class CameraController {
     // New helper function to update UI from state object
     updateUIFromState(state) {
         if (!state) return;
-
+        console.log('Backend state received in updateUIFromState:', JSON.stringify(state)); // Log received state
+ 
         this.isConnected = state.isConnected;
-
+ 
         if (this.isConnected) {
-            this.serialNumberSelect.innerHTML = `<option value="${state.serialNumber}">${state.serialNumber}</option>`;
-            this.configFileInput.value = state.configFile || '';
-            this.savePathInput.value = state.savePath || '';
-            this.cameraNameInput.value = state.cameraName || '';
-            this.cameraModelInput.value = state.cameraModel || '';
-            this.currentZ = state.currentZ;
+            // Ensure elements exist before updating
+            if (this.serialNumberSelect) { this.serialNumberSelect.innerHTML = `<option value="${state.serialNumber}">${state.serialNumber}</option>`; }
+            if (this.configFileInput) { this.configFileInput.value = state.configFile || ''; }
+            if (this.savePathInput) { this.savePathInput.value = state.savePath || ''; }
+            if (this.cameraNameInput) { this.cameraNameInput.value = state.cameraName || ''; }
+            if (this.cameraModelInput) { this.cameraModelInput.value = state.cameraModel || ''; }
+ 
+            this.currentZ = state.currentZ !== undefined ? state.currentZ : '--'; // Handle potential undefined Z
             this.currentClarity = state.clarity;
-            this.footerZPos.textContent = this.currentZ.toFixed(2);
-            this.currentZInput.value = this.currentZ.toFixed(2);
-            this.clarityValueInput.value = this.currentClarity.toFixed(3);
+ 
+            const currentZStr = typeof this.currentZ === 'number' ? this.currentZ.toFixed(2) : '--';
+            if (this.footerZPos) { this.footerZPos.textContent = currentZStr; }
+            if (this.currentZInput) { this.currentZInput.value = currentZStr; }
+            if (this.clarityValueInput) { this.clarityValueInput.value = typeof this.currentClarity === 'number' ? this.currentClarity.toFixed(3) : '--'; }
             this.applyBlur(this.currentClarity);
-
-            // Populate Properties Table 
-            this.propertyTableBody.innerHTML = '';
+ 
+            // Update individual property controls based on backend state
             const properties = state.properties || {};
-            for (const propName in properties) {
-                const prop = properties[propName];
-                const row = this.propertyTableBody.insertRow();
-                const nameCell = row.insertCell();
-                const valueCell = row.insertCell();
-                nameCell.textContent = propName;
-                let control; 
-                if (prop.type === 'select') {
-                    control = document.createElement('select');
-                    (prop.options || []).forEach(opt => { 
-                        const option = document.createElement('option'); 
-                        option.value = opt; option.textContent = opt; control.appendChild(option); 
-                    });
-                    control.value = prop.value;
-                } else if (prop.type === 'number' || prop.type === 'range') {
-                    control = document.createElement('input');
-                    control.type = prop.type; control.value = prop.value;
-                    if (prop.min !== undefined) control.min = prop.min;
-                    if (prop.max !== undefined) control.max = prop.max;
-                    if (prop.step !== undefined) control.step = prop.step;
-                } 
-                if (control) { 
-                    valueCell.appendChild(control);
-                    control.disabled = !this.isConnected; 
-                } 
+            console.log('Processing properties:', JSON.stringify(properties)); // Log properties object
+ 
+            // Example: Update Exposure and Gain if they exist in state.properties
+            // Add similar logic for other properties (Y/X Invert, Trigger Mode etc.) if they come from backend
+            const exposureInput = document.getElementById('exposure-time');
+            // Use the actual key from the backend state for properties, adjust if needed
+            const exposureKey = '曝光时间(us)'; // Assuming this is the key, verify from logs
+            if (exposureInput) { // Check if element exists first
+                 if (properties[exposureKey] && properties[exposureKey].value !== undefined) {
+                    exposureInput.value = properties[exposureKey].value;
+                } else {
+                    exposureInput.value = ''; // Clear if not present in state or key is wrong
+                }
             }
-            this.populatePropertiesTable(properties); // Extracted logic
-
+ 
+            const gainInput = document.getElementById('gain');
+            const gainKey = '增益'; // Assuming this is the key, verify from logs
+            if (gainInput) { // Check if element exists first
+                if (properties[gainKey] && properties[gainKey].value !== undefined) {
+                    gainInput.value = properties[gainKey].value;
+                } else {
+                    gainInput.value = ''; // Clear if not present in state or key is wrong
+                }
+            }
+ 
+            // Update Enable and Auto WB switches based on specific state fields
+            const enableSwitch = document.getElementById('enable-camera-cb');
+            if (enableSwitch) { // Check element exists first
+                 enableSwitch.checked = state.cameraEnabled || false;
+            }
+ 
+            // (White balance update logic below remains mostly the same)
+ 
             // ROI Area
-            // No longer setting input values. If backend sends ROI, store it.
+            // Check element existence before accessing properties
             const roi = state.roiCoords; // Assuming backend sends {x, y, width, height}
             if (roi && typeof roi === 'object' && roi.width > 0 && roi.height > 0) {
-                 this.finalRoiRect = roi; // Store it
-                 // If ROI is also enabled in state, draw the initial overlay
-                 if (state.roiEnabled) {
-                     this.roiEnabled = true; // Make sure frontend knows
-                     this.enableRoiBtn.textContent = "禁用ROI";
-                     this.simulatedImage.style.cursor = 'crosshair';
-                     // Need to calculate display coords and show overlay
-                     // We need a function to draw based on finalRoiRect
-                     this.drawFinalRoiOverlay();
-                 } else {
-                     this.roiEnabled = false;
-                     this.enableRoiBtn.textContent = "启用ROI";
-                     this.simulatedImage.style.cursor = 'default';
-                     this.roiOverlay.style.display = 'none';
-                 }
+                  this.finalRoiRect = roi; // Store it
+                  // If ROI is also enabled in state, draw the initial overlay
+                  if (state.roiEnabled) {
+                      this.roiEnabled = true; // Make sure frontend knows
+                      if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "禁用ROI"; } // Check exists
+                      if (this.simulatedImage) { this.simulatedImage.style.cursor = 'crosshair'; } // Check exists
+                      // Need to calculate display coords and show overlay
+                      // We need a function to draw based on finalRoiRect
+                      this.drawFinalRoiOverlay();
+                  } else {
+                      this.roiEnabled = false;
+                      if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "启用ROI"; } // Check exists
+                      if (this.simulatedImage) { this.simulatedImage.style.cursor = 'default'; } // Check exists
+                      if (this.roiOverlay) { this.roiOverlay.style.display = 'none'; } // Check exists
+                  }
             } else {
                 // No ROI from backend or invalid
                  this.finalRoiRect = null;
                  this.pendingRoiRect = null; // Ensure pending is also null
                  this.roiEnabled = state.roiEnabled || false; // Use backend state or default false
                  if (this.roiEnabled) {
-                     this.enableRoiBtn.textContent = "禁用ROI";
-                     this.simulatedImage.style.cursor = 'crosshair';
-                     this.roiOverlay.style.display = 'none'; // Hide until drawn
+                     if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "禁用ROI"; } // Check exists
+                     if (this.simulatedImage) { this.simulatedImage.style.cursor = 'crosshair'; } // Check exists
+                     if (this.roiOverlay) { this.roiOverlay.style.display = 'none'; } // Hide until drawn
                  } else {
-                     this.enableRoiBtn.textContent = "启用ROI";
-                     this.simulatedImage.style.cursor = 'default';
-                     this.roiOverlay.style.display = 'none';
+                     if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "启用ROI"; } // Check exists
+                     if (this.simulatedImage) { this.simulatedImage.style.cursor = 'default'; } // Check exists
+                     if (this.roiOverlay) { this.roiOverlay.style.display = 'none'; } // Check exists
                  }
             }
             // Update selected Axis display
             this.updateConfigAxisButtonDisplay(state.selectedAxisId);
-
+ 
+            // Update White Balance controls based on state
+            if (this.whiteBalanceCheckbox) { // Check exists first
+                 this.whiteBalanceCheckbox.checked = state.autoWhiteBalanceEnabled || false;
+                 this.toggleManualWBControls(!this.whiteBalanceCheckbox.checked);
+            }
+            if (state.whiteBalanceValues) {
+                if (this.wbRedSlider) { this.wbRedSlider.value = state.whiteBalanceValues.red !== undefined ? state.whiteBalanceValues.red : 128; } // Check exists & value defined
+                if (this.wbGreenSlider) { this.wbGreenSlider.value = state.whiteBalanceValues.green !== undefined ? state.whiteBalanceValues.green : 128; }
+                if (this.wbBlueSlider) { this.wbBlueSlider.value = state.whiteBalanceValues.blue !== undefined ? state.whiteBalanceValues.blue : 128; }
+                this.updateWBValueDisplays(); // Update span text
+            }
+ 
         } else {
             // Handle disconnected state (similar to resetUIData)
             this.resetUIData();
@@ -1208,7 +1127,8 @@ class CameraController {
         }
     }
 
-    // Extracted function to populate the properties table
+    // Extracted function to populate the properties table - NOW OBSOLETE
+    /*
     populatePropertiesTable(properties) {
         this.propertyTableBody.innerHTML = '';
         properties = properties || {};
@@ -1239,6 +1159,7 @@ class CameraController {
             } 
         }
     }
+    */
 
     // Helper to update config axis button text/title
     async updateConfigAxisButtonDisplay(axisId) {
@@ -1614,11 +1535,77 @@ class CameraController {
         return this.QUADRANT_BEST_Z[quadrant] || 15.0; // Fallback Z
     }
     // -----------------------------------------
-}
+
+    // --- ROI Drawing Event Handlers ---
+    handleRoiMouseDown(event) {
+        if (!this.roiEnabled || this.isDrawingRoi || this.finalRoiRect || this.pendingRoiRect) return; // Only draw if enabled, not already drawing, and no ROI exists
+        event.preventDefault(); // Prevent default image drag behavior
+        console.log("ROI Mouse Down");
+        this.isDrawingRoi = true;
+        const coords = this.getImageCoordinates(event);
+        this.roiStartX = coords.x;
+        this.roiStartY = coords.y;
+        this.currentRoiX = coords.x; // Initialize current position for drawing
+        this.currentRoiY = coords.y;
+        // No need to set styles directly here, drawFinalRoiOverlay will handle it
+        this.drawFinalRoiOverlay(); // <-- Call this instead of updateRoiOverlay
+
+        // Add temporary listeners to window for mousemove and mouseup
+        this.boundHandleRoiMouseMove = this.handleRoiMouseMove.bind(this);
+        this.boundHandleRoiMouseUp = this.handleRoiMouseUp.bind(this);
+        window.addEventListener('mousemove', this.boundHandleRoiMouseMove);
+        window.addEventListener('mouseup', this.boundHandleRoiMouseUp);
+    }
+
+    handleRoiMouseMove(event) {
+        if (!this.isDrawingRoi) return;
+        // console.log("ROI Mouse Move"); // Optional: Log frequently
+        const coords = this.getImageCoordinates(event);
+        this.currentRoiX = coords.x;
+        this.currentRoiY = coords.y;
+        this.updateRoiOverlay();
+    }
+
+    handleRoiMouseUp(event) {
+        if (!this.isDrawingRoi) return;
+        console.log("ROI Mouse Up");
+        this.isDrawingRoi = false;
+
+        // Remove temporary listeners
+        window.removeEventListener('mousemove', this.boundHandleRoiMouseMove);
+        window.removeEventListener('mouseup', this.boundHandleRoiMouseUp);
+
+        const finalCoords = this.getImageCoordinates(event);
+        this.currentRoiX = finalCoords.x;
+        this.currentRoiY = finalCoords.y;
+
+        // Calculate final rectangle in image coordinates
+        const x = Math.min(this.roiStartX, this.currentRoiX);
+        const y = Math.min(this.roiStartY, this.currentRoiY);
+        const width = Math.abs(this.roiStartX - this.currentRoiX);
+        const height = Math.abs(this.roiStartY - this.currentRoiY);
+
+        // Store the drawn rectangle, ready for confirmation
+        if (width > 5 && height > 5) { // Minimum size check
+             this.pendingRoiRect = { x, y, width, height };
+             console.log('ROI 绘制完成，等待确认:', this.pendingRoiRect);
+             // Update overlay one last time based on pending rect
+             this.drawFinalRoiOverlay(); // Use this function to draw based on pending/final
+             this.simulatedImage.style.cursor = 'default'; // Reset cursor after drawing
+             this.updateControlStates(this.isConnected); // <-- 添加调用以更新按钮状态
+        } else {
+            // If ROI is too small, reset overlay and cursor without setting pending
+            this.roiOverlay.style.display = 'none';
+            this.simulatedImage.style.cursor = 'crosshair'; // Keep crosshair if draw failed
+            console.log('ROI 绘制尺寸过小，未设置');
+        }
+    }
+} // CameraController 类的结束括号
+
 
 // Initialize the controller when the DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     // Modify this if your CameraController relies on backend data for init
     // Maybe fetch initial status here or inside the constructor
     new CameraController();
-}); 
+});

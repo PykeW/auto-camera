@@ -35,25 +35,22 @@
             </section>
 
             <aside class="control-panel" id="control-panel-content">
+                <!-- Camera Connection & Axis -->
                 <div class="panel-section requires-connection">
                     <label for="serial-number">相机序列号：</label>
                      <div class="input-group axis-config-group">
-                         <!-- First row -->
                          <div class="axis-config-row">
                              <select id="serial-number" disabled><option>加载相机...</option></select>
                              <button id="connect-btn" class="connect-button" disabled>连接</button>
                          </div>
-                         <!-- Second row -->
                          <div class="axis-config-row button-row">
                              <button id="config-axis-btn" class="select-button" title="配置相机Z轴" disabled>配置轴</button>
                              <button id="clear-axis-btn" class="select-button danger-button" title="清空已选Z轴" disabled>清除</button>
                          </div>
                     </div>
-                    <!-- 新增: 轴配置下拉菜单容器 -->
                     <div id="axis-config-dropdown" class="axis-dropdown" >
                          <div class="axis-dropdown-header">选择 Z 轴 (模拟PLC数据)</div>
                          <ul id="axis-list" class="axis-list">
-                             <!-- 轴选项将由 JS 动态填充 -->
                              <li class="axis-list-loading">加载中...</li>
                          </ul>
                          <div class="axis-dropdown-footer">
@@ -62,85 +59,152 @@
                     </div>
                 </div>
 
+                <!-- Camera Info -->
                 <div class="panel-section requires-connection">
-                    <label for="config-file">配置文件：</label>
-                     <div class="input-group">
-                        <input type="text" id="config-file" value="" readonly placeholder="未选择文件">
-                        <button id="select-config-btn" class="select-button" disabled>选择文件</button>
-                    </div>
-                </div>
-
-                <div class="panel-section requires-connection">
-                    <label for="save-path">图像保存路径：</label>
-                     <div class="input-group">
-                        <input type="text" id="save-path" value="" readonly placeholder="连接后显示">
-                        <button id="select-folder-btn" class="select-button" disabled>选择文件夹</button>
-                    </div>
-                </div>
-
-                <div class="panel-section requires-connection">
-                    <label for="camera-name">相机名称：</label>
-                    <input type="text" id="camera-name" value="" disabled>
-                </div>
-
-                <div class="panel-section requires-connection">
-                    <label for="camera-model">相机型号：</label>
-                    <input type="text" id="camera-model" value="" readonly disabled>
-                </div>
-
-                <div class="panel-section requires-connection">
-                    <h3>相机属性</h3>
-                    <table class="property-table" id="property-table">
-                        <tbody>
-                            <!-- Rows will be populated by JS, inputs/selects should be disabled initially -->
-                        </tbody>
-                    </table>
-                </div>
-
-                 <div class="panel-section requires-connection">
-                    <h3>Z轴控制 / 对焦</h3>
                     <div class="control-item">
-                        <label for="current-z">当前 Z 位置 (mm):</label>
+                        <label for="config-file">配置文件：</label>
+                         <div class="input-group">
+                            <input type="text" id="config-file" value="" readonly placeholder="未选择文件" disabled="">
+                            <button id="select-config-btn" class="select-button mini-button" disabled="">选择</button>
+                        </div>
+                    </div>
+                     <div class="control-item">
+                        <label for="save-path">图像保存路径：</label>
+                         <div class="input-group">
+                            <input type="text" id="save-path" value="" readonly placeholder="连接后显示" disabled="">
+                            <button id="select-folder-btn" class="select-button mini-button" disabled="">选择</button>
+                        </div>
+                    </div>
+                    <div class="camera-info-grid">
+                        <div class="control-item">
+                            <label for="camera-name">相机名称：</label>
+                            <input type="text" id="camera-name" value="" disabled="">
+                        </div>
+                        <div class="control-item">
+                            <label for="camera-model">相机型号：</label>
+                            <input type="text" id="camera-model" value="" readonly="" disabled="">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Camera Properties & Controls -->
+                <div class="panel-section requires-connection">
+                    <h3>相机属性与控制</h3>
+
+                    <div class="property-grid">
+                        <!-- Simulated Properties -->
+                        <div class="control-item">
+                            <label>Y反转:</label>
+                            <select class="compact-select" disabled=""><option>否</option><option>是</option></select>
+                        </div>
+                        <div class="control-item">
+                            <label>X反转:</label>
+                            <select class="compact-select" disabled=""><option>否</option><option>是</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>触发模式:</label>
+                            <select id="trigger-mode-select" disabled=""><option value="连续采集">连续采集</option><option value="软件触发">软件触发</option><option>外部触发</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>触发信号:</label>
+                            <select disabled=""><option>上升沿</option><option>下降沿</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>触发源:</label>
+                            <select disabled=""><option>通道0</option><option>通道1</option><option>软件</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>图像格式:</label>
+                            <select disabled=""><option>MONO8</option><option>RGB8</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label for="exposure-time">曝光时间(us):</label>
+                            <input type="number" id="exposure-time" value="-1" disabled="">
+                        </div>
+                        <div class="control-item">
+                            <label for="gain">增益:</label>
+                            <input type="number" id="gain" value="-1" disabled="">
+                        </div>
+                        <div class="control-item toggle-item">
+                            <label for="enable-camera-cb">使能:</label>
+                            <label class="switch">
+                                <input type="checkbox" id="enable-camera-cb" disabled="">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="control-item toggle-item">
+                            <label for="white-balance-cb">自动白平衡:</label>
+                             <label class="switch">
+                                <input type="checkbox" id="white-balance-cb" disabled="">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <!-- Re-added Red, Green, Blue Range Sliders -->
+                        <div class="control-item range-item manual-wb-control" style="display: flex;">
+                            <label>红(R):</label>
+                            <input type="range" id="wb-red" disabled="" min="0" max="255" value="128">
+                            <span class="range-value">(128)</span>
+                        </div>
+                        <div class="control-item range-item manual-wb-control" style="display: flex;">
+                            <label>绿(G):</label>
+                            <input type="range" id="wb-green" disabled="" min="0" max="255" value="128">
+                            <span class="range-value">(128)</span>
+                        </div>
+                        <div class="control-item range-item manual-wb-control" style="display: flex;">
+                            <label>蓝(B):</label>
+                            <input type="range" id="wb-blue" disabled="" min="0" max="255" value="128">
+                            <span class="range-value">(128)</span>
+                        </div>
+                    </div>
+
+                    <hr class="separator">
+
+                    <!-- Z Axis / Focus -->
+                    <h4>Z轴控制 / 对焦</h4>
+                    <div class="control-item">
+                        <label for="current-z">当前 Z (mm):</label>
                         <input type="text" id="current-z" value="--" readonly disabled="">
                     </div>
                      <div class="control-item">
                         <label for="clarity-value">当前清晰度:</label>
-                        <input type="text" id="clarity-value" value="--" readonly="" disabled="">
-                    </div>
-                    <div class="control-item focus-controls">
-                        <button id="start-focus-btn" class="primary-button" disabled=""><i class="fas fa-crosshairs"></i> 开始自动对焦</button>
-                        <button id="stop-focus-btn" class="danger-button" disabled=""><i class="fas fa-stop-circle"></i> 停止</button>
+                        <input type="text" id="clarity-value" value="--" readonly disabled="">
                     </div>
                      <div class="control-item focus-status">
                         <label>对焦状态:</label>
                         <span id="focus-status-text" class="status-未连接">未连接</span>
                     </div>
-                </div>
-                <div class="panel-section requires-connection">
-                    <h3>ROI区域</h3>
-                     <p class="description">启用ROI后，在上方图像区域拖动鼠标绘制选区。</p>
-                     <div class="roi-button-group">
+                    <div class="control-item focus-controls">
+                        <button id="start-focus-btn" class="primary-button" disabled=""><i class="fas fa-crosshairs"></i> 开始自动对焦</button>
+                        <button id="stop-focus-btn" class="danger-button" disabled=""><i class="fas fa-stop-circle"></i> 停止</button>
+                    </div>
+
+                    <hr class="separator">
+
+                     <!-- ROI Controls -->
+                     <h4>ROI区域</h4>
+                     <p class="description small-description">启用后在图像上绘制选区。</p>
+                     <div class="roi-button-group control-item">
                         <button id="enable-roi-btn" class="roi-button" disabled="" style="display: inline-block;">启用ROI</button>
                         <button id="confirm-roi-btn" class="roi-button confirm-button" style="display: none;" disabled="">确认ROI</button>
                         <button id="redraw-roi-btn" class="roi-button redraw-button" style="display: none;" disabled="">重新绘制</button>
                     </div>
-                </div>
-                <div class="panel-section requires-connection">
-                    <h3>当量计算 (可选)</h3>
-                    <div class="control-item">
-                        <button id="calibrate-btn" disabled=""><i class="fas fa-ruler-combined"></i> 执行当量计算</button>
-                        <button id="toggle-view-btn" class="select-button" disabled="" style="margin-left: 10px;"><i class="fas fa-sync-alt"></i> 显示标定板</button>
-                    </div>
-                    <div class="control-item">
-                         <label for="calib-square-size">单个方格尺寸 (mm):</label>
+
+                    <hr class="separator">
+
+                    <!-- Calibration Controls -->
+                    <h4>当量计算</h4>
+                     <div class="control-item">
+                         <label for="calib-square-size">方格尺寸(mm):</label>
                          <input type="number" id="calib-square-size" value="1.0" step="0.1" min="0.1" disabled="">
                      </div>
-                    <p class="description">对焦后显示标定板，输入方格尺寸，再执行计算。</p>
-                    <!-- Added result display area -->
-                    <div class="control-item calibration-result" style="margin-top: 10px;">
-                        <label>计算结果:</label>
-                        <span id="calibration-result-value">-- pixels/mm</span>
-                    </div>
+                      <div class="control-item">
+                         <label>计算结果:</label>
+                         <span id="calibration-result-value">-- px/mm</span>
+                     </div>
+                     <div class="control-item calibration-buttons">
+                         <button id="toggle-view-btn" class="select-button" disabled=""><i class="fas fa-sync-alt"></i> 显示标定板</button>
+                         <button id="calibrate-btn" disabled=""><i class="fas fa-ruler-combined"></i> 执行计算</button>
+                     </div>
                 </div>
             </aside>
         </main>
