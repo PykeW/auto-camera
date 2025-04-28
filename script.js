@@ -89,7 +89,6 @@ class CameraController {
         this.dropdownCameraSN = document.getElementById('dropdown-camera-sn');
 
         // --- Simulation Parameters ---
-        this.SIMULATED_BEST_Z = 15.5; // mm
         this.Z_RANGE = { min: 5, max: 25 }; // mm
         this.Z_STEP_ROUGH = 1.0; // mm
         this.Z_STEP_FINE = 0.1; // mm
@@ -103,6 +102,13 @@ class CameraController {
         this.CALIBRATION_DELAY = 1500; // ms total for simulated calibration steps
         this.SIMULATED_SQUARE_SIZE_PX = 37.5; // Simulated pixel size of square at best focus
         this.CHECKERBOARD_SVG = `<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="checkerboard" width="75" height="75" patternUnits="userSpaceOnUse"><rect width="37.5" height="37.5" fill="black"/><rect x="37.5" y="37.5" width="37.5" height="37.5" fill="black"/></pattern></defs><rect width="300" height="300" fill="white"/><rect width="300" height="300" fill="url(#checkerboard)"/><style>rect { stroke: grey; stroke-width: 0.5; }</style></svg>`;
+        // Quadrant Best Z Simulation
+        this.QUADRANT_BEST_Z = {
+            TL: 15.0, // Top Left
+            TR: 16.5, // Top Right
+            BL: 14.0, // Bottom Left
+            BR: 15.8  // Bottom Right
+        };
         // ---------------------------
 
         this.selectedAxisId = null; // Store the selected axis ID
@@ -138,18 +144,42 @@ class CameraController {
 
     // --- Utility Functions ---
     calculateClarity(z) {
-        // Simulate ROI having a slightly different optimal focus point
-        // Only apply if ROI is enabled AND a valid ROI has been drawn
-        const effectiveBestZ = (this.roiEnabled && this.finalRoiRect) ? this.SIMULATED_BEST_Z + 0.5 : this.SIMULATED_BEST_Z;
+        let effectiveBestZ = this.getEffectiveBestZ(); // Get best Z based on ROI or center
         const diff = z - effectiveBestZ;
-        const focusSharpness = 2.0;
-        const clarity = Math.exp(-(diff * diff) / (2 * focusSharpness * focusSharpness));
+        const focusSharpness = 1.5; // Make focus sharper for better distinction
+        let clarity = Math.exp(-(diff * diff) / (2 * focusSharpness * focusSharpness));
+
+        // Add slight noise to make it less perfect
+        clarity = Math.max(0, Math.min(1, clarity - (Math.random() * 0.05)));
+
         return clarity;
     }
 
     applyBlur(clarity) {
         const blurValue = (1 - clarity) * this.MAX_BLUR;
         this.simulatedImage.style.filter = `blur(${blurValue.toFixed(2)}px)`;
+
+        // Adjust ROI overlay opacity based on clarity and whether ROI is confirmed
+        if (this.roiOverlay) {
+            if (this.roiEnabled && this.finalRoiRect) {
+                // ROI is confirmed, make overlay more visible when clarity is high
+                // Map clarity [0, 1] to opacity [0.1, 0.9] (example mapping)
+                 const minOpacity = 0.1;
+                 const maxOpacity = 0.7; // Keep it somewhat transparent even when sharp
+                 this.roiOverlay.style.opacity = minOpacity + clarity * (maxOpacity - minOpacity);
+                 this.roiOverlay.style.display = 'block'; // Ensure it's visible
+                 this.roiOverlay.style.backgroundColor = 'rgba(255, 255, 0, 0.08)'; // Ensure background is set
+             } else if (this.roiEnabled && this.pendingRoiRect) {
+                 // ROI is pending confirmation, keep it fully visible but without background effect yet
+                 this.roiOverlay.style.opacity = 1; // Full dashed border visibility
+                 this.roiOverlay.style.backgroundColor = 'transparent'; // No background while drawing/pending
+                 this.roiOverlay.style.display = 'block';
+             } else {
+                 // No ROI active or drawing
+                 this.roiOverlay.style.opacity = 0;
+                 this.roiOverlay.style.display = 'none';
+             }
+        }
     }
 
     updateUI() {
@@ -381,22 +411,23 @@ class CameraController {
         // Calibration Input
         if(this.calibSquareSizeInput) this.calibSquareSizeInput.disabled = !connected || this.isCalibrating || this.isFocusing; // Disable if not connected or calibrating/focusing
 
-        // ROI Button
-        const showEnableBtn = connected && !this.isFocusing && !this.isCapturing && !this.isRecording && !this.pendingRoiRect && !this.isCalibrating;
-        const showConfirmRedrawBtns = connected && this.roiEnabled && this.pendingRoiRect && !this.isDrawingRoi && !this.isCalibrating;
+        // ROI Button States
+        const isRoiConfirmed = connected && this.roiEnabled && this.finalRoiRect && !this.pendingRoiRect;
+        const isRoiPending = connected && this.roiEnabled && this.pendingRoiRect && !this.isDrawingRoi;
+        const canEnableRoi = connected && !this.roiEnabled && !this.isFocusing && !this.isCapturing && !this.isRecording && !this.isCalibrating;
 
         if(this.enableRoiBtn) {
-             this.enableRoiBtn.disabled = !showEnableBtn;
-             this.enableRoiBtn.style.display = showConfirmRedrawBtns ? 'none' : 'inline-block';
-             this.enableRoiBtn.textContent = this.roiEnabled ? "禁用ROI" : "启用ROI";
+            this.enableRoiBtn.disabled = !(canEnableRoi || isRoiConfirmed); // Enable if can be enabled OR if ROI is confirmed (to allow disabling)
+            this.enableRoiBtn.textContent = this.roiEnabled ? "禁用ROI" : "启用ROI";
+            this.enableRoiBtn.style.display = isRoiPending ? 'none' : 'inline-block'; // Hide when pending confirmation
         }
         if (this.confirmRoiBtn) {
-            this.confirmRoiBtn.disabled = !showConfirmRedrawBtns;
-            this.confirmRoiBtn.style.display = showConfirmRedrawBtns ? 'inline-block' : 'none';
+            this.confirmRoiBtn.disabled = !isRoiPending;
+            this.confirmRoiBtn.style.display = isRoiPending ? 'inline-block' : 'none';
         }
         if (this.redrawRoiBtn) {
-            this.redrawRoiBtn.disabled = !showConfirmRedrawBtns;
-            this.redrawRoiBtn.style.display = showConfirmRedrawBtns ? 'inline-block' : 'none';
+            this.redrawRoiBtn.disabled = !(isRoiPending || isRoiConfirmed); // Enable if pending OR confirmed
+            this.redrawRoiBtn.style.display = (isRoiPending || isRoiConfirmed) ? 'inline-block' : 'none'; // Show if pending OR confirmed
         }
 
         // Table controls
@@ -564,8 +595,9 @@ class CameraController {
             while (z_rough <= this.Z_RANGE.max) {
                  console.log(`模拟: [控制器->通信层] 移动 Z 轴到 ${z_rough.toFixed(2)}`);
                  await this.simulateZMovement(z_rough);
-                 console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${(this.roiEnabled && this.finalRoiRect) ? ' (ROI区域)' : ''}`); // Indicate ROI usage only if drawn
-                 console.log(` > 粗扫: Z=${z_rough.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${(this.roiEnabled && this.finalRoiRect) ? ' (ROI)' : ''}`);
+                 const roiQuadrantInfo = (this.roiEnabled && this.finalRoiRect) ? ` (ROI中心象限: ${this.getCoordinateQuadrant(this.finalRoiRect.x + this.finalRoiRect.width / 2, this.finalRoiRect.y + this.finalRoiRect.height / 2)})` : ' (全局中心)';
+                 console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${roiQuadrantInfo}`);
+                 console.log(` > 粗扫: Z=${z_rough.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${roiQuadrantInfo}`);
                  if (this.currentClarity > maxClarityFound) {
                      maxClarityFound = this.currentClarity;
                      this.bestZFound = z_rough;
@@ -587,8 +619,9 @@ class CameraController {
              while (z_fine <= fineEnd) {
                  console.log(`模拟: [控制器->通信层] 移动 Z 轴到 ${z_fine.toFixed(2)}`);
                  await this.simulateZMovement(z_fine);
-                  console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${(this.roiEnabled && this.finalRoiRect) ? ' (ROI区域)' : ''}`); // Indicate ROI usage only if drawn
-                 console.log(` > 精扫: Z=${z_fine.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${(this.roiEnabled && this.finalRoiRect) ? ' (ROI)' : ''}`);
+                 const roiQuadrantInfo = (this.roiEnabled && this.finalRoiRect) ? ` (ROI中心象限: ${this.getCoordinateQuadrant(this.finalRoiRect.x + this.finalRoiRect.width / 2, this.finalRoiRect.y + this.finalRoiRect.height / 2)})` : ' (全局中心)';
+                 console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${roiQuadrantInfo}`);
+                 console.log(` > 精扫: Z=${z_fine.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${roiQuadrantInfo}`);
                  if (this.currentClarity > maxClarityFound) {
                      maxClarityFound = this.currentClarity;
                      finalBestZ = z_fine;
@@ -901,18 +934,22 @@ class CameraController {
                 this.finalRoiRect = this.pendingRoiRect;
                 this.pendingRoiRect = null;
                 console.log('ROI 已确认:', this.finalRoiRect);
+                this.simulatedImage.style.cursor = 'default'; // Change cursor back after confirm
                 this.updateControlStates(this.isConnected);
                  // Keep overlay showing the confirmed ROI
                  this.drawFinalRoiOverlay();
+                 this.applyBlur(this.calculateClarity(this.currentZ)); // Apply blur effect based on confirmed ROI
             }
         });
         this.redrawRoiBtn?.addEventListener('click', () => {
              this.pendingRoiRect = null;
-             this.finalRoiRect = null; // Also clear confirmed ROI if redraw is chosen?
+             this.finalRoiRect = null; // Also clear confirmed ROI if redraw is chosen
              this.roiOverlay.style.display = 'none';
+             this.simulatedImage.style.cursor = 'crosshair'; // Set cursor for drawing
              console.log('请求重新绘制 ROI');
              this.updateControlStates(this.isConnected);
              // User can now click and drag again
+             this.applyBlur(this.calculateClarity(this.currentZ)); // Re-apply blur based on global center
          });
 
         // --- Calibration Listener ---
@@ -1255,15 +1292,38 @@ class CameraController {
     }
 
     updateRoiOverlay() {
-        if (!this.isDrawingRoi || !this.roiOverlay) return;
+        if (!this.roiOverlay) return; // Check if overlay exists first
+
+        // Ensure overlay is visible and styled correctly during drawing or when pending
+        if (this.isDrawingRoi || this.pendingRoiRect) {
+             this.roiOverlay.style.opacity = 1;
+             this.roiOverlay.style.backgroundColor = 'transparent';
+             this.roiOverlay.style.display = 'block';
+        } else if (!this.finalRoiRect) {
+            // Hide if not drawing, not pending, and not confirmed
+             this.roiOverlay.style.opacity = 0;
+             this.roiOverlay.style.display = 'none';
+             return; // No need to calculate position if hidden
+        }
+        // If confirmed, opacity/bg is handled by applyBlur, just ensure display is block here if needed
+        else if (this.finalRoiRect && this.roiOverlay.style.display === 'none') {
+             this.roiOverlay.style.display = 'block';
+        }
+
+        // Only proceed with position calculation if drawing
+        if (!this.isDrawingRoi && !this.pendingRoiRect && !this.finalRoiRect) return; // Exit if not needed
 
         const imgRect = this.simulatedImage.getBoundingClientRect();
+        const viewElement = this.simulatedImage.closest('.camera-view'); // Get the positioning parent
+        if (!viewElement) return; // Add check for viewElement
+        const viewRect = viewElement.getBoundingClientRect(); // Re-add viewRect acquisition
+
         const scaleX = imgRect.width / this.simulatedImage.naturalWidth;
         const scaleY = imgRect.height / this.simulatedImage.naturalHeight;
 
-        const containerRect = this.simulatedImage.parentElement.getBoundingClientRect();
-        const imgOffsetX = imgRect.left - containerRect.left;
-        const imgOffsetY = imgRect.top - containerRect.top;
+        // Calculate image offset relative to the .camera-view parent
+        const imgOffsetX = imgRect.left - viewRect.left;
+        const imgOffsetY = imgRect.top - viewRect.top;
 
         // Calculate display coordinates based on start and current *image* coordinates
         const startDispX = this.roiStartX * scaleX;
@@ -1277,7 +1337,7 @@ class CameraController {
         const dispW = Math.abs(startDispX - currentDispX);
         const dispH = Math.abs(startDispY - currentDispY);
 
-        // Position relative to the container
+        // Position relative to the .camera-view container
         this.roiOverlay.style.left = `${imgOffsetX + dispL}px`;
         this.roiOverlay.style.top = `${imgOffsetY + dispT}px`;
         this.roiOverlay.style.width = `${dispW}px`;
@@ -1380,20 +1440,24 @@ class CameraController {
         }
 
         const imgRect = this.simulatedImage.getBoundingClientRect();
+        const viewElement = this.simulatedImage.closest('.camera-view'); // Get the positioning parent
+        if (!viewElement) return;
+        const viewRect = viewElement.getBoundingClientRect();
+
         const scaleX = imgRect.width / this.simulatedImage.naturalWidth;
         const scaleY = imgRect.height / this.simulatedImage.naturalHeight;
 
-        const containerRect = this.simulatedImage.parentElement.getBoundingClientRect();
-        const imgOffsetX = imgRect.left - containerRect.left;
-        const imgOffsetY = imgRect.top - containerRect.top;
+        // Calculate image offset relative to the .camera-view parent
+        const imgOffsetX = imgRect.left - viewRect.left;
+        const imgOffsetY = imgRect.top - viewRect.top;
 
-        // Calculate display coordinates from stored finalRoiRect
+        // Calculate display coordinates from stored rectToDraw
         const dispL = rectToDraw.x * scaleX;
         const dispT = rectToDraw.y * scaleY;
         const dispW = rectToDraw.width * scaleX;
         const dispH = rectToDraw.height * scaleY;
 
-        // Position relative to the container
+        // Position relative to the .camera-view container
         this.roiOverlay.style.left = `${imgOffsetX + dispL}px`;
         this.roiOverlay.style.top = `${imgOffsetY + dispT}px`;
         this.roiOverlay.style.width = `${dispW}px`;
@@ -1523,6 +1587,33 @@ class CameraController {
         }
     }
     // -------------------------------
+
+    // --- Helper functions for Quadrant Logic ---
+    getCoordinateQuadrant(imageX, imageY) {
+        const midX = this.simulatedImage.naturalWidth / 2;
+        const midY = this.simulatedImage.naturalHeight / 2;
+        if (imageX < midX && imageY < midY) return 'TL';
+        if (imageX >= midX && imageY < midY) return 'TR';
+        if (imageX < midX && imageY >= midY) return 'BL';
+        if (imageX >= midX && imageY >= midY) return 'BR';
+        return 'TL'; // Default fallback
+    }
+
+    getEffectiveBestZ() {
+        let refX, refY;
+        if (this.roiEnabled && this.finalRoiRect) {
+            // Use ROI center
+            refX = this.finalRoiRect.x + this.finalRoiRect.width / 2;
+            refY = this.finalRoiRect.y + this.finalRoiRect.height / 2;
+        } else {
+            // Use image center (default global focus point)
+            refX = this.simulatedImage.naturalWidth / 2;
+            refY = this.simulatedImage.naturalHeight / 2;
+        }
+        const quadrant = this.getCoordinateQuadrant(refX, refY);
+        return this.QUADRANT_BEST_Z[quadrant] || 15.0; // Fallback Z
+    }
+    // -----------------------------------------
 }
 
 // Initialize the controller when the DOM is ready

@@ -126,6 +126,10 @@ body {
     border: 2px dashed var(--accent-yellow);
     pointer-events: none;
     /* JS will set left, top, width, height */
+    background-color: rgba(255, 255, 0, 0.08); /* Lighter, less intrusive yellow background */
+    opacity: 0; /* Start fully transparent */
+    transition: opacity 0.15s linear; /* Smooth transition for opacity changes */
+    box-shadow: 0 0 10px rgba(255, 255, 0, 0.2); /* Optional subtle glow */
 }
 
 /* Control Panel */
