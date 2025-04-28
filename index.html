@@ -30,8 +30,11 @@
                     <div id="calibration-pattern-display" style="display: none; width: 100%; height: 100%;">
                         <!-- SVG will be injected here by JS -->
                     </div>
+                    <!-- Focus ROI Overlay (Original) -->
+                    <div class="focus-overlay" id="focus-roi-overlay" style="display: none;"></div>
+                    <!-- Calibration ROI Overlay (New) -->
+                    <div class="focus-overlay calibration-roi-overlay" id="calibration-roi-overlay" style="display: none;"></div>
                 </div>
-                <div class="focus-overlay" id="focus-roi-overlay" style="display: none;"></div>
             </section>
 
             <aside class="control-panel" id="control-panel-content">
@@ -161,15 +164,18 @@
 
                     <!-- Z Axis / Focus -->
                     <h4>Z轴控制 / 对焦</h4>
-                    <div class="control-item">
+                    <!-- Apply side-by-side layout -->
+                    <div class="control-item side-by-side">
                         <label for="current-z">当前 Z (mm):</label>
                         <input type="text" id="current-z" value="--" readonly disabled="">
                     </div>
-                     <div class="control-item">
+                     <!-- Apply side-by-side layout -->
+                     <div class="control-item side-by-side">
                         <label for="clarity-value">当前清晰度:</label>
                         <input type="text" id="clarity-value" value="--" readonly disabled="">
                     </div>
-                     <div class="control-item focus-status">
+                     <!-- Apply side-by-side layout -->
+                     <div class="control-item focus-status side-by-side">
                         <label>对焦状态:</label>
                         <span id="focus-status-text" class="status-未连接">未连接</span>
                     </div>
@@ -178,26 +184,30 @@
                         <button id="stop-focus-btn" class="danger-button" disabled=""><i class="fas fa-stop-circle"></i> 停止</button>
                     </div>
 
-                    <hr class="separator">
-
-                     <!-- ROI Controls -->
-                     <h4>ROI区域</h4>
-                     <p class="description small-description">启用后在图像上绘制选区。</p>
+                    <!-- Focus ROI Controls (Moved Here) -->
+                     <h4 class="roi-heading">对焦ROI区域</h4>
+                     <p class="description small-description">启用后在相机图像上绘制选区。</p>
                      <div class="roi-button-group control-item">
-                        <button id="enable-roi-btn" class="roi-button" disabled="" style="display: inline-block;">启用ROI</button>
-                        <button id="confirm-roi-btn" class="roi-button confirm-button" style="display: none;" disabled="">确认ROI</button>
-                        <button id="redraw-roi-btn" class="roi-button redraw-button" style="display: none;" disabled="">重新绘制</button>
+                        <!-- ADDED Draw Button -->
+                        <button id="draw-roi-focus-btn" class="roi-button" disabled=""><i class="fas fa-pencil-alt"></i> 绘制</button>
+                        <button id="confirm-roi-focus-btn" class="roi-button confirm-button" style="display: none;" disabled="">确认</button>
+                        <button id="redraw-roi-focus-btn" class="roi-button redraw-button" style="display: none;" disabled="">重绘</button>
                     </div>
+                    <!-- End Focus ROI -->
 
                     <hr class="separator">
+
+                    <!-- REMOVED Original ROI Section -->
 
                     <!-- Calibration Controls -->
                     <h4>当量计算</h4>
-                     <div class="control-item">
+                     <!-- Apply side-by-side layout -->
+                     <div class="control-item side-by-side">
                          <label for="calib-square-size">方格尺寸(mm):</label>
                          <input type="number" id="calib-square-size" value="1.0" step="0.1" min="0.1" disabled="">
                      </div>
-                      <div class="control-item">
+                      <!-- Apply side-by-side layout -->
+                      <div class="control-item side-by-side">
                          <label>计算结果:</label>
                          <span id="calibration-result-value">-- px/mm</span>
                      </div>
@@ -205,6 +215,16 @@
                          <button id="toggle-view-btn" class="select-button" disabled=""><i class="fas fa-sync-alt"></i> 显示标定板</button>
                          <button id="calibrate-btn" disabled=""><i class="fas fa-ruler-combined"></i> 执行计算</button>
                      </div>
+
+                     <!-- Calibration ROI Controls (Moved Here) -->
+                     <h4 class="roi-heading">校准ROI区域</h4>
+                     <p class="description small-description">启用后在标定板视图上绘制选区。</p>
+                     <div class="roi-button-group control-item">
+                        <button id="enable-roi-calib-btn" class="roi-button" disabled="" style="display: inline-block;">启用校准ROI</button>
+                        <button id="confirm-roi-calib-btn" class="roi-button confirm-button" style="display: none;" disabled="">确认</button>
+                        <button id="redraw-roi-calib-btn" class="roi-button redraw-button" style="display: none;" disabled="">重绘</button>
+                    </div>
+                    <!-- End Calibration ROI -->
                 </div>
             </aside>
         </main>

@@ -19,31 +19,8 @@ class CameraController {
         this.savePathInput = document.getElementById('save-path');
         this.cameraNameInput = document.getElementById('camera-name');
         this.cameraModelInput = document.getElementById('camera-model');
-        // REMOVED: this.propertyTableBody reference
 
-        // --- Find ROI elements using standard JS ---
-        // New logic: Find the button first, then its parent panel section
-        const roiButton = document.getElementById('enable-roi-btn');
-        this.roiSection = null; // Initialize roiSection
-        if (roiButton) {
-            this.roiSection = roiButton.closest('.panel-section'); // Find the closest ancestor panel section
-            if (this.roiSection) {
-                console.log('通过按钮找到 ROI 区域所在的 Panel Section:', this.roiSection);
-            } else {
-                console.error("错误: 找到了 ROI 按钮 (#enable-roi-btn)，但未能找到其父级 .panel-section。请检查 index.html 结构。");
-            }
-        } else {
-            console.error("错误: 未能找到 ID 为 'enable-roi-btn' 的 ROI 按钮。请检查 index.html ID。");
-        }
-
-        // Initialize ROI inputs to null (Keep this part)
-        this.roiLeftX = null;
-        this.roiTopY = null;
-        this.roiRightX = null;
-        this.roiBottomY = null;
-
-        // --- End of ROI element finding ---
-
+        // --- Control References ---
         this.connectBtn = document.getElementById('connect-btn');
         this.configAxisBtn = document.getElementById('config-axis-btn');
         this.clearAxisBtn = document.getElementById('clear-axis-btn');
@@ -58,15 +35,23 @@ class CameraController {
         this.btnTrigger = document.getElementById('btn-trigger');
         this.selectConfigBtn = document.getElementById('select-config-btn');
         this.selectFolderBtn = document.getElementById('select-folder-btn');
-        this.enableRoiBtn = document.getElementById('enable-roi-btn');
-        this.roiOverlay = document.getElementById('focus-roi-overlay'); // Get ROI overlay element
-        this.confirmRoiBtn = document.getElementById('confirm-roi-btn');
-        this.redrawRoiBtn = document.getElementById('redraw-roi-btn');
+
+        // --- Focus ROI Elements ---
+        this.focusRoiOverlay = document.getElementById('focus-roi-overlay');
+        this.confirmFocusRoiBtn = document.getElementById('confirm-roi-focus-btn');
+        this.redrawFocusRoiBtn = document.getElementById('redraw-roi-focus-btn');
+        this.drawRoiFocusBtn = document.getElementById('draw-roi-focus-btn');
+
+        // --- Calibration ROI Elements ---
+        this.enableCalibRoiBtn = document.getElementById('enable-roi-calib-btn');
+        this.calibRoiOverlay = document.getElementById('calibration-roi-overlay');
+        this.confirmCalibRoiBtn = document.getElementById('confirm-roi-calib-btn');
+        this.redrawCalibRoiBtn = document.getElementById('redraw-roi-calib-btn');
 
         // Calibration elements
         this.calibrationPatternDisplay = document.getElementById('calibration-pattern-display');
         this.calibrationResultValue = document.getElementById('calibration-result-value');
-        this.cameraDisplayContainer = document.getElementById('camera-display-container'); // Container
+        this.cameraDisplayContainer = document.getElementById('camera-display-container');
         this.toggleViewBtn = document.getElementById('toggle-view-btn');
         this.calibSquareSizeInput = document.getElementById('calib-square-size');
 
@@ -89,41 +74,45 @@ class CameraController {
         this.CALIBRATION_DELAY = 1500; // ms total for simulated calibration steps
         this.SIMULATED_SQUARE_SIZE_PX = 37.5; // Simulated pixel size of square at best focus
         this.CHECKERBOARD_SVG = `<svg width="300" height="300" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="checkerboard" width="75" height="75" patternUnits="userSpaceOnUse"><rect width="37.5" height="37.5" fill="black"/><rect x="37.5" y="37.5" width="37.5" height="37.5" fill="black"/></pattern></defs><rect width="300" height="300" fill="white"/><rect width="300" height="300" fill="url(#checkerboard)"/><style>rect { stroke: grey; stroke-width: 0.5; }</style></svg>`;
-        // Quadrant Best Z Simulation
-        this.QUADRANT_BEST_Z = {
-            TL: 15.0, // Top Left
-            TR: 16.5, // Top Right
-            BL: 14.0, // Bottom Left
-            BR: 15.8  // Bottom Right
-        };
-        // ---------------------------
+        this.QUADRANT_BEST_Z = { TL: 15.0, TR: 16.5, BL: 14.0, BR: 15.8 };
 
-        this.selectedAxisId = null; // Store the selected axis ID
+        // --- State Variables ---
+        this.selectedAxisId = null;
         this.currentZ = 10.0;
         this.isFocusing = false;
-        this.focusProcessId = null; // Stores timeout/interval ID for stopping
+        this.focusProcessId = null;
         this.currentClarity = 0;
         this.bestZFound = null;
-        this.isConnected = false;       // Added connection state
-        this.connectionProcessId = null; // For connect/disconnect process
+        this.isConnected = false;
+        this.connectionProcessId = null;
         this.isCapturing = false;
         this.isRecording = false;
-        this.roiEnabled = false;
-        this.isAxisDropdownVisible = false; // Track dropdown visibility
-        this.isCalibrating = false; // Track calibration state
-        this.calibrationRatio = null; // Store calibration result
-        this.isShowingCalibrationPattern = false; // Track view state
+        this.isAxisDropdownVisible = false;
+        this.isCalibrating = false;
+        this.calibrationRatio = null;
+        this.isShowingCalibrationPattern = false;
 
-        // ROI Drawing State
-        this.isDrawingRoi = false;
+        // --- Focus ROI State ---
+        this.isDrawingRoi = false; // Focus ROI drawing state
         this.roiStartX = 0;
         this.roiStartY = 0;
         this.currentRoiX = 0;
         this.currentRoiY = 0;
-        this.finalRoiRect = null; // Stores { x, y, width, height } in image coordinates
-        this.pendingRoiRect = null; // Stores drawn ROI before confirmation
+        this.finalRoiRect = null; // Focus ROI final rect
+        this.pendingRoiRect = null; // Focus ROI pending rect
+        this.isInRoiDrawMode = false; // Added state for draw mode
 
-        this.backendUrl = 'http://localhost:5000'; 
+        // --- Calibration ROI State ---
+        this.isDrawingCalibRoi = false;      // Is mouse currently down for drawing Calib ROI
+        this.isInCalibRoiDrawMode = false;   // Has user clicked "Enable Calib ROI" button
+        this.calibRoiStartX = 0;
+        this.calibRoiStartY = 0;
+        this.currentCalibRoiX = 0;
+        this.currentCalibRoiY = 0;
+        this.finalCalibRoiRect = null;     // The confirmed calibration ROI
+        this.pendingCalibRoiRect = null;    // The drawn calibration ROI waiting for confirmation
+
+        this.backendUrl = 'http://localhost:5000';
 
         this.initializeEventListeners();
         this.initUI();
@@ -301,12 +290,20 @@ class CameraController {
             this.updateUIFromState(backendState); // Should handle isConnected = false
             this.updateControlStates(false); // Ensure controls are disabled
             this.updateFocusStatus('未连接');
-            if (this.roiOverlay) this.roiOverlay.style.display = 'none'; 
-            if (this.enableRoiBtn) this.enableRoiBtn.textContent = "启用ROI";
+            if (this.focusRoiOverlay) this.focusRoiOverlay.style.display = 'none'; 
+            if (this.enableCalibRoiBtn) this.enableCalibRoiBtn.textContent = "启用对焦ROI";
             this.hideAxisDropdown(); 
             console.log("前端状态已更新为断开");
             // Fetch available cameras again after disconnecting
             this.fetchAvailableCameras();
+
+            // Reset Calibration ROI State as well
+            this.pendingCalibRoiRect = null;
+            this.finalCalibRoiRect = null;
+            this.isInCalibRoiDrawMode = false;
+            this.isDrawingCalibRoi = false;
+            if (this.calibRoiOverlay) this.calibRoiOverlay.style.display = 'none';
+            if (this.calibrationPatternDisplay) this.calibrationPatternDisplay.style.cursor = 'default';
 
         } catch (error) {
             console.error("断开相机时出错:", error);
@@ -329,7 +326,7 @@ class CameraController {
     // Enables/disables controls based on connection status AND other states
     updateControlStates(connected) {
         const isIdle = connected && !this.isFocusing && !this.isCapturing && !this.isRecording;
-        const canStartActivity = connected && !this.isFocusing; // Can start capture/record if connected and not focusing
+        const canStartActivity = isIdle; // Adjusted to use isIdle
 
         // Connect Button
         const hasSelectedCamera = this.serialNumberSelect && this.serialNumberSelect.value !== '';
@@ -352,7 +349,8 @@ class CameraController {
         // Panel controls requiring connection (General)
         this.panelControls.forEach(ctrl => {
              // Exclude buttons with their own specific logic handled below
-             const excludedIds = ['connect-btn', 'start-focus-btn', 'stop-focus-btn', 'calibrate-btn', 'toggle-view-btn', 'enable-roi-btn', 'confirm-roi-btn', 'redraw-roi-btn', 'calib-square-size'];
+             // Note: Removed enable-roi-focus-btn from exclusions
+             const excludedIds = ['connect-btn', 'start-focus-btn', 'stop-focus-btn', 'calibrate-btn', 'toggle-view-btn', 'confirm-roi-focus-btn', 'redraw-roi-focus-btn', 'calib-square-size'];
              if (!excludedIds.includes(ctrl.id) && !ctrl.classList.contains('header-button')) {
                   ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
              }
@@ -376,24 +374,54 @@ class CameraController {
         // Calibration Input
         if(this.calibSquareSizeInput) this.calibSquareSizeInput.disabled = !connected || this.isCalibrating || this.isFocusing; // Disable if not connected or calibrating/focusing
 
-        // ROI Button States
-        const isRoiConfirmed = connected && this.roiEnabled && this.finalRoiRect && !this.pendingRoiRect;
-        const isRoiPending = connected && this.roiEnabled && this.pendingRoiRect && !this.isDrawingRoi;
-        const canEnableRoi = connected && !this.roiEnabled && !this.isFocusing && !this.isCapturing && !this.isRecording && !this.isCalibrating;
+        // --- Focus ROI Button States (Simplified Logic) ---
+        const isFocusRoiPending = connected && this.pendingRoiRect;
+        const hasFocusRoiConfirmed = connected && this.finalRoiRect;
 
-        if(this.enableRoiBtn) {
-            this.enableRoiBtn.disabled = !(canEnableRoi || isRoiConfirmed); // Enable if can be enabled OR if ROI is confirmed (to allow disabling)
-            this.enableRoiBtn.textContent = this.roiEnabled ? "禁用ROI" : "启用ROI";
-            this.enableRoiBtn.style.display = isRoiPending ? 'none' : 'inline-block'; // Hide when pending confirmation
+        // Draw Button State
+        const canDrawRoi = isIdle && !this.isInRoiDrawMode && !hasFocusRoiConfirmed && !isFocusRoiPending;
+        if (this.drawRoiFocusBtn) {
+            this.drawRoiFocusBtn.disabled = !canDrawRoi;
+            // Visibility: Show if idle and no ROI exists, or after Redraw. Hide during draw/pending/confirmed.
+            this.drawRoiFocusBtn.style.display = (isIdle && !hasFocusRoiConfirmed && !isFocusRoiPending && !this.isInRoiDrawMode) ? 'inline-block' : 'none';
         }
-        if (this.confirmRoiBtn) {
-            this.confirmRoiBtn.disabled = !isRoiPending;
-            this.confirmRoiBtn.style.display = isRoiPending ? 'inline-block' : 'none';
+
+        // Show Confirm button only when ROI is pending
+        if (this.confirmFocusRoiBtn) {
+            this.confirmFocusRoiBtn.disabled = !isFocusRoiPending;
+            this.confirmFocusRoiBtn.style.display = isFocusRoiPending ? 'inline-block' : 'none';
         }
-        if (this.redrawRoiBtn) {
-            this.redrawRoiBtn.disabled = !(isRoiPending || isRoiConfirmed); // Enable if pending OR confirmed
-            this.redrawRoiBtn.style.display = (isRoiPending || isRoiConfirmed) ? 'inline-block' : 'none'; // Show if pending OR confirmed
+        // Show Redraw button if ROI is pending OR confirmed
+        if (this.redrawFocusRoiBtn) {
+            const canRedraw = isIdle && (isFocusRoiPending || hasFocusRoiConfirmed);
+            this.redrawFocusRoiBtn.disabled = !canRedraw;
+            this.redrawFocusRoiBtn.style.display = (isFocusRoiPending || hasFocusRoiConfirmed) ? 'inline-block' : 'none';
         }
+        // --------------------------------------------------
+
+        // --- Calibration ROI Button States ---
+        const isCalibRoiPending = connected && this.pendingCalibRoiRect;
+        const hasCalibRoiConfirmed = connected && this.finalCalibRoiRect;
+        const canEnableCalibRoi = isIdle && this.isShowingCalibrationPattern && !this.isInCalibRoiDrawMode && !hasCalibRoiConfirmed && !isCalibRoiPending;
+
+        if (this.enableCalibRoiBtn) {
+            this.enableCalibRoiBtn.disabled = !canEnableCalibRoi;
+            // Visibility: Show if idle on calib view and no ROI exists. Hide during draw/pending/confirmed.
+            this.enableCalibRoiBtn.style.display = (canEnableCalibRoi) ? 'inline-block' : 'none';
+            // Set text based on state
+            this.enableCalibRoiBtn.innerHTML = this.isInCalibRoiDrawMode ? '<i class="fas fa-pencil-alt"></i> 绘制中...' : '<i class="fas fa-pencil-alt"></i> 启用校准ROI';
+            if(this.isInCalibRoiDrawMode) this.enableCalibRoiBtn.disabled = true; // Disable while drawing
+        }
+        if (this.confirmCalibRoiBtn) {
+            this.confirmCalibRoiBtn.disabled = !isCalibRoiPending;
+            this.confirmCalibRoiBtn.style.display = isCalibRoiPending ? 'inline-block' : 'none';
+        }
+        if (this.redrawCalibRoiBtn) {
+             const canRedrawCalib = isIdle && this.isShowingCalibrationPattern && (isCalibRoiPending || hasCalibRoiConfirmed);
+             this.redrawCalibRoiBtn.disabled = !canRedrawCalib;
+            this.redrawCalibRoiBtn.style.display = (isCalibRoiPending || hasCalibRoiConfirmed) ? 'inline-block' : 'none';
+        }
+        // ----------------------------------------------------------
 
         // Table controls
         document.querySelectorAll('#property-table input, #property-table select').forEach(ctrl => {
@@ -407,504 +435,34 @@ class CameraController {
         if (this.clearAxisBtn) this.clearAxisBtn.disabled = !connected || !this.selectedAxisId || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating; // Enable only if axis is selected and idle
     }
 
-    // Clears data when disconnected
-    resetUIData() {
-        this.serialNumberSelect.innerHTML = '<option>请连接...</option>';
-        this.serialNumberSelect.disabled = true;
-        this.configFileInput.value = '';
-        this.savePathInput.value = '';
-        this.cameraNameInput.value = '';
-        this.cameraModelInput.value = '';
-        this.clarityValueInput.value = '--';
-        this.currentZInput.value = '--';
-        this.footerZPos.textContent = '--';
-        if (this.calibSquareSizeInput) this.calibSquareSizeInput.value = '1.0'; // Reset calibration input
-        if (this.calibrationResultValue) this.calibrationResultValue.textContent = '-- pixels/mm'; // Reset calibration result
-        this.applyBlur(1); // Apply max blur
-        this.switchToCameraView(); // Ensure camera view is shown
-    }
-
-    // Populates controls with simulated data (called after connection)
-    async populateSimulatedData() {
-        console.log("正在填充模拟数据 (来自后端)...");
-        if (!this.isConnected) return; // Check backend state if available
-
-        // --- Fetch full state from backend after connect ---
-        // It's often better to get the full state from backend after connecting
-        // instead of relying on the connect response alone.
-        try {
-            const statusResponse = await fetch(`${this.backendUrl}/status`);
-            if (!statusResponse.ok) throw new Error(`HTTP ${statusResponse.status}`);
-            const backendState = await statusResponse.json();
-            
-            // Update local state (or directly use backendState if structure matches)
-            this.serialNumberSelect.innerHTML = `<option value="${backendState.serialNumber}">${backendState.serialNumber}</option>`;
-            this.configFileInput.value = backendState.configFile || '';
-            this.savePathInput.value = backendState.savePath || '';
-            this.cameraNameInput.value = backendState.cameraName || '';
-            this.cameraModelInput.value = backendState.cameraModel || '';
-
-            // Populate Properties Table from Backend
-            this.propertyTableBody.innerHTML = '';
-            const properties = backendState.properties || {};
-            for (const propName in properties) {
-                const prop = properties[propName];
-                const row = this.propertyTableBody.insertRow();
-                const nameCell = row.insertCell();
-                const valueCell = row.insertCell();
-                nameCell.textContent = propName;
-                let control;
-
-                if (prop.type === 'select') {
-                    control = document.createElement('select');
-                    prop.options.forEach(opt => {
-                         const option = document.createElement('option');
-                         option.value = opt; option.textContent = opt; control.appendChild(option);
-                    });
-                    control.value = prop.value;
-                } else if (prop.type === 'number' || prop.type === 'range') {
-                    control = document.createElement('input');
-                    control.type = prop.type; control.value = prop.value;
-                    if (prop.min !== undefined) control.min = prop.min;
-                    if (prop.max !== undefined) control.max = prop.max;
-                    if (prop.step !== undefined) control.step = prop.step;
-                }
-                 if (control) {
-                    valueCell.appendChild(control);
-                    control.disabled = !this.isConnected; // Should be enabled now
-                }
-            }
-
-            // ROI Area - Use backend state if available, otherwise keep frontend sim
-            const roi = backendState.roiCoords || {l: 150, t: 100, r: 450, b: 400}; // Default
-             if (this.roiLeftX && this.roiTopY && this.roiRightX && this.roiBottomY) {
-                 this.roiLeftX.value = roi.l; this.roiTopY.value = roi.t;
-                 this.roiRightX.value = roi.r; this.roiBottomY.value = roi.b;
-            } else {
-                 // Warning already handled in constructor check if needed
-            }
-             // Update selected Axis display if already configured
-             if (backendState.selectedAxisId) {
-                 this.selectedAxisId = backendState.selectedAxisId;
-                 // We need the name, fetch axes again or store names locally?
-                 // Simple solution: just show ID for now, or update button after selection
-                 const axisInfo = simulated_plc_axes.find(a => a.id === this.selectedAxisId); // Use backend data directly
-                 if (axisInfo) {
-                    this.configAxisBtn.textContent = `轴:${axisInfo.name}`;
-                    this.configAxisBtn.title = `当前配置轴: ${axisInfo.name} (ID: ${this.selectedAxisId})`;
-                 } else {
-                     this.configAxisBtn.textContent = `配置轴`; // Reset if ID invalid?
-                     this.configAxisBtn.title = `配置相机Z轴`;
-                 }
-
-             } else {
-                  this.configAxisBtn.textContent = `配置轴`; // Reset button text
-                  this.configAxisBtn.title = `配置相机Z轴`;
-             }
-
-
-            console.log("模拟数据(后端)填充完成。");
-
-        } catch (error) {
-             console.error("从后端获取状态或填充数据时出错:", error);
-             // Handle error - maybe show message to user or use defaults
-             this.populateSimulatedDataFallback(); // Use old hardcoded data as fallback
-        }
-    }
-
-    // Fallback if backend fetch fails
-    populateSimulatedDataFallback() {
-        console.warn("警告: 使用前端硬编码数据作为后备。");
-        // (此处可以粘贴你之前 populateSimulatedData 中填充属性表格等的代码)
-        // Basic Settings
-       this.serialNumberSelect.innerHTML = '<option value="SN12345678_FB">SN12345678_FB</option><option value="SN98765432_FB">SN98765432_FB</option>';
-       this.serialNumberSelect.value = "SN12345678_FB";
-       this.configFileInput.value = "C:/CameraConfigs/fallback.cfg";
-       this.savePathInput.value = "D:/Captures/Fallback/";
-       this.cameraNameInput.value = "前置定焦相机 (后备)";
-       this.cameraModelInput.value = "模拟相机 (Fallback)";
-       // ... (填充属性表格等) ...
-        this.propertyTableBody.innerHTML = `<tr><td>曝光时间(us)</td><td><input type='number' value='15000'></td></tr><tr><td>增益</td><td><input type='number' value='1.2'></td></tr>`; // 简化版后备
-    }
-
-    // --- Autofocus Simulation Logic --- (Refined)
-    async startAutofocus() {
-        if (this.isFocusing || !this.isConnected) {
-            console.warn("无法开始对焦: 未连接或已在对焦中");
-            return;
-        }
-        console.log("--------- 开始自动对焦流程 ---------");
-        this.bestZFound = null;
-        let maxClarityFound = -1;
-        let currentStage = "初始化";
-
-        try {
-            // 1. Initialization
-            currentStage = "初始化";
-            this.updateFocusStatus('初始化/检查');
-            console.log("模拟: [控制器] 确认PLC处于手动模式");
-            await this.wait(this.INIT_DELAY);
-            console.log("模拟: [控制器] 获取工位-相机-轴映射");
-            await this.wait(this.INIT_DELAY);
-            currentStage = "请求控制权";
-            this.updateFocusStatus('请求Z轴控制权');
-            console.log("模拟: [控制器->通信层] 请求目标 Z 轴控制权");
-            await this.wait(this.CONTROL_REQUEST_DELAY);
-            console.log("模拟: [通信层->控制器] Z 轴控制权已获取");
-
-            // 2. Rough Focusing
-            currentStage = "粗对焦";
-            this.updateFocusStatus('粗对焦中');
-            let z_rough = this.Z_RANGE.min;
-            while (z_rough <= this.Z_RANGE.max) {
-                 console.log(`模拟: [控制器->通信层] 移动 Z 轴到 ${z_rough.toFixed(2)}`);
-                 await this.simulateZMovement(z_rough);
-                 const roiQuadrantInfo = (this.roiEnabled && this.finalRoiRect) ? ` (ROI中心象限: ${this.getCoordinateQuadrant(this.finalRoiRect.x + this.finalRoiRect.width / 2, this.finalRoiRect.y + this.finalRoiRect.height / 2)})` : ' (全局中心)';
-                 console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${roiQuadrantInfo}`);
-                 console.log(` > 粗扫: Z=${z_rough.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${roiQuadrantInfo}`);
-                 if (this.currentClarity > maxClarityFound) {
-                     maxClarityFound = this.currentClarity;
-                     this.bestZFound = z_rough;
-                 }
-                 await this.wait(this.SCAN_DELAY_ROUGH);
-                 z_rough += this.Z_STEP_ROUGH;
-             }
-             if (this.bestZFound === null) throw new Error("粗对焦未能确定峰值区域");
-             console.log(`粗对焦峰值 Z ≈ ${this.bestZFound.toFixed(2)}`);
-
-            // 3. Fine Focusing
-            currentStage = "精细对焦";
-            this.updateFocusStatus('精细对焦中');
-             maxClarityFound = -1;
-             let fineStart = Math.max(this.Z_RANGE.min, this.bestZFound - this.Z_STEP_ROUGH);
-             let fineEnd = Math.min(this.Z_RANGE.max, this.bestZFound + this.Z_STEP_ROUGH);
-             let z_fine = fineStart;
-             let finalBestZ = this.bestZFound;
-             while (z_fine <= fineEnd) {
-                 console.log(`模拟: [控制器->通信层] 移动 Z 轴到 ${z_fine.toFixed(2)}`);
-                 await this.simulateZMovement(z_fine);
-                 const roiQuadrantInfo = (this.roiEnabled && this.finalRoiRect) ? ` (ROI中心象限: ${this.getCoordinateQuadrant(this.finalRoiRect.x + this.finalRoiRect.width / 2, this.finalRoiRect.y + this.finalRoiRect.height / 2)})` : ' (全局中心)';
-                 console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度${roiQuadrantInfo}`);
-                 console.log(` > 精扫: Z=${z_fine.toFixed(2)}, 清晰度=${this.currentClarity.toFixed(3)}${roiQuadrantInfo}`);
-                 if (this.currentClarity > maxClarityFound) {
-                     maxClarityFound = this.currentClarity;
-                     finalBestZ = z_fine;
-                 }
-                 await this.wait(this.SCAN_DELAY_FINE);
-                 z_fine = parseFloat((z_fine + this.Z_STEP_FINE).toFixed(2));
-             }
-             console.log(`精细对焦完成, 判定最佳 Z = ${finalBestZ.toFixed(2)}`);
-             this.bestZFound = finalBestZ;
-
-            // 4. Calibration (Simulated Placeholder)
-            currentStage = "当量计算(可选)";
-            this.updateFocusStatus('当量计算(模拟)');
-            console.log("模拟: [控制器] 检查是否需要执行当量计算...");
-            await this.wait(this.INIT_DELAY);
-            const needsCalibration = false; // Set to true to simulate running it
-            if (needsCalibration) {
-                console.log("模拟: [控制器->图像处理] 在最佳位置采集标准块图像");
-                await this.wait(this.CALIBRATION_DELAY / 2);
-                console.log("模拟: [图像处理] 分析特征点/线间距");
-                await this.wait(this.CALIBRATION_DELAY / 2);
-                console.log("模拟: [图像处理->控制器] 返回像素/距离比");
-            } else {
-                 console.log("模拟: 跳过当量计算步骤");
-            }
-
-            // 5. Completion and Switch
-             currentStage = "移动到最佳位置";
-             this.updateFocusStatus('移动到最佳位置');
-             console.log(`模拟: [控制器->通信层] 移动 Z 轴到最终位置 ${this.bestZFound.toFixed(2)}`);
-             await this.simulateZMovement(this.bestZFound);
-             console.log("模拟: 已移动到最佳对焦位置");
-
-             currentStage = "保存参数";
-             this.updateFocusStatus('保存参数中');
-             console.log(`模拟: [控制器] 保存对焦参数 (最佳 Z = ${this.bestZFound.toFixed(2)}) 到配置文件`);
-             await this.wait(this.SAVE_DELAY);
-
-             currentStage = "完成";
-             this.updateFocusStatus('已对焦'); // Final success state
-             console.log("--------- 自动对焦流程完成 --------- ");
-             console.log("模拟: [控制器] 可选择继续下一工位");
-             this.saveState(); // Save state after successful focus
-
-        } catch (error) {
-            if (error.message.startsWith("Stopped")) {
-                console.log(`对焦流程被停止 (阶段: ${currentStage})`); // Simplified stop message
-                this.updateFocusStatus('已停止');
-            } else {
-                console.error(`对焦流程在 [${currentStage}] 阶段出错: ${error.message}`);
-                this.updateFocusStatus('错误');
-            }
-        } finally {
-             // Release control simulation
-             console.log("模拟: [控制器->通信层] 释放 Z 轴控制权");
-             this.isFocusing = false;
-             this.focusProcessId = null;
-              // Update controls based on final state (connected but idle/error/stopped)
-             this.updateControlStates(this.isConnected);
-        }
-        this.saveState(); // Save state after selecting axis
-    }
-
-    stopAutofocus() {
-        if (this.focusProcessId) {
-            clearTimeout(this.focusProcessId);
-            this.focusProcessId = null;
-            console.log("停止信号已发送");
-        }
-        this.isFocusing = false;
-        // Update status immediately if it was in a focusing state
-        if (![ '空闲', '已对焦', '已停止', '错误', '未连接' ].includes(this.focusStatusText.textContent)){
-             this.updateFocusStatus('已停止'); 
-        }
-        this.updateControlStates(this.isConnected); // Update button states
-    }
-
-    // --- Simulation Functions for Actions ---
-    startCapture() {
-        if (!this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
-        console.log("模拟: 开始连续采集...");
-        this.isCapturing = true;
-        this.footerStatus.textContent = "状态: 采集中";
-        this.updateControlStates(true);
-        // Simulate FPS update (example)
-        // this.fpsInterval = setInterval(() => { /* update FPS display */ }, 1000);
-    }
-
-    stopCapture() {
-        if (!this.isCapturing && !this.isRecording) return;
-        console.log("模拟: 停止采集/录制...");
-        this.isCapturing = false;
-        this.isRecording = false;
-        this.footerStatus.textContent = "状态: 已连接"; // Or Idle?
-        // clearInterval(this.fpsInterval);
-        this.updateControlStates(true);
-    }
-
-    singleShot() {
-         if (!this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
-         console.log("模拟: 执行单张拍照...");
-         this.footerStatus.textContent = "状态: 拍照中...";
-         // Simulate a brief action
-         setTimeout(() => {
-              if (this.isConnected) { // Check if still connected
-                  this.footerStatus.textContent = "状态: 已连接";
-              }
-         }, 300);
-         // No state change for isCapturing/isRecording needed for single shot
-         // Buttons might briefly disable/re-enable if needed via updateControlStates
-    }
-
-    startRecording() {
-         if (!this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
-         console.log("模拟: 开始录制...");
-         this.isRecording = true;
-         this.footerStatus.textContent = "状态: 录制中";
-         this.updateControlStates(true);
-    }
-
-    softwareTrigger() {
-        if (!this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
-         console.log("模拟: 发送软件触发信号...");
-          this.footerStatus.textContent = "状态: 触发拍照...";
-         // Simulate a brief action
-         setTimeout(() => {
-              if (this.isConnected) {
-                  this.footerStatus.textContent = "状态: 已连接";
-              }
-         }, 300);
-    }
-
-    toggleROI() {
-        if (!this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
-        this.roiEnabled = !this.roiEnabled;
-        console.log(`ROI 功能: ${this.roiEnabled ? '启用，请在图像上绘制' : '禁用'}`);
-
-        if (this.roiEnabled) {
-            this.enableRoiBtn.textContent = "禁用ROI";
-            this.simulatedImage.style.cursor = 'crosshair'; // Indicate drawing mode
-            // Don't show overlay until drawing starts
-        } else {
-            this.enableRoiBtn.textContent = "启用ROI";
-            this.simulatedImage.style.cursor = 'default';
-            this.roiOverlay.style.display = 'none'; // Hide overlay
-            this.isDrawingRoi = false; // Ensure drawing stops if disabled mid-draw
-            this.finalRoiRect = null; // Clear stored ROI when disabled
-            this.pendingRoiRect = null; // Clear pending ROI
-            console.log('ROI 已禁用并清除');
-        }
-
-        this.updateControlStates(true);
-    }
-
-    // --- Axis Configuration Dropdown Logic ---
-
-    async fetchAndShowAxisDropdown() {
-        if (!this.isConnected || !this.axisDropdown) return;
-
-        // Toggle visibility
-        if (this.isAxisDropdownVisible) {
-            this.hideAxisDropdown();
-            return;
-        }
-
-        console.log("获取轴配置...");
-        this.axisListUl.innerHTML = '<li class="axis-list-loading">加载中...</li>'; // Show loading
-        this.dropdownCameraSN.textContent = `相机: ${this.serialNumberSelect.value || 'N/A'}`;
-        this.axisDropdown.classList.add('show'); // Show container early
-        this.isAxisDropdownVisible = true;
-
-        try {
-            // --- FETCH FROM BACKEND ---
-            console.log('准备发送请求到 /api/axes');
-            const response = await fetch(`${this.backendUrl}/api/axes`); // Use backendUrl
-            console.log(`收到 /api/axes 响应: Status=${response.status}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const axesData = await response.json();
-            console.log('成功解析轴数据:', axesData);
-            // --------------------------
-
-            // 检查 this.axisListUl 是否有效
-            console.log('检查 this.axisListUl:', this.axisListUl);
-            if (!this.axisListUl) {
-                console.error('错误：无法找到 axis-list UL 元素!');
-                return; // 无法继续
-            }
-
-            this.axisListUl.innerHTML = ''; // Clear loading/previous items
-            console.log('清空 axisListUl 内容');
-
-            if (axesData && axesData.length > 0) {
-                console.log(`开始填充 ${axesData.length} 个轴项目...`);
-                axesData.forEach((axis, index) => {
-                    console.log(`  处理第 ${index + 1} 个轴:`, axis);
-                    try {
-                        const li = document.createElement('li');
-                        // 基本检查确保属性存在
-                        const axisName = axis.name || '未知名称';
-                        const axisId = axis.id || '未知ID';
-                        const rangeMin = axis.range_min !== undefined ? axis.range_min : '--';
-                        const rangeMax = axis.range_max !== undefined ? axis.range_max : '--';
-
-                        li.textContent = `${axisName} (ID: ${axisId}, Range: ${rangeMin}-${rangeMax}mm)`;
-                        li.dataset.axisId = axisId;
-                        li.addEventListener('click', () => this.selectAxis(axisId, axisName));
-                        this.axisListUl.appendChild(li);
-                        console.log(`    > 成功添加 li: ${axisName}`);
-                    } catch (loopError) {
-                        console.error(`    > 添加轴 ${axis ? axis.id : '未知'} 时出错:`, loopError);
-                        // 可以在这里决定是否中断循环或继续
-                    }
-                });
-                console.log('轴项目填充完成。');
-            } else {
-                console.log('收到的轴数据为空或无效，显示空消息。');
-                this.axisListUl.innerHTML = '<li class="axis-list-empty">无可用轴数据</li>';
-            }
-
-        } catch (error) {
-            console.error("获取轴列表失败:", error);
-            this.axisListUl.innerHTML = '<li class="axis-list-error">加载失败</li>';
-        }
-    }
-
-    hideAxisDropdown() {
-        if (!this.axisDropdown) return;
-        this.axisDropdown.classList.remove('show');
-        this.isAxisDropdownVisible = false;
-        console.log("关闭轴配置下拉菜单");
-    }
-
-    async selectAxis(axisId, axisName) {
-        if (!this.isConnected) return;
-        console.log(`选择轴: ${axisName} (ID: ${axisId})`);
-        this.selectedAxisId = axisId;
-        this.hideAxisDropdown(); // Hide dropdown after selection
-
-        // --- SIMULATE SAVING TO BACKEND ---
-        try {
-            console.log(`模拟: 将配置保存到后端... (相机: ${this.serialNumberSelect.value}, 轴ID: ${axisId})`);
-            const response = await fetch(`${this.backendUrl}/set_axis_config`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    cameraSN: this.serialNumberSelect.value,
-                    axisId: axisId
-                })
-            });
-            if (!response.ok) {
-                 throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
-            if (result.status === 'ok') {
-                console.log("后端确认配置已保存:", result);
-                alert(`模拟: 相机 ${this.serialNumberSelect.value} 已配置使用轴 ${axisName}`);
-                 // Update button text or add indicator? (Optional)
-                this.configAxisBtn.textContent = `轴:${axisName}`; // Example: update button text
-                this.configAxisBtn.title = `当前配置轴: ${axisName} (ID: ${axisId})`;
-            } else {
-                 console.error("后端保存配置失败:", result.message);
-                 alert("模拟: 保存轴配置到后端失败!");
-                 this.selectedAxisId = null; // Revert selection on failure?
-            }
-        } catch (error) {
-             console.error("保存轴配置时出错:", error);
-             alert("模拟: 保存轴配置时发生网络或处理错误!");
-             this.selectedAxisId = null; // Revert selection on failure?
-        }
-        // ---------------------------------
-        this.updateControlStates(this.isConnected);
-        this.saveState(); // Save state after selecting axis
-    }
-
     // --- Event Listeners ---
     initializeEventListeners() {
-        // Connect Button Listener (Example - keep existing listeners)
+        // Connect Button Listener
         if (this.connectBtn) {
              this.connectBtn.addEventListener('click', () => {
                 if (this.isConnected) {
-                    this.disconnectCamera(); 
+                    this.disconnectCamera();
                 } else {
-                    this.connectCamera(); 
+                    this.connectCamera();
                 }
             });
         }
-        // Add other existing listeners back here (configAxisBtn, startFocusBtn, etc.)
-        // ... (Keep existing listeners)
-
-        // --- ROI Drawing Listeners ---
-        if (this.simulatedImage) {
-             this.simulatedImage.addEventListener('mousedown', this.handleRoiMouseDown.bind(this));
-            // mousemove and mouseup listeners are added dynamically to the window during mousedown
-            // mouseleave is handled by the existing listener, but we modify its handler
-            // Find and potentially remove the old mouseleave if needed, or ensure only one is active
-             // REMOVED: this.simulatedImage.addEventListener('mouseleave', this.handleRoiMouseLeave.bind(this)); // Add the new one
-        } else {
-            console.error("错误：无法找到 simulatedImage 元素来附加 ROI 监听器！");
-        }
-        // ---------------------------
-
-        // --- Serial Number Selection Listener (Example - keep existing listener) ---
+        // Serial Number Selection Listener
         if (this.serialNumberSelect) {
              this.serialNumberSelect.addEventListener('change', () => {
                 this.updateControlStates(this.isConnected); // Update connect button state based on selection
             });
         }
-        // ----------------------------------
-
-        this.configAxisBtn.addEventListener('click', (e) => {
+        // Axis Config Button
+        this.configAxisBtn?.addEventListener('click', (e) => {
              e.stopPropagation(); // Prevent body click from closing immediately
              this.fetchAndShowAxisDropdown()
          });
-        this.startFocusBtn.addEventListener('click', () => this.startAutofocus());
-        this.stopFocusBtn.addEventListener('click', () => this.stopAutofocus());
+        // Focus Buttons
+        this.startFocusBtn?.addEventListener('click', () => this.startAutofocus());
+        this.stopFocusBtn?.addEventListener('click', () => this.stopAutofocus());
 
-        // Add listeners for Header Buttons (Simulation)
+        // Header Buttons
         this.btnPlay?.addEventListener('click', () => this.startCapture());
         this.btnStop?.addEventListener('click', () => this.stopCapture());
         this.btnCapture?.addEventListener('click', () => this.singleShot());
@@ -915,34 +473,73 @@ class CameraController {
         // Panel Buttons
         this.selectConfigBtn?.addEventListener('click', () => alert("模拟：打开文件选择器选择配置文件"));
         this.selectFolderBtn?.addEventListener('click', () => alert("模拟：打开文件夹选择器选择保存路径"));
-        this.enableRoiBtn?.addEventListener('click', () => this.toggleROI());
-        this.confirmRoiBtn?.addEventListener('click', () => {
-            if (this.pendingRoiRect) {
-                this.finalRoiRect = this.pendingRoiRect;
+
+        // --- Focus ROI Event Listeners ---
+        // REMOVED direct mousedown listener on simulatedImage
+        /*
+        if (this.simulatedImage) {
+             this.simulatedImage.addEventListener('mousedown', this.handleRoiMouseDown.bind(this));
+        } else {
+            console.error("错误：无法找到 simulatedImage 元素来附加 ROI 监听器！");
+        }
+        */
+
+        // ADDED listener for the new Draw button
+        this.drawRoiFocusBtn?.addEventListener('click', () => {
+            if (this.drawRoiFocusBtn.disabled || !this.isConnected || this.isFocusing || this.isCapturing || this.isRecording) return;
+            console.log('点击绘制对焦 ROI 按钮');
+            this.isInRoiDrawMode = true;
+            if (this.simulatedImage) {
+                this.simulatedImage.style.cursor = 'crosshair';
+                // Dynamically add the listener ONLY when draw mode starts
+                this.boundHandleRoiMouseDown = this.handleRoiMouseDown.bind(this);
+                this.simulatedImage.addEventListener('mousedown', this.boundHandleRoiMouseDown);
+            }
+            this.drawRoiFocusBtn.disabled = true; // Disable draw button while drawing
+            // Update other states if needed
+            this.updateControlStates(this.isConnected);
+        });
+
+        // Listeners for Focus ROI buttons (Confirm and Redraw only)
+        this.confirmFocusRoiBtn?.addEventListener('click', () => {
+            if (this.pendingRoiRect) { // Use Focus pending rect
+                this.finalRoiRect = this.pendingRoiRect; // Set Focus final rect
                 this.pendingRoiRect = null;
-                console.log('ROI 已确认:', this.finalRoiRect);
-                this.simulatedImage.style.cursor = 'default'; // Change cursor back after confirm
+                console.log('对焦 ROI 已确认:', this.finalRoiRect);
+                if (this.simulatedImage) this.simulatedImage.style.cursor = 'default';
+                // Hide Draw button after confirmation, show Redraw
+                if (this.drawRoiFocusBtn) this.drawRoiFocusBtn.style.display = 'none';
                 this.updateControlStates(this.isConnected);
-                 // Keep overlay showing the confirmed ROI
-                 this.drawFinalRoiOverlay();
-                 this.applyBlur(this.calculateClarity(this.currentZ)); // Apply blur effect based on confirmed ROI
+                this.updateRoiOverlay(); // Use unified update function
             }
         });
-        this.redrawRoiBtn?.addEventListener('click', () => {
-             this.pendingRoiRect = null;
-             this.finalRoiRect = null; // Also clear confirmed ROI if redraw is chosen
-             this.roiOverlay.style.display = 'none';
-             this.simulatedImage.style.cursor = 'crosshair'; // Set cursor for drawing
-             console.log('请求重新绘制 ROI');
+        this.redrawFocusRoiBtn?.addEventListener('click', () => {
+             this.pendingRoiRect = null; // Clear Focus pending
+             this.finalRoiRect = null;   // Clear Focus final
+             this.isInRoiDrawMode = false; // Exit draw mode if any
+             if (this.focusRoiOverlay) this.focusRoiOverlay.style.display = 'none'; // Hide Focus overlay
+             if (this.simulatedImage) {
+                 this.simulatedImage.style.cursor = 'default'; // Reset cursor, drawing starts on Draw click
+                 // Ensure listener is removed if redrawing before finishing previous draw
+                 if (this.boundHandleRoiMouseDown) {
+                     this.simulatedImage.removeEventListener('mousedown', this.boundHandleRoiMouseDown);
+                 }
+             }
+             console.log('请求重新绘制对焦 ROI');
+             // Show Draw button, hide Confirm/Redraw
+            if (this.drawRoiFocusBtn) this.drawRoiFocusBtn.style.display = 'inline-block';
              this.updateControlStates(this.isConnected);
-             // User can now click and drag again
-             this.applyBlur(this.calculateClarity(this.currentZ)); // Re-apply blur based on global center
          });
+        // --------------------------------
 
-        // --- Calibration Listener ---
+        // --- Calibration Listeners ---
         this.calibrateBtn?.addEventListener('click', () => {
             if (this.calibrateBtn.disabled) return;
             this.startCalibration();
+        });
+        this.toggleViewBtn?.addEventListener('click', () => {
+            if (this.toggleViewBtn.disabled) return;
+            this.toggleCalibrationView();
         });
         // ------------------------
 
@@ -953,13 +550,6 @@ class CameraController {
         });
         // -------------------------
 
-        // --- View Toggle Listener ---
-        this.toggleViewBtn?.addEventListener('click', () => {
-            if (this.toggleViewBtn.disabled) return;
-            this.toggleCalibrationView();
-        });
-        // --------------------------
-
         // Close dropdown if clicking outside
         document.body.addEventListener('click', (e) => {
             if (this.isAxisDropdownVisible &&
@@ -969,21 +559,105 @@ class CameraController {
             }
         });
 
-        this.simulatedImage.addEventListener('mousemove', (e) => {
+        // Status Bar Mouse Coords
+        this.simulatedImage?.addEventListener('mousemove', (e) => {
             const rect = this.simulatedImage.getBoundingClientRect();
-            // Adjust coordinates based on image's natural size vs displayed size if needed
             const scaleX = this.simulatedImage.naturalWidth / rect.width;
             const scaleY = this.simulatedImage.naturalHeight / rect.height;
             const x = Math.round((e.clientX - rect.left) * scaleX);
             const y = Math.round((e.clientY - rect.top) * scaleY);
-            // Clamp coordinates to image bounds
             const clampedX = Math.max(0, Math.min(x, this.simulatedImage.naturalWidth));
             const clampedY = Math.max(0, Math.min(y, this.simulatedImage.naturalHeight));
-            this.statusBarMouse.textContent = `${clampedX}, ${clampedY}`;
+            if(this.statusBarMouse) this.statusBarMouse.textContent = `${clampedX}, ${clampedY}`;
         });
-        this.simulatedImage.addEventListener('mouseleave', () => {
-             this.statusBarMouse.textContent = `---, ---`;
+        this.simulatedImage?.addEventListener('mouseleave', () => {
+             if(this.statusBarMouse) this.statusBarMouse.textContent = `---, ---`;
         });
+
+        // --- Calibration ROI Listeners ---
+        this.enableCalibRoiBtn?.addEventListener('click', () => this.enableCalibRoi());
+        this.confirmCalibRoiBtn?.addEventListener('click', () => this.confirmCalibRoi());
+        this.redrawCalibRoiBtn?.addEventListener('click', () => this.redrawCalibRoi());
+        // Mouse listeners for drawing calib ROI will be added dynamically
+    }
+
+    getEffectiveBestZ() { // Uses Focus ROI state
+        let refX, refY;
+        // Check directly for finalRoiRect instead of roiEnabled
+        if (this.finalRoiRect) {
+            refX = this.finalRoiRect.x + this.finalRoiRect.width / 2;
+            refY = this.finalRoiRect.y + this.finalRoiRect.height / 2;
+        } else {
+            refX = this.simulatedImage.naturalWidth / 2;
+            refY = this.simulatedImage.naturalHeight / 2;
+        }
+        const quadrant = this.getCoordinateQuadrant(refX, refY);
+        return this.QUADRANT_BEST_Z[quadrant] || 15.0;
+    }
+
+    handleRoiMouseDown(event) {
+        // Should only be called when isInRoiDrawMode is true and listener is active
+        if (!this.isInRoiDrawMode || this.isDrawingRoi) return;
+        event.preventDefault();
+        console.log("Focus ROI Mouse Down - Start Drawing");
+        this.isDrawingRoi = true; // Set Focus drawing state
+        const coords = this.getImageCoordinates(event, this.simulatedImage); // Uses simulatedImage
+        this.roiStartX = coords.x;
+        this.roiStartY = coords.y;
+        this.currentRoiX = coords.x; // Initialize current coords
+        this.currentRoiY = coords.y;
+        this.updateRoiOverlay(); // Draw initial box on focus overlay
+
+        // Add temporary listeners
+        this.boundHandleRoiMouseMove = this.handleRoiMouseMove.bind(this);
+        this.boundHandleRoiMouseUp = this.handleRoiMouseUp.bind(this);
+        window.addEventListener('mousemove', this.boundHandleRoiMouseMove);
+        window.addEventListener('mouseup', this.boundHandleRoiMouseUp);
+    }
+
+    handleRoiMouseMove(event) {
+        if (!this.isDrawingRoi) return; // Check Focus drawing state
+        const coords = this.getImageCoordinates(event, this.simulatedImage); // Uses simulatedImage
+        this.currentRoiX = coords.x;
+        this.currentRoiY = coords.y;
+        this.updateRoiOverlay(); // Update focus overlay position/size
+    }
+
+    handleRoiMouseUp(event) {
+        if (!this.isDrawingRoi) return; // Check Focus drawing state
+        console.log("Focus ROI Mouse Up");
+
+        // Always remove listeners and exit drawing states immediately
+        this.isDrawingRoi = false;
+        this.isInRoiDrawMode = false;
+        if (this.simulatedImage && this.boundHandleRoiMouseDown) {
+            this.simulatedImage.removeEventListener('mousedown', this.boundHandleRoiMouseDown);
+            this.simulatedImage.style.cursor = 'default';
+        }
+
+        window.removeEventListener('mousemove', this.boundHandleRoiMouseMove);
+        window.removeEventListener('mouseup', this.boundHandleRoiMouseUp);
+
+        const finalCoords = this.getImageCoordinates(event, this.simulatedImage); // Uses simulatedImage
+        this.currentRoiX = finalCoords.x;
+        this.currentRoiY = finalCoords.y;
+
+        this.updateRoiOverlay(); // Update overlay to final position before calculating rect
+
+        const x = Math.min(this.roiStartX, this.currentRoiX);
+        const y = Math.min(this.roiStartY, this.currentRoiY);
+        const width = Math.abs(this.roiStartX - this.currentRoiX);
+        const height = Math.abs(this.roiStartY - this.currentRoiY);
+
+        if (width > 5 && height > 5) {
+             this.pendingRoiRect = { x, y, width, height }; // Set Focus pending rect
+             console.log('Focus ROI 绘制完成，等待确认:', this.pendingRoiRect);
+        } else {
+            if(this.focusRoiOverlay) this.focusRoiOverlay.style.display = 'none';
+            console.log('Focus ROI 绘制尺寸过小，未设置');
+        }
+        // Update buttons regardless of whether rect was valid
+        this.updateControlStates(this.isConnected);
     }
 
     // --- Initial Setup ---
@@ -1079,16 +753,14 @@ class CameraController {
                   // If ROI is also enabled in state, draw the initial overlay
                   if (state.roiEnabled) {
                       this.roiEnabled = true; // Make sure frontend knows
-                      if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "禁用ROI"; } // Check exists
-                      if (this.simulatedImage) { this.simulatedImage.style.cursor = 'crosshair'; } // Check exists
+                      // Cursor is handled by Draw button now
                       // Need to calculate display coords and show overlay
-                      // We need a function to draw based on finalRoiRect
-                      this.drawFinalRoiOverlay();
+                      this.updateRoiOverlay(); // Call unified update function
                   } else {
                       this.roiEnabled = false;
-                      if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "启用ROI"; } // Check exists
                       if (this.simulatedImage) { this.simulatedImage.style.cursor = 'default'; } // Check exists
                       if (this.roiOverlay) { this.roiOverlay.style.display = 'none'; } // Check exists
+                      this.updateRoiOverlay(); // Ensure overlay hidden if no rect
                   }
             } else {
                 // No ROI from backend or invalid
@@ -1096,13 +768,13 @@ class CameraController {
                  this.pendingRoiRect = null; // Ensure pending is also null
                  this.roiEnabled = state.roiEnabled || false; // Use backend state or default false
                  if (this.roiEnabled) {
-                     if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "禁用ROI"; } // Check exists
                      if (this.simulatedImage) { this.simulatedImage.style.cursor = 'crosshair'; } // Check exists
                      if (this.roiOverlay) { this.roiOverlay.style.display = 'none'; } // Hide until drawn
+                     this.updateRoiOverlay(); // Ensure overlay hidden if no rect
                  } else {
-                     if (this.enableRoiBtn) { this.enableRoiBtn.textContent = "启用ROI"; } // Check exists
                      if (this.simulatedImage) { this.simulatedImage.style.cursor = 'default'; } // Check exists
                      if (this.roiOverlay) { this.roiOverlay.style.display = 'none'; } // Check exists
+                     this.updateRoiOverlay(); // Ensure overlay hidden if no rect
                  }
             }
             // Update selected Axis display
@@ -1127,143 +799,143 @@ class CameraController {
         }
     }
 
-    // Extracted function to populate the properties table - NOW OBSOLETE
-    /*
-    populatePropertiesTable(properties) {
-        this.propertyTableBody.innerHTML = '';
-        properties = properties || {};
-        for (const propName in properties) {
-            const prop = properties[propName];
-            const row = this.propertyTableBody.insertRow();
-            const nameCell = row.insertCell();
-            const valueCell = row.insertCell();
-            nameCell.textContent = propName;
-            let control; 
-            if (prop.type === 'select') {
-                control = document.createElement('select');
-                (prop.options || []).forEach(opt => { 
-                    const option = document.createElement('option'); 
-                    option.value = opt; option.textContent = opt; control.appendChild(option); 
-                });
-                control.value = prop.value;
-            } else if (prop.type === 'number' || prop.type === 'range') {
-                control = document.createElement('input');
-                control.type = prop.type; control.value = prop.value;
-                if (prop.min !== undefined) control.min = prop.min;
-                if (prop.max !== undefined) control.max = prop.max;
-                if (prop.step !== undefined) control.step = prop.step;
-            } 
-            if (control) { 
-                valueCell.appendChild(control);
-                control.disabled = !this.isConnected; 
-            } 
+    // --- Helper for coordinate calculation relative to a target element ---
+    getImageCoordinates(event, targetElement) {
+        if (!targetElement) {
+            console.error("getImageCoordinates: targetElement is missing!");
+            return { x: 0, y: 0 };
         }
-    }
-    */
 
-    // Helper to update config axis button text/title
-    async updateConfigAxisButtonDisplay(axisId) {
-        this.selectedAxisId = axisId;
-        if (this.selectedAxisId) {
-            try {
-                const axesResp = await fetch(`${this.backendUrl}/api/axes`);
-                if (axesResp.ok) {
-                    const axesList = await axesResp.json();
-                    const axisInfo = axesList.find(a => a.id === this.selectedAxisId);
-                    if (axisInfo) {
-                        this.configAxisBtn.textContent = `轴:${axisInfo.name}`;
-                        this.configAxisBtn.title = `当前配置轴: ${axisInfo.name} (ID: ${this.selectedAxisId})`;
-                    } else { throw new Error('Axis ID not found in list'); }
-                } else { throw new Error('Failed to fetch axes for name'); }
-            } catch (axesError) {
-                console.warn('Could not fetch axis name for display:', axesError);
-                this.configAxisBtn.textContent = `轴:${this.selectedAxisId}`;
-                this.configAxisBtn.title = `当前配置轴 ID: ${this.selectedAxisId}`;
-            }
-        } else {
-            this.configAxisBtn.textContent = `配置轴`; 
-            this.configAxisBtn.title = `配置相机Z轴`;
+        const rect = targetElement.getBoundingClientRect();
+
+        // Determine the 'natural' dimensions. For SVG, use width/height attributes or viewBox?
+        // For simplicity, let's assume the calibration pattern SVG display area acts like an image.
+        // In a real scenario, SVG coordinates might need different handling.
+        const naturalWidth = targetElement.naturalWidth || rect.width; // Fallback to rect width for SVG
+        const naturalHeight = targetElement.naturalHeight || rect.height; // Fallback to rect height for SVG
+
+        if (rect.width === 0 || rect.height === 0 || naturalWidth === 0 || naturalHeight === 0) {
+            console.warn("getImageCoordinates: Invalid dimensions for target element or rect.", { rect, naturalWidth, naturalHeight });
+            return { x: 0, y: 0 };
         }
-    }
 
-    // --- Helper for coordinate calculation relative to image --- 
-    getImageCoordinates(event) {
-        const rect = this.simulatedImage.getBoundingClientRect();
-        const scaleX = this.simulatedImage.naturalWidth / rect.width;
-        const scaleY = this.simulatedImage.naturalHeight / rect.height;
-
-        // Calculate mouse position relative to the image element's top-left corner
-        let clientX = event.clientX;
+        const scaleX = naturalWidth / rect.width;
+        const scaleY = naturalHeight / rect.height;
+        // ... (rest of calculation remains the same for now)
+        let clientX = event.clientX; 
         let clientY = event.clientY;
-
-        // Adjust for touch events if necessary (basic example)
         if (event.touches && event.touches.length > 0) {
             clientX = event.touches[0].clientX;
             clientY = event.touches[0].clientY;
         }
-
         const x = (clientX - rect.left) * scaleX;
         const y = (clientY - rect.top) * scaleY;
-
-        // Clamp coordinates to image bounds
-        const clampedX = Math.max(0, Math.min(x, this.simulatedImage.naturalWidth));
-        const clampedY = Math.max(0, Math.min(y, this.simulatedImage.naturalHeight));
-
+        const clampedX = Math.max(0, Math.min(x, naturalWidth));
+        const clampedY = Math.max(0, Math.min(y, naturalHeight));
         return { x: clampedX, y: clampedY };
     }
 
     updateRoiOverlay() {
-        if (!this.roiOverlay) return; // Check if overlay exists first
+        const isCalibView = this.isShowingCalibrationPattern;
+        const overlayElement = isCalibView ? this.calibRoiOverlay : this.focusRoiOverlay;
+        const targetDisplayElement = isCalibView ? this.calibrationPatternDisplay : this.simulatedImage;
+        const otherOverlayElement = isCalibView ? this.focusRoiOverlay : this.calibRoiOverlay;
 
-        // Ensure overlay is visible and styled correctly during drawing or when pending
-        if (this.isDrawingRoi || this.pendingRoiRect) {
-             this.roiOverlay.style.opacity = 1;
-             this.roiOverlay.style.backgroundColor = 'transparent';
-             this.roiOverlay.style.display = 'block';
-        } else if (!this.finalRoiRect) {
-            // Hide if not drawing, not pending, and not confirmed
-             this.roiOverlay.style.opacity = 0;
-             this.roiOverlay.style.display = 'none';
-             return; // No need to calculate position if hidden
-        }
-        // If confirmed, opacity/bg is handled by applyBlur, just ensure display is block here if needed
-        else if (this.finalRoiRect && this.roiOverlay.style.display === 'none') {
-             this.roiOverlay.style.display = 'block';
+        // Always hide the overlay for the *other* view
+        if (otherOverlayElement) {
+            otherOverlayElement.style.display = 'none';
         }
 
-        // Only proceed with position calculation if drawing
-        if (!this.isDrawingRoi && !this.pendingRoiRect && !this.finalRoiRect) return; // Exit if not needed
+        if (!overlayElement || !targetDisplayElement) {
+            console.warn("updateRoiOverlay: Missing overlay or target display element for current view.");
+            return;
+        }
 
-        const imgRect = this.simulatedImage.getBoundingClientRect();
-        const viewElement = this.simulatedImage.closest('.camera-view'); // Get the positioning parent
-        if (!viewElement) return; // Add check for viewElement
-        const viewRect = viewElement.getBoundingClientRect(); // Re-add viewRect acquisition
+        // Get the correct state variables based on the view
+        const isDrawing = isCalibView ? this.isDrawingCalibRoi : this.isDrawingRoi;
+        const pendingRect = isCalibView ? this.pendingCalibRoiRect : this.pendingRoiRect;
+        const finalRect = isCalibView ? this.finalCalibRoiRect : this.finalRoiRect;
+        const startX = isCalibView ? this.calibRoiStartX : this.roiStartX;
+        const startY = isCalibView ? this.calibRoiStartY : this.roiStartY;
+        const currentX = isCalibView ? this.currentCalibRoiX : this.currentRoiX;
+        const currentY = isCalibView ? this.currentCalibRoiY : this.currentRoiY;
 
-        const scaleX = imgRect.width / this.simulatedImage.naturalWidth;
-        const scaleY = imgRect.height / this.simulatedImage.naturalHeight;
+        // Simpler logic: If drawing OR pending OR final, display it. Otherwise hide.
+        const shouldDisplay = isDrawing || pendingRect || finalRect;
+        if (!shouldDisplay) {
+            overlayElement.style.display = 'none';
+            return;
+        }
+        overlayElement.style.display = 'block';
 
-        // Calculate image offset relative to the .camera-view parent
-        const imgOffsetX = imgRect.left - viewRect.left;
-        const imgOffsetY = imgRect.top - viewRect.top;
 
-        // Calculate display coordinates based on start and current *image* coordinates
-        const startDispX = this.roiStartX * scaleX;
-        const startDispY = this.roiStartY * scaleY;
-        const currentDispX = this.currentRoiX * scaleX;
-        const currentDispY = this.currentRoiY * scaleY;
+        // Check which rect to use for drawing: Current drag or pending/final
+        let rectToDraw;
+        if (isDrawing) {
+            // Calculate rect based on start and current mouse coords
+            rectToDraw = {
+                x: Math.min(startX, currentX),
+                y: Math.min(startY, currentY),
+                width: Math.abs(startX - currentX),
+                height: Math.abs(startY - currentY)
+            };
+             overlayElement.style.opacity = 1; // Solid border while drawing
+             overlayElement.style.backgroundColor = 'transparent';
+        } else {
+            // Use pending or final if not actively drawing
+            rectToDraw = pendingRect || finalRect;
+            if (!rectToDraw) { // Should not happen if shouldDisplay is true, but safety check
+                 overlayElement.style.display = 'none';
+                 return;
+            }
+             // Style based on pending vs final
+             if (pendingRect) { // Pending confirmation
+                 overlayElement.style.opacity = 1;
+                 overlayElement.style.backgroundColor = 'transparent'; // Still like drawing
+             } else if (finalRect) { // Confirmed
+                 overlayElement.style.opacity = 0.7;
+                 overlayElement.style.backgroundColor = 'rgba(255, 255, 0, 0.08)';
+                 if (isCalibView) {
+                      overlayElement.style.borderColor = 'cyan'; // Example: Cyan border for calib ROI
+                      overlayElement.style.backgroundColor = 'rgba(0, 255, 255, 0.08)';
+                 } else {
+                      overlayElement.style.borderColor = 'yellow'; // Reset focus ROI style
+                      overlayElement.style.backgroundColor = 'rgba(255, 255, 0, 0.08)';
+                 }
+             }
+        }
 
-        // Handle drawing in any direction
-        const dispL = Math.min(startDispX, currentDispX);
-        const dispT = Math.min(startDispY, currentDispY);
-        const dispW = Math.abs(startDispX - currentDispX);
-        const dispH = Math.abs(startDispY - currentDispY);
+        // --- Calculation based on simulatedImage (Focus ROI) --- 
+        const targetRect = targetDisplayElement.getBoundingClientRect();
+        const viewElement = targetDisplayElement.closest('.camera-view');
+        if (!viewElement) return;
+        const viewRect = viewElement.getBoundingClientRect();
 
-        // Position relative to the .camera-view container
-        this.roiOverlay.style.left = `${imgOffsetX + dispL}px`;
-        this.roiOverlay.style.top = `${imgOffsetY + dispT}px`;
-        this.roiOverlay.style.width = `${dispW}px`;
-        this.roiOverlay.style.height = `${dispH}px`;
-        this.roiOverlay.style.display = 'block';
+        const naturalWidth = targetDisplayElement.naturalWidth || targetRect.width;
+        const naturalHeight = targetDisplayElement.naturalHeight || targetRect.height;
+
+         if (targetRect.width === 0 || targetRect.height === 0 || naturalWidth === 0 || naturalHeight === 0) {
+            console.warn("updateRoiOverlay: Invalid dimensions for target element or rect.", { targetRect, naturalWidth, naturalHeight });
+            overlayElement.style.display = 'none';
+            return;
+        }
+
+        const scaleX = targetRect.width / naturalWidth;
+        const scaleY = targetRect.height / naturalHeight;
+
+        const offsetX = targetRect.left - viewRect.left;
+        const offsetY = targetRect.top - viewRect.top;
+
+        const dispL = rectToDraw.x * scaleX;
+        const dispT = rectToDraw.y * scaleY;
+        const dispW = rectToDraw.width * scaleX;
+        const dispH = rectToDraw.height * scaleY;
+
+        // --- Apply to focusRoiOverlay --- 
+        overlayElement.style.left = `${offsetX + dispL}px`;
+        overlayElement.style.top = `${offsetY + dispT}px`;
+        overlayElement.style.width = `${dispW}px`;
+        overlayElement.style.height = `${dispH}px`;
     }
 
     // --- New Calibration Simulation Logic ---
@@ -1284,7 +956,7 @@ class CameraController {
             console.log("模拟: 显示标准棋盘格图像");
             this.simulatedImage.style.display = 'none';
             this.calibrationPatternDisplay.innerHTML = this.CHECKERBOARD_SVG;
-            this.calibrationPatternDisplay.style.display = 'block';
+            this.calibrationPatternDisplay.style.display = 'flex'; // Use flex to center potentially
             await this.wait(this.CALIBRATION_DELAY / 3, 'calibrationProcessId'); // Use a unique process ID ref if needed
 
             // 2. Simulate Analysis
@@ -1335,9 +1007,15 @@ class CameraController {
         console.log("切换到标定板视图");
         this.simulatedImage.style.display = 'none';
         this.calibrationPatternDisplay.innerHTML = this.CHECKERBOARD_SVG;
-        this.calibrationPatternDisplay.style.display = 'block';
+        this.calibrationPatternDisplay.style.display = 'flex'; // Use flex to center potentially
         this.toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示相机视图';
         this.isShowingCalibrationPattern = true;
+        // Stop focus ROI drawing if active
+        if (this.isInRoiDrawMode) {
+           this.cancelFocusRoiDraw();
+        }
+        this.updateRoiOverlay(); // Hide focus overlay, show calib overlay if exists
+        this.updateControlStates(this.isConnected);
     }
 
     switchToCameraView() {
@@ -1347,43 +1025,195 @@ class CameraController {
         this.simulatedImage.style.display = 'block';
         this.toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示标定板';
         this.isShowingCalibrationPattern = false;
+        // Stop calib ROI drawing if active
+        if (this.isInCalibRoiDrawMode) {
+            this.cancelCalibRoiDraw();
+        }
+        this.updateRoiOverlay(); // Hide calib overlay, show focus overlay if exists
+        this.updateControlStates(this.isConnected);
     }
     // -------------------------
 
-    // New helper function to draw the overlay based on finalRoiRect OR pendingRoiRect
-    drawFinalRoiOverlay() {
-        // Determine which ROI to draw (confirmed takes precedence)
-        const rectToDraw = this.finalRoiRect || this.pendingRoiRect;
+    // --- Autofocus Logic ---
+    async startAutofocus() {
+        if (this.isFocusing || !this.isConnected || !this.selectedAxisId) return;
 
-        if (!rectToDraw || !this.roiOverlay || !this.roiEnabled) {
-            if(this.roiOverlay) this.roiOverlay.style.display = 'none';
+        console.log("--------- 开始自动对焦流程 ---------");
+        this.isFocusing = true;
+        this.bestZFound = null; // Reset previous best Z
+        let bestClarityRough = -1;
+        let bestZRough = null;
+        this.updateFocusStatus('初始化检查');
+        await this.wait(this.INIT_DELAY);
+
+        try {
+            this.updateFocusStatus('请求Z轴控制权');
+            // Simulate requesting control (no actual action needed here)
+            await this.wait(this.CONTROL_REQUEST_DELAY);
+
+            // --- Rough Scan --- //
+            this.updateFocusStatus('粗对焦中');
+            console.log('粗对焦: 扫描范围', this.Z_RANGE, '步长', this.Z_STEP_ROUGH);
+            for (let z = this.Z_RANGE.min; z <= this.Z_RANGE.max; z += this.Z_STEP_ROUGH) {
+                if (!this.isFocusing) throw new Error('对焦已手动停止'); // Check for stop signal
+                await this.simulateZMovement(z);
+                const clarity = this.calculateClarity(z);
+                console.log(`  Z=${z.toFixed(2)}, 清晰度=${clarity.toFixed(3)}`);
+                if (clarity > bestClarityRough) {
+                    bestClarityRough = clarity;
+                    bestZRough = z;
+                }
+                await this.wait(this.SCAN_DELAY_ROUGH);
+            }
+            console.log(`粗对焦完成: 最佳 Z ≈ ${bestZRough?.toFixed(2)}, 清晰度 ≈ ${bestClarityRough.toFixed(3)}`);
+
+            if (bestZRough === null) throw new Error('粗对焦未能找到最佳位置');
+
+            // --- Fine Scan --- //
+            this.updateFocusStatus('精细对焦中');
+            const fineRangeMin = Math.max(this.Z_RANGE.min, bestZRough - this.Z_STEP_ROUGH); // Scan around the rough best
+            const fineRangeMax = Math.min(this.Z_RANGE.max, bestZRough + this.Z_STEP_ROUGH);
+            let bestClarityFine = -1;
+            let bestZFine = null;
+            console.log('精细对焦: 扫描范围', { min: fineRangeMin, max: fineRangeMax }, '步长', this.Z_STEP_FINE);
+            for (let z = fineRangeMin; z <= fineRangeMax; z += this.Z_STEP_FINE) {
+                 // Round z to avoid floating point issues comparing with fineRangeMax
+                const currentZFine = parseFloat(z.toFixed(2)); 
+                if (!this.isFocusing) throw new Error('对焦已手动停止');
+                await this.simulateZMovement(currentZFine);
+                const clarity = this.calculateClarity(currentZFine);
+                console.log(`    Z=${currentZFine.toFixed(2)}, 清晰度=${clarity.toFixed(3)}`);
+                if (clarity > bestClarityFine) {
+                    bestClarityFine = clarity;
+                    bestZFine = currentZFine;
+                }
+                await this.wait(this.SCAN_DELAY_FINE);
+            }
+            this.bestZFound = bestZFine; // Store final best Z
+            console.log(`精细对焦完成: 最佳 Z = ${this.bestZFound?.toFixed(2)}, 清晰度 = ${bestClarityFine.toFixed(3)}`);
+
+            if (this.bestZFound === null) throw new Error('精细对焦未能找到最佳位置');
+
+            // --- Move to Best Z --- //
+            this.updateFocusStatus('移动到最佳位置');
+            await this.simulateZMovement(this.bestZFound);
+            await this.wait(this.CONTROL_REQUEST_DELAY); // Simulate settling time
+
+             // --- Save Parameters (Simulated) --- //
+            this.updateFocusStatus('保存参数中');
+            this.saveState(); // Save the found bestZ etc.
+            await this.wait(this.SAVE_DELAY); 
+
+           this.updateFocusStatus('已对焦');
+           console.log("--------- 自动对焦流程成功完成 ---------");
+
+        } catch (error) {
+            console.error("自动对焦过程中出错:", error);
+            if (this.isFocusing) { // Only show error if not stopped manually
+                this.updateFocusStatus('错误');
+                alert(`自动对焦失败: ${error.message}`);
+            } else {
+                this.updateFocusStatus('已停止'); // Ensure status reflects manual stop
+            }
+        } finally {
+            this.isFocusing = false;
+            this.focusProcessId = null; // Clear any lingering wait timeouts
+            this.updateControlStates(this.isConnected);
+        }
+    }
+
+    stopAutofocus() {
+        if (!this.isFocusing) return;
+        console.log("请求停止自动对焦...");
+        this.isFocusing = false; // Signal the loop to stop
+        if (this.focusProcessId) {
+             clearTimeout(this.focusProcessId);
+             this.focusProcessId = null;
+        }
+        // Don't immediately change status here, let the loop catch the flag
+        // this.updateFocusStatus('已停止'); // Let the catch block handle final status
+        this.updateControlStates(this.isConnected);
+        console.log("停止信号已发送。");
+    }
+    // ---------------------
+
+    // --- 获取并显示轴配置下拉列表 ---
+    async fetchAndShowAxisDropdown() {
+        if (!this.isConnected) return; // 仅在连接时操作
+
+        if (this.isAxisDropdownVisible) {
+            this.hideAxisDropdown();
             return;
         }
 
-        const imgRect = this.simulatedImage.getBoundingClientRect();
-        const viewElement = this.simulatedImage.closest('.camera-view'); // Get the positioning parent
-        if (!viewElement) return;
-        const viewRect = viewElement.getBoundingClientRect();
+        console.log("模拟: 开始获取轴列表...");
+        this.axisListUl.innerHTML = '<li class="axis-list-loading">加载中...</li>';
+        this.dropdownCameraSN.textContent = `相机: ${this.serialNumberSelect.value}`;
+        this.axisDropdown.classList.add('show'); // 显示下拉框（开始动画）
+        this.isAxisDropdownVisible = true;
 
-        const scaleX = imgRect.width / this.simulatedImage.naturalWidth;
-        const scaleY = imgRect.height / this.simulatedImage.naturalHeight;
+        try {
+            // --- 模拟后端/PLC请求 ---
+            await this.wait(400, 'axisFetchProcessId'); // 使用不同的 processIdRef
+            const availableAxes = [
+                { id: 'PLC_Axis_Z1', name: '龙门 Z 轴' },
+                { id: 'PLC_Axis_Z2', name: '旋转台 Z 轴' },
+                { id: 'PLC_Axis_A1', name: '辅助轴 A' },
+                { id: 'SimulatedZ', name: '模拟 Z 轴' },
+            ];
+            // const availableAxes = []; // 测试空列表
+            console.log("模拟: 获取到轴列表:", availableAxes);
+            // ------------------------
 
-        // Calculate image offset relative to the .camera-view parent
-        const imgOffsetX = imgRect.left - viewRect.left;
-        const imgOffsetY = imgRect.top - viewRect.top;
+            this.axisListUl.innerHTML = ''; // 清空加载提示
 
-        // Calculate display coordinates from stored rectToDraw
-        const dispL = rectToDraw.x * scaleX;
-        const dispT = rectToDraw.y * scaleY;
-        const dispW = rectToDraw.width * scaleX;
-        const dispH = rectToDraw.height * scaleY;
+            if (availableAxes.length > 0) {
+                availableAxes.forEach(axis => {
+                    const li = document.createElement('li');
+                    li.textContent = `${axis.name} (${axis.id})`;
+                    li.dataset.axisId = axis.id;
+                    li.addEventListener('click', () => this.selectAxis(axis.id));
+                    this.axisListUl.appendChild(li);
+                });
+            } else {
+                this.axisListUl.innerHTML = '<li class="axis-list-empty">未找到可用轴</li>';
+            }
 
-        // Position relative to the .camera-view container
-        this.roiOverlay.style.left = `${imgOffsetX + dispL}px`;
-        this.roiOverlay.style.top = `${imgOffsetY + dispT}px`;
-        this.roiOverlay.style.width = `${dispW}px`;
-        this.roiOverlay.style.height = `${dispH}px`;
-        this.roiOverlay.style.display = 'block';
+        } catch (error) {
+            // 如果 wait 被中断 (例如隐藏下拉框)
+            if (error.message.includes('Stopped during wait')) {
+                 console.log("模拟: 轴列表获取被取消。");
+                 // 不需要显示错误，因为是用户主动隐藏
+            } else {
+                 console.error("模拟: 获取轴列表时出错:", error);
+                 this.axisListUl.innerHTML = '<li class="axis-list-error">加载轴列表失败</li>';
+            }
+        }
+    }
+
+    // --- 隐藏轴配置下拉列表 ---
+    hideAxisDropdown() {
+        if (this.axisFetchProcessId) { // 如果正在获取，取消它
+             clearTimeout(this.axisFetchProcessId);
+             this.axisFetchProcessId = null;
+        }
+        this.axisDropdown.classList.remove('show');
+        this.isAxisDropdownVisible = false;
+         // 可以加一个短暂延迟后清空内容，以配合动画效果
+         // setTimeout(() => { this.axisListUl.innerHTML = ''; }, 200);
+    }
+
+    // --- 选择一个轴 ---
+    selectAxis(axisId) {
+        console.log(`选择了轴: ${axisId}`);
+        this.selectedAxisId = axisId;
+        this.updateConfigAxisButtonDisplay(axisId); // 更新按钮显示
+        this.hideAxisDropdown();
+        this.updateControlStates(this.isConnected); // 更新依赖轴选择的控件状态（例如对焦按钮）
+        // --- 模拟保存到后端/本地 ---
+        this.saveState(); // 保存状态
+        console.log("模拟: 已将选定的轴保存到状态。");
+        // ---------------------------
     }
 
     // --- Clear Axis Configuration ---
@@ -1466,6 +1296,23 @@ class CameraController {
     }
     // ---------------------------------------------
 
+    // --- 更新配置轴按钮的显示 ---
+    updateConfigAxisButtonDisplay(axisId) {
+        if (this.configAxisBtn) {
+            if (axisId) {
+                // 如果有选中的轴ID，显示ID并更新标题
+                this.configAxisBtn.textContent = `轴: ${axisId}`;
+                this.configAxisBtn.title = `当前选择的Z轴: ${axisId} - 点击修改`;
+            } else {
+                // 如果没有选中的轴ID，显示默认文本
+                this.configAxisBtn.textContent = '配置轴';
+                this.configAxisBtn.title = '配置相机Z轴';
+            }
+        } else {
+            console.warn("无法找到 configAxisBtn 元素进行更新。");
+        }
+    }
+
     // --- Fetch Available Cameras ---
     async fetchAvailableCameras() {
         console.log("正在获取可用相机列表...");
@@ -1520,92 +1367,146 @@ class CameraController {
         return 'TL'; // Default fallback
     }
 
-    getEffectiveBestZ() {
-        let refX, refY;
-        if (this.roiEnabled && this.finalRoiRect) {
-            // Use ROI center
-            refX = this.finalRoiRect.x + this.finalRoiRect.width / 2;
-            refY = this.finalRoiRect.y + this.finalRoiRect.height / 2;
-        } else {
-            // Use image center (default global focus point)
-            refX = this.simulatedImage.naturalWidth / 2;
-            refY = this.simulatedImage.naturalHeight / 2;
+    // --- Calibration ROI Logic ---
+    enableCalibRoi() {
+        if (this.enableCalibRoiBtn.disabled || !this.isConnected || !this.isShowingCalibrationPattern) return;
+        console.log('启用校准 ROI 绘制模式');
+        this.isInCalibRoiDrawMode = true;
+        if (this.calibrationPatternDisplay) {
+             this.calibrationPatternDisplay.style.cursor = 'crosshair';
+            // Dynamically add the listener ONLY when draw mode starts
+            this.boundHandleCalibRoiMouseDown = this.handleCalibRoiMouseDown.bind(this);
+            this.calibrationPatternDisplay.addEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
         }
-        const quadrant = this.getCoordinateQuadrant(refX, refY);
-        return this.QUADRANT_BEST_Z[quadrant] || 15.0; // Fallback Z
-    }
-    // -----------------------------------------
-
-    // --- ROI Drawing Event Handlers ---
-    handleRoiMouseDown(event) {
-        if (!this.roiEnabled || this.isDrawingRoi || this.finalRoiRect || this.pendingRoiRect) return; // Only draw if enabled, not already drawing, and no ROI exists
-        event.preventDefault(); // Prevent default image drag behavior
-        console.log("ROI Mouse Down");
-        this.isDrawingRoi = true;
-        const coords = this.getImageCoordinates(event);
-        this.roiStartX = coords.x;
-        this.roiStartY = coords.y;
-        this.currentRoiX = coords.x; // Initialize current position for drawing
-        this.currentRoiY = coords.y;
-        // No need to set styles directly here, drawFinalRoiOverlay will handle it
-        this.drawFinalRoiOverlay(); // <-- Call this instead of updateRoiOverlay
-
-        // Add temporary listeners to window for mousemove and mouseup
-        this.boundHandleRoiMouseMove = this.handleRoiMouseMove.bind(this);
-        this.boundHandleRoiMouseUp = this.handleRoiMouseUp.bind(this);
-        window.addEventListener('mousemove', this.boundHandleRoiMouseMove);
-        window.addEventListener('mouseup', this.boundHandleRoiMouseUp);
+        this.updateControlStates(this.isConnected);
     }
 
-    handleRoiMouseMove(event) {
-        if (!this.isDrawingRoi) return;
-        // console.log("ROI Mouse Move"); // Optional: Log frequently
-        const coords = this.getImageCoordinates(event);
-        this.currentRoiX = coords.x;
-        this.currentRoiY = coords.y;
+    handleCalibRoiMouseDown(event) {
+        if (!this.isInCalibRoiDrawMode || this.isDrawingCalibRoi) return;
+        event.preventDefault();
+        console.log("Calibration ROI Mouse Down - Start Drawing");
+        this.isDrawingCalibRoi = true;
+        const coords = this.getImageCoordinates(event, this.calibrationPatternDisplay);
+        this.calibRoiStartX = coords.x;
+        this.calibRoiStartY = coords.y;
+        this.currentCalibRoiX = coords.x;
+        this.currentCalibRoiY = coords.y;
+        this.updateRoiOverlay();
+
+        this.boundHandleCalibRoiMouseMove = this.handleCalibRoiMouseMove.bind(this);
+        this.boundHandleCalibRoiMouseUp = this.handleCalibRoiMouseUp.bind(this);
+        window.addEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+        window.addEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
+    }
+
+    handleCalibRoiMouseMove(event) {
+        if (!this.isDrawingCalibRoi) return;
+        const coords = this.getImageCoordinates(event, this.calibrationPatternDisplay);
+        this.currentCalibRoiX = coords.x;
+        this.currentCalibRoiY = coords.y;
         this.updateRoiOverlay();
     }
 
-    handleRoiMouseUp(event) {
-        if (!this.isDrawingRoi) return;
-        console.log("ROI Mouse Up");
-        this.isDrawingRoi = false;
+    handleCalibRoiMouseUp(event) {
+        if (!this.isDrawingCalibRoi) return;
+        console.log("Calibration ROI Mouse Up");
 
-        // Remove temporary listeners
-        window.removeEventListener('mousemove', this.boundHandleRoiMouseMove);
-        window.removeEventListener('mouseup', this.boundHandleRoiMouseUp);
+        this.isDrawingCalibRoi = false;
+        this.isInCalibRoiDrawMode = false;
+        if (this.calibrationPatternDisplay && this.boundHandleCalibRoiMouseDown) {
+            this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+            this.calibrationPatternDisplay.style.cursor = 'default';
+        }
 
-        const finalCoords = this.getImageCoordinates(event);
-        this.currentRoiX = finalCoords.x;
-        this.currentRoiY = finalCoords.y;
+        window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+        window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
 
-        // Calculate final rectangle in image coordinates
-        const x = Math.min(this.roiStartX, this.currentRoiX);
-        const y = Math.min(this.roiStartY, this.currentRoiY);
-        const width = Math.abs(this.roiStartX - this.currentRoiX);
-        const height = Math.abs(this.roiStartY - this.currentRoiY);
+        const finalCoords = this.getImageCoordinates(event, this.calibrationPatternDisplay);
+        this.currentCalibRoiX = finalCoords.x;
+        this.currentCalibRoiY = finalCoords.y;
 
-        // Store the drawn rectangle, ready for confirmation
-        if (width > 5 && height > 5) { // Minimum size check
-             this.pendingRoiRect = { x, y, width, height };
-             console.log('ROI 绘制完成，等待确认:', this.pendingRoiRect);
-             // Update overlay one last time based on pending rect
-             this.drawFinalRoiOverlay(); // Use this function to draw based on pending/final
-             this.simulatedImage.style.cursor = 'default'; // Reset cursor after drawing
-             this.updateControlStates(this.isConnected); // <-- 添加调用以更新按钮状态
+        this.updateRoiOverlay(); // Update final box before calc
+
+        const x = Math.min(this.calibRoiStartX, this.currentCalibRoiX);
+        const y = Math.min(this.calibRoiStartY, this.currentCalibRoiY);
+        const width = Math.abs(this.calibRoiStartX - this.currentCalibRoiX);
+        const height = Math.abs(this.calibRoiStartY - this.currentCalibRoiY);
+
+        if (width > 5 && height > 5) {
+            this.pendingCalibRoiRect = { x, y, width, height };
+            console.log('Calibration ROI 绘制完成，等待确认:', this.pendingCalibRoiRect);
         } else {
-            // If ROI is too small, reset overlay and cursor without setting pending
-            this.roiOverlay.style.display = 'none';
-            this.simulatedImage.style.cursor = 'crosshair'; // Keep crosshair if draw failed
-            console.log('ROI 绘制尺寸过小，未设置');
+            if(this.calibRoiOverlay) this.calibRoiOverlay.style.display = 'none';
+            console.log('Calibration ROI 绘制尺寸过小，未设置');
+        }
+        this.updateControlStates(this.isConnected);
+    }
+
+     confirmCalibRoi() {
+        if (this.pendingCalibRoiRect) {
+            this.finalCalibRoiRect = this.pendingCalibRoiRect;
+            this.pendingCalibRoiRect = null;
+            console.log('校准 ROI 已确认:', this.finalCalibRoiRect);
+            if (this.calibrationPatternDisplay) this.calibrationPatternDisplay.style.cursor = 'default';
+            if (this.enableCalibRoiBtn) this.enableCalibRoiBtn.style.display = 'none'; // Hide enable button
+            this.updateControlStates(this.isConnected);
+            this.updateRoiOverlay(); // Update overlay style
         }
     }
-} // CameraController 类的结束括号
 
+    redrawCalibRoi() {
+        this.pendingCalibRoiRect = null;
+        this.finalCalibRoiRect = null;
+        this.isInCalibRoiDrawMode = false;
+        if (this.calibRoiOverlay) this.calibRoiOverlay.style.display = 'none';
+        if (this.calibrationPatternDisplay) {
+            this.calibrationPatternDisplay.style.cursor = 'default';
+             if (this.boundHandleCalibRoiMouseDown) {
+                this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+            }
+        }
+        console.log('请求重新绘制校准 ROI');
+        if (this.enableCalibRoiBtn) this.enableCalibRoiBtn.style.display = 'inline-block';
+        this.updateControlStates(this.isConnected);
+    }
 
-// Initialize the controller when the DOM is ready
+    // Helper to cancel drawing if view switches
+    cancelFocusRoiDraw() {
+        if (!this.isInRoiDrawMode && !this.isDrawingRoi) return;
+         console.log("取消对焦 ROI 绘制");
+         this.isDrawingRoi = false;
+         this.isInRoiDrawMode = false;
+         if (this.simulatedImage && this.boundHandleRoiMouseDown) {
+             this.simulatedImage.removeEventListener('mousedown', this.boundHandleRoiMouseDown);
+             this.simulatedImage.style.cursor = 'default';
+         }
+         window.removeEventListener('mousemove', this.boundHandleRoiMouseMove);
+         window.removeEventListener('mouseup', this.boundHandleRoiMouseUp);
+         this.pendingRoiRect = null; // Discard pending rect if cancelled mid-draw
+         this.updateRoiOverlay();
+         this.updateControlStates(this.isConnected);
+    }
+
+    cancelCalibRoiDraw() {
+        if (!this.isInCalibRoiDrawMode && !this.isDrawingCalibRoi) return;
+         console.log("取消校准 ROI 绘制");
+         this.isDrawingCalibRoi = false;
+         this.isInCalibRoiDrawMode = false;
+         if (this.calibrationPatternDisplay && this.boundHandleCalibRoiMouseDown) {
+             this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+             this.calibrationPatternDisplay.style.cursor = 'default';
+         }
+         window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+         window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
+         this.pendingCalibRoiRect = null; // Discard pending rect if cancelled mid-draw
+         this.updateRoiOverlay();
+         this.updateControlStates(this.isConnected);
+    }
+
+   // --- End Calibration ROI Logic ---
+} // End Class
+
+// Initialize the controller
 document.addEventListener('DOMContentLoaded', () => {
-    // Modify this if your CameraController relies on backend data for init
-    // Maybe fetch initial status here or inside the constructor
     new CameraController();
 });

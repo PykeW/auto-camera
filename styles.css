@@ -226,6 +226,18 @@ select {
     height: 28px; /* Match button height */
 }
 
+/* Style number inputs to add space before spinners and hide default spinners */
+input[type="number"] {
+    padding-right: 15px; /* Add some space on the right */
+    -moz-appearance: textfield; /* Firefox - hide default spinners */
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none; /* Safari and Chrome - hide default spinners */
+    margin: 0; /* Remove any potential margin */
+}
+
 input:read-only {
     background-color: #4a4a4a;
     cursor: default;
@@ -807,4 +819,40 @@ input:checked + .slider:before {
     color: var(--text-medium);
     min-width: 35px; /* Ensure space for (255) */
     text-align: right;
+}
+
+/* Style for side-by-side layout items */
+.control-item.side-by-side {
+    display: flex;
+    align-items: center; /* Vertically align label and input */
+    justify-content: space-between; /* Push label left, input right */
+    gap: var(--spacing-medium);
+}
+
+.control-item.side-by-side label {
+    margin-bottom: 0; /* Remove bottom margin */
+    flex-shrink: 0; /* Prevent label shrinking */
+    /* Optionally set a fixed width or min-width for labels */
+    min-width: 80px; /* Example */
+    text-align: left;
+}
+
+.control-item.side-by-side input,
+.control-item.side-by-side span /* For focus status and calibration result */ {
+    flex-grow: 1; /* Allow input/span to fill space */
+    text-align: right; /* Align input text/result to the right */
+}
+
+/* Specific alignment for the span inside focus-status */
+.focus-status.side-by-side span {
+    text-align: right; /* Ensure status text aligns right */
+    flex-grow: 0; /* Don't let span grow excessively if label is short */
+}
+
+/* Specific alignment for calibration result span */
+#calibration-result-value {
+    text-align: right; /* Ensure result aligns right */
+    flex-grow: 1;
+    display: inline-block;
+    width: auto; /* Allow it to size naturally but align right */
 } 
