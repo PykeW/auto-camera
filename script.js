@@ -51,6 +51,7 @@ class CameraController {
         this.confirmCalibRoiBtn = document.getElementById('confirm-roi-calib-btn');
         this.redrawCalibRoiBtn = document.getElementById('redraw-roi-calib-btn');
         this.toggleCalibRoiVisibilityBtn = document.getElementById('toggle-calib-roi-visibility-btn');
+        this.calibRoiButtonGroup = document.getElementById('calib-roi-button-group'); // Added direct reference
 
         // Calibration elements
         this.calibrationPatternDisplay = document.getElementById('calibration-pattern-display');
@@ -629,25 +630,33 @@ class CameraController {
     }
 
     handleRoiMouseDown(event) {
-        if (this.focusRoiState !== 'drawing') return;
+        // Only handle if focus ROI is active AND we are in camera view
+        if (this.focusRoiState !== 'drawing' || this.isShowingCalibrationPattern) return;
+
         const imageRect = this.simulatedImage?.getBoundingClientRect();
         if (!imageRect || event.clientX < imageRect.left || event.clientX > imageRect.right || event.clientY < imageRect.top || event.clientY > imageRect.bottom) {
             return; // Click outside image
         }
         event.preventDefault(); // Prevent image drag
 
-        this.isDrawingRoi = true;
+        this.isDrawingRoi = true; // This flag is now only for focus ROI
         const coords = this.getImageCoordinates(event, this.simulatedImage);
-        if (!coords) return;
+        if (!coords) {
+            this.isDrawingRoi = false;
+            return;
+        }
         this.roiStartX = coords.x;
         this.roiStartY = coords.y;
+        // Update the correct state object
         this.pendingRoiRect = { x: this.roiStartX, y: this.roiStartY, width: 0, height: 0 };
-        if (this.focusRoiOverlay) this.focusRoiOverlay.style.opacity = '1';
+        // Call the correct update function
+        this.updateRoiOverlay();
         console.log("Focus ROI Mouse Down - Start Drawing");
     }
 
     handleRoiMouseMove(event) {
-        if (!this.isDrawingRoi || this.focusRoiState !== 'drawing') return;
+        // Check if drawing FOCUS ROI
+        if (!this.isDrawingRoi || this.focusRoiState !== 'drawing' || this.isShowingCalibrationPattern) return;
 
         const coords = this.getImageCoordinates(event, this.simulatedImage);
         if (!coords) return;
@@ -660,19 +669,22 @@ class CameraController {
         const height = Math.abs(this.currentRoiY - this.roiStartY);
 
         this.pendingRoiRect = { x, y, width, height };
-        this.updateRoiOverlay();
+        this.updateRoiOverlay(); // Update Focus overlay
     }
 
     handleRoiMouseUp(event) {
-        if (!this.isDrawingRoi || this.focusRoiState !== 'drawing') return;
-        this.isDrawingRoi = false;
+         // Check if drawing FOCUS ROI
+        if (!this.isDrawingRoi || this.focusRoiState !== 'drawing' || this.isShowingCalibrationPattern) return;
 
+        this.isDrawingRoi = false; // End focus drawing session
+
+        // Check the pending focus ROI
         if (this.pendingRoiRect && (this.pendingRoiRect.width < 5 || this.pendingRoiRect.height < 5)) {
             console.log("Focus ROI too small, canceling draw.");
             this.focusRoiState = 'idle'; // Go back to idle directly
             this.pendingRoiRect = null;
         } else if (this.pendingRoiRect) {
-            this.focusRoiState = 'drawn';
+            this.focusRoiState = 'drawn'; // Focus ROI drawn, waiting confirmation
             console.log("Focus ROI 绘制完成，等待确认:", this.pendingRoiRect);
         } else {
             console.log("Focus ROI mouse up without drawing.");
@@ -684,7 +696,7 @@ class CameraController {
             this.simulatedImage.style.cursor = 'default';
         }
         this.updateRoiControlsUI();
-        this.updateRoiOverlay(); // Ensure overlay updates based on final pending state
+        this.updateRoiOverlay(); // Ensure focus overlay updates based on final pending state
         console.log("Focus ROI Mouse Up");
     }
 
@@ -695,13 +707,30 @@ class CameraController {
         this.updateControlStates(false); // Disable controls initially
         this.fetchAvailableCameras();
 
-        // ... image dimensions update logic ...
+        // Initial image dimensions update
+        if (this.simulatedImage) {
+            this.simulatedImage.onload = () => {
+                if(this.statusBarImageDims) this.statusBarImageDims.textContent = `${this.simulatedImage.naturalWidth}, ${this.simulatedImage.naturalHeight}`;
+                // Update overlays in case image loaded after initial UI setup
+                 this.updateRoiOverlay();
+                 this.updateCalibRoiOverlay(); // Also update calib overlay
+            };
+             // If image already loaded (cached)
+            if (this.simulatedImage.complete && this.simulatedImage.naturalWidth > 0) {
+                 if(this.statusBarImageDims) this.statusBarImageDims.textContent = `${this.simulatedImage.naturalWidth}, ${this.simulatedImage.naturalHeight}`;
+            }
+        }
 
-        this.updateRoiOverlay(); // Initialize overlay state
+
+        this.updateRoiOverlay(); // Initialize focus overlay state
+        this.updateCalibRoiOverlay(); // Initialize calib overlay state
         this.updateRoiControlsUI(); // Initialize ROI button visibility
         this.updateCalibRoiControlsUI(); // Initialize Calib ROI buttons
         // Load state *after* UI elements are referenced and initial UI is set
-        this.loadState(); 
+        this.loadState();
+        // Apply loaded state to overlays
+        this.updateRoiOverlay();
+        this.updateCalibRoiOverlay();
     }
 
     // --- Helper for coordinate calculation relative to a target element ---
@@ -713,21 +742,23 @@ class CameraController {
 
         const rect = targetElement.getBoundingClientRect();
 
-        // Determine the 'natural' dimensions. For SVG, use width/height attributes or viewBox?
-        // For simplicity, let's assume the calibration pattern SVG display area acts like an image.
-        // In a real scenario, SVG coordinates might need different handling.
-        const naturalWidth = targetElement.naturalWidth || rect.width; // Fallback to rect width for SVG
-        const naturalHeight = targetElement.naturalHeight || rect.height; // Fallback to rect height for SVG
+        // Determine the 'natural' dimensions. Use rect dimensions for SVG.
+        const isSvgElement = targetElement.tagName?.toLowerCase() === 'svg' || targetElement === this.calibrationPatternDisplay;
+        const naturalWidth = isSvgElement ? rect.width : targetElement.naturalWidth;
+        const naturalHeight = isSvgElement ? rect.height : targetElement.naturalHeight;
 
         if (rect.width === 0 || rect.height === 0 || naturalWidth === 0 || naturalHeight === 0) {
             console.warn("getImageCoordinates: Invalid dimensions for target element or rect.", { rect, naturalWidth, naturalHeight });
-            return { x: 0, y: 0 };
+            // Return null or a specific indicator of failure? Returning 0,0 might be misleading.
+            // Let's return null to indicate failure.
+            return null;
+            // return { x: 0, y: 0 }; // Previous behavior
         }
 
         const scaleX = naturalWidth / rect.width;
         const scaleY = naturalHeight / rect.height;
-        // ... (rest of calculation remains the same for now)
-        let clientX = event.clientX; 
+
+        let clientX = event.clientX;
         let clientY = event.clientY;
         if (event.touches && event.touches.length > 0) {
             clientX = event.touches[0].clientX;
@@ -735,21 +766,25 @@ class CameraController {
         }
         const x = (clientX - rect.left) * scaleX;
         const y = (clientY - rect.top) * scaleY;
+
+        // Clamp coordinates to the calculated natural dimensions
         const clampedX = Math.max(0, Math.min(x, naturalWidth));
         const clampedY = Math.max(0, Math.min(y, naturalHeight));
+
         return { x: clampedX, y: clampedY };
     }
 
-    updateRoiOverlay() {
-        if (!this.focusRoiOverlay || !this.simulatedImage || !this.simulatedImage.parentElement) {
-             console.warn("[updateRoiOverlay] Missing required elements (overlay, image, or image parent).");
+    updateRoiOverlay() { // Updates ONLY the FOCUS ROI overlay
+        if (!this.focusRoiOverlay || !this.simulatedImage || !this.simulatedImage.parentElement || this.isShowingCalibrationPattern) {
+             console.warn("[updateRoiOverlay] Hiding focus overlay (missing elements or in calibration view).");
+             if(this.focusRoiOverlay) this.focusRoiOverlay.style.display = 'none';
              return;
         }
 
         let rectToDraw = null;
         let isVisible = false;
 
-        // Determine rect and visibility based on state
+        // Determine rect and visibility based on focus ROI state
          if (this.focusRoiState === 'confirmed' && this.finalRoiRect && this.isFocusRoiVisible) {
             rectToDraw = this.finalRoiRect;
             isVisible = true;
@@ -760,11 +795,11 @@ class CameraController {
               rectToDraw = this.pendingRoiRect;
               isVisible = true;
          }
-        console.log(`[updateRoiOverlay] State: ${this.focusRoiState}, isVisibleByUser: ${this.isFocusRoiVisible}, isDrawingRoi: ${this.isDrawingRoi}, rectToDraw:`, rectToDraw);
+         console.log(`[updateRoiOverlay] Focus State: ${this.focusRoiState}, isVisibleByUser: ${this.isFocusRoiVisible}, isDrawingRoi: ${this.isDrawingRoi}, rectToDraw:`, rectToDraw);
 
         if (rectToDraw && isVisible) {
             const overlay = this.focusRoiOverlay;
-            const image = this.simulatedImage;
+            const image = this.simulatedImage; // Target is always the image for focus ROI
             const imageRect = image.getBoundingClientRect();
             const container = image.parentElement; // #camera-display-container
             const containerRect = container.getBoundingClientRect();
@@ -776,17 +811,12 @@ class CameraController {
                 const scaleX = imageRect.width / naturalWidth;
                 const scaleY = imageRect.height / naturalHeight;
 
-                 // Calculate position relative to the container, applying scaling
-                 // Coords in rectToDraw are relative to the natural image size (0,0 top-left)
                 const displayX = (imageRect.left - containerRect.left) + (rectToDraw.x * scaleX);
                 const displayY = (imageRect.top - containerRect.top) + (rectToDraw.y * scaleY);
                 const displayW = rectToDraw.width * scaleX;
                 const displayH = rectToDraw.height * scaleY;
 
-                 console.log(`[updateRoiOverlay] Calculated Pos: L=${displayX.toFixed(1)}, T=${displayY.toFixed(1)}, W=${displayW.toFixed(1)}, H=${displayH.toFixed(1)}`);
-                 console.log(`[updateRoiOverlay] Image Rect: L=${imageRect.left.toFixed(1)}, T=${imageRect.top.toFixed(1)}, W=${imageRect.width.toFixed(1)}, H=${imageRect.height.toFixed(1)}`);
-                 console.log(`[updateRoiOverlay] Container Rect: L=${containerRect.left.toFixed(1)}, T=${containerRect.top.toFixed(1)}`);
-                 console.log(`[updateRoiOverlay] Scale: X=${scaleX.toFixed(2)}, Y=${scaleY.toFixed(2)}`);
+                console.log(`[updateRoiOverlay] Focus Calculated Pos: L=${displayX.toFixed(1)}, T=${displayY.toFixed(1)}, W=${displayW.toFixed(1)}, H=${displayH.toFixed(1)}`);
 
                 overlay.style.left = `${displayX}px`;
                 overlay.style.top = `${displayY}px`;
@@ -795,15 +825,91 @@ class CameraController {
                 overlay.style.opacity = '1';
                 overlay.style.display = 'block';
             } else {
-                 console.warn("[updateRoiOverlay] Hiding overlay due to invalid image/natural dimensions.");
+                 console.warn("[updateRoiOverlay] Hiding focus overlay due to invalid image/natural dimensions.");
                 overlay.style.display = 'none';
             }
         } else {
-             console.log("[updateRoiOverlay] Hiding overlay.");
+             console.log("[updateRoiOverlay] Hiding focus overlay.");
             this.focusRoiOverlay.style.display = 'none';
             this.focusRoiOverlay.style.opacity = '0';
         }
     }
+
+     // --- New function to update Calibration ROI Overlay ---
+     updateCalibRoiOverlay() {
+         // First, check for essential missing elements
+         if (!this.calibRoiOverlay || !this.calibrationPatternDisplay || !this.calibrationPatternDisplay.parentElement) {
+             console.warn("[updateCalibRoiOverlay] Hiding calibration overlay due to missing required HTML elements (calibRoiOverlay or calibrationPatternDisplay or its parent).");
+             if(this.calibRoiOverlay) this.calibRoiOverlay.style.display = 'none'; // Try to hide if it exists
+             return;
+         }
+
+         // If elements exist, check if we are in the correct view
+         if (!this.isShowingCalibrationPattern) {
+              // console.log("[updateCalibRoiOverlay] Not in calibration view, hiding overlay."); // Optional: change to log instead of warn
+              this.calibRoiOverlay.style.display = 'none';
+              return;
+         }
+
+         // --- If we reach here, elements exist AND we are in calibration view ---
+
+         let rectToDraw = null;
+         let isVisible = false;
+
+         // Determine rect and visibility based on calibration ROI state
+         if (this.finalCalibRoiRect && this.isCalibRoiVisible) { // Only show confirmed for now unless drawing
+             rectToDraw = this.finalCalibRoiRect;
+             isVisible = true;
+         } else if (this.pendingCalibRoiRect) { // Show pending if it exists (drawing or drawn)
+             rectToDraw = this.pendingCalibRoiRect;
+             isVisible = true;
+         }
+         console.log(`[updateCalibRoiOverlay] Calib State: final=${!!this.finalCalibRoiRect}, pending=${!!this.pendingCalibRoiRect}, isVisibleByUser: ${this.isCalibRoiVisible}, isDrawingCalib: ${this.isDrawingCalibRoi}, rectToDraw:`, rectToDraw);
+
+
+         if (rectToDraw && isVisible) {
+             const overlay = this.calibRoiOverlay;
+             const patternDisplay = this.calibrationPatternDisplay; // Target is the pattern display
+             const patternRect = patternDisplay.getBoundingClientRect();
+             const container = patternDisplay.parentElement; // #camera-display-container
+             const containerRect = container.getBoundingClientRect();
+
+             // Use rect dimensions for SVG pattern display
+             const naturalWidth = patternRect.width;
+             const naturalHeight = patternRect.height;
+
+             if (patternRect.width > 0 && patternRect.height > 0) {
+                 // Scaling factors (relative to bounding rect, so should be 1 if not scaled within container)
+                 const scaleX = 1; // naturalWidth / patternRect.width;
+                 const scaleY = 1; // naturalHeight / patternRect.height;
+
+                 // Calculate position relative to the container
+                 // Coords in rectToDraw are relative to the patternDisplay's coordinate system (0,0 top-left)
+                 const displayX = (patternRect.left - containerRect.left) + (rectToDraw.x * scaleX);
+                 const displayY = (patternRect.top - containerRect.top) + (rectToDraw.y * scaleY);
+                 const displayW = rectToDraw.width * scaleX;
+                 const displayH = rectToDraw.height * scaleY;
+
+                 console.log(`[updateCalibRoiOverlay] Calib Calculated Pos: L=${displayX.toFixed(1)}, T=${displayY.toFixed(1)}, W=${displayW.toFixed(1)}, H=${displayH.toFixed(1)}`);
+
+                 overlay.style.left = `${displayX}px`;
+                 overlay.style.top = `${displayY}px`;
+                 overlay.style.width = `${displayW}px`;
+                 overlay.style.height = `${displayH}px`;
+                 overlay.style.opacity = '1'; // Make sure it's visible
+                 overlay.style.display = 'block';
+
+             } else {
+                  console.warn("[updateCalibRoiOverlay] Hiding calib overlay due to invalid pattern display dimensions.");
+                 overlay.style.display = 'none';
+             }
+         } else {
+              // console.log("[updateCalibRoiOverlay] Hiding calib overlay (no rect to draw or not visible)."); // Optional: change to log
+             this.calibRoiOverlay.style.display = 'none';
+             this.calibRoiOverlay.style.opacity = '0'; // Ensure opacity reset
+         }
+     }
+
 
     // --- New Calibration Simulation Logic ---
     async startCalibration() {
@@ -817,13 +923,14 @@ class CameraController {
         this.footerStatus.textContent = "状态: 当量计算中...";
         this.updateControlStates(true); // Disable other controls
         this.calibrationResultValue.textContent = "计算中...";
+        if (!this.isShowingCalibrationPattern) {
+            this.switchToPatternView(); // Ensure pattern is visible
+        }
+
 
         try {
-            // 1. Show Checkerboard
-            console.log("模拟: 显示标准棋盘格图像");
-            this.simulatedImage.style.display = 'none';
-            this.calibrationPatternDisplay.innerHTML = this.CHECKERBOARD_SVG;
-            this.calibrationPatternDisplay.style.display = 'flex'; // Use flex to center potentially
+            // 1. Show Checkerboard (already done by switchToPatternView if needed)
+            console.log("模拟: (已显示标准棋盘格图像)");
             await this.wait(this.CALIBRATION_DELAY / 3, 'calibrationProcessId'); // Use a unique process ID ref if needed
 
             // 2. Simulate Analysis
@@ -841,22 +948,23 @@ class CameraController {
 
             this.calibrationRatio = this.SIMULATED_SQUARE_SIZE_PX / knownSquareSizeMm;
             console.log(`计算当量: ${this.SIMULATED_SQUARE_SIZE_PX} px / ${knownSquareSizeMm} mm = ${this.calibrationRatio.toFixed(2)} pixels/mm`);
-            this.calibrationResultValue.textContent = `${this.calibrationRatio.toFixed(2)} pixels/mm`;
+            this.calibrationResultValue.textContent = `${this.calibrationRatio.toFixed(2)} px/mm`; // Corrected unit display
             await this.wait(this.CALIBRATION_DELAY / 3, 'calibrationProcessId');
 
             console.log("--------- 当量计算流程完成 --------- ");
 
         } catch (error) {
             console.error("当量计算过程中出错:", error);
-            this.calibrationResultValue.textContent = `计算失败 (${error.message})`; // Show error message
+            this.calibrationResultValue.textContent = `计算失败`; // (${error.message}) - Keep it short
         } finally {
             // 4. Restore State (Don't automatically switch view back)
             console.log("模拟: 当量计算状态结束");
             this.isCalibrating = false;
-            this.footerStatus.textContent = "状态: 已连接"; // Or Idle?
+            this.footerStatus.textContent = this.isConnected ? "状态: 已连接" : "状态: 未连接"; // Reflect current connection
             this.updateControlStates(this.isConnected);
+            // Keep the pattern view active after calculation
         }
-        this.saveState(); // Save state after selecting axis
+        this.saveState(); // Save state after calculation (includes calibrationRatio)
     }
     // ----------------------------------------
 
@@ -868,6 +976,9 @@ class CameraController {
         } else {
             this.switchToCameraView();
         }
+        // Update both overlays after switching views
+        this.updateRoiOverlay();
+        this.updateCalibRoiOverlay();
     }
 
     switchToPatternView() {
@@ -875,14 +986,16 @@ class CameraController {
         this.simulatedImage.style.display = 'none';
         this.calibrationPatternDisplay.innerHTML = this.CHECKERBOARD_SVG;
         this.calibrationPatternDisplay.style.display = 'flex'; // Use flex to center potentially
-        this.toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示相机视图';
+        this.toggleViewBtn.innerHTML = '<i class="fas fa-camera"></i> 显示相机视图'; // Changed icon
         this.isShowingCalibrationPattern = true;
         // Stop focus ROI drawing if active
-        if (this.isInRoiDrawMode) {
-           this.cancelFocusRoiDraw();
+        if (this.focusRoiState === 'drawing') {
+           this.cancelFocusRoiDraw(); // Make sure this function exists and works
         }
-        this.updateRoiOverlay(); // Hide focus overlay, show calib overlay if exists
+        this.updateRoiOverlay(); // Hide focus overlay
+        this.updateCalibRoiOverlay(); // Show calib overlay if exists
         this.updateControlStates(this.isConnected);
+        this.updateCalibRoiControlsUI(); // Explicitly update calib controls
     }
 
     switchToCameraView() {
@@ -890,14 +1003,16 @@ class CameraController {
         this.calibrationPatternDisplay.style.display = 'none';
         this.calibrationPatternDisplay.innerHTML = ''; // Clear SVG
         this.simulatedImage.style.display = 'block';
-        this.toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示标定板';
+        this.toggleViewBtn.innerHTML = '<i class="fas sync-alt"></i> 显示标定板'; // Changed icon back
         this.isShowingCalibrationPattern = false;
         // Stop calib ROI drawing if active
-        if (this.isInCalibRoiDrawMode) {
-            this.cancelCalibRoiDraw();
+        if (this.isInCalibRoiDrawMode) { // Check the correct flag
+            this.cancelCalibRoiDraw(); // Make sure this function exists and works
         }
-        this.updateRoiOverlay(); // Hide calib overlay, show focus overlay if exists
+        this.updateCalibRoiOverlay(); // Hide calib overlay
+        this.updateRoiOverlay(); // Show focus overlay if exists
         this.updateControlStates(this.isConnected);
+        this.updateCalibRoiControlsUI(); // Explicitly update calib controls
     }
     // -------------------------
 
@@ -1236,138 +1351,177 @@ class CameraController {
 
     // --- Calibration ROI Logic ---
     enableCalibRoi() {
-        if (this.drawCalibRoiBtn.disabled || !this.isConnected || !this.isShowingCalibrationPattern) return; // Use renamed button
+        // Check if button is disabled OR not connected OR not in pattern view
+        if (this.drawCalibRoiBtn.disabled || !this.isConnected || !this.isShowingCalibrationPattern) return;
+
         console.log('启用校准 ROI 绘制模式');
-        this.isInCalibRoiDrawMode = true;
+        this.isInCalibRoiDrawMode = true; // Flag specifically for calib draw mode
+        this.pendingCalibRoiRect = null; // Clear any previous pending rect
+        this.isDrawingCalibRoi = false; // Reset internal flag
+
         if (this.calibrationPatternDisplay) {
              this.calibrationPatternDisplay.style.cursor = 'crosshair';
             // Dynamically add the listener ONLY when draw mode starts
-            this.boundHandleCalibRoiMouseDown = this.handleCalibRoiMouseDown.bind(this);
-            this.calibrationPatternDisplay.addEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+            // Ensure we don't add multiple listeners
+            if (!this.boundHandleCalibRoiMouseDown) {
+                 this.boundHandleCalibRoiMouseDown = this.handleCalibRoiMouseDown.bind(this);
+                 this.calibrationPatternDisplay.addEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+            }
         }
-        this.updateControlStates(this.isConnected);
+        this.updateCalibRoiControlsUI(); // Update buttons state
     }
 
     handleCalibRoiMouseDown(event) {
-        if (!this.isInCalibRoiDrawMode || this.isDrawingCalibRoi) return;
+        // Only handle if in calib draw mode AND on the pattern display
+        if (!this.isInCalibRoiDrawMode || this.isDrawingCalibRoi || !this.isShowingCalibrationPattern) return;
+
         event.preventDefault();
         console.log("Calibration ROI Mouse Down - Start Drawing");
-        this.isDrawingCalibRoi = true;
+        this.isDrawingCalibRoi = true; // Start calib drawing session
         const coords = this.getImageCoordinates(event, this.calibrationPatternDisplay);
+         if (!coords) { // Check if coordinate calculation failed
+             this.isDrawingCalibRoi = false; // Abort drawing
+             console.error("Calibration ROI Mouse Down - Failed to get coordinates.");
+             return;
+         }
         this.calibRoiStartX = coords.x;
         this.calibRoiStartY = coords.y;
-        this.currentCalibRoiX = coords.x;
-        this.currentCalibRoiY = coords.y;
-        this.updateRoiOverlay();
+        // Initialize pending rect for calib
+        this.pendingCalibRoiRect = { x: this.calibRoiStartX, y: this.calibRoiStartY, width: 0, height: 0 };
+        this.updateCalibRoiOverlay(); // Show initial dot
 
-        this.boundHandleCalibRoiMouseMove = this.handleCalibRoiMouseMove.bind(this);
-        this.boundHandleCalibRoiMouseUp = this.handleCalibRoiMouseUp.bind(this);
-        window.addEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
-        window.addEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
+        // Attach move/up listeners to window/document for better capture
+         this.boundHandleCalibRoiMouseMove = this.handleCalibRoiMouseMove.bind(this);
+         this.boundHandleCalibRoiMouseUp = this.handleCalibRoiMouseUp.bind(this);
+         window.addEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+         window.addEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
     }
 
     handleCalibRoiMouseMove(event) {
-        if (!this.isDrawingCalibRoi) return;
+        if (!this.isDrawingCalibRoi || !this.isInCalibRoiDrawMode || !this.isShowingCalibrationPattern) return; // Check drawing CALIB ROI
+
         const coords = this.getImageCoordinates(event, this.calibrationPatternDisplay);
+        if (!coords) return; // Ignore if coords are invalid
         this.currentCalibRoiX = coords.x;
         this.currentCalibRoiY = coords.y;
-        this.updateRoiOverlay();
-    }
-
-    handleCalibRoiMouseUp(event) {
-        if (!this.isDrawingCalibRoi) return;
-        console.log("Calibration ROI Mouse Up");
-
-        this.isDrawingCalibRoi = false;
-        this.isInCalibRoiDrawMode = false;
-        if (this.calibrationPatternDisplay && this.boundHandleCalibRoiMouseDown) {
-            this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
-            this.calibrationPatternDisplay.style.cursor = 'default';
-        }
-
-        window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
-        window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
-
-        const finalCoords = this.getImageCoordinates(event, this.calibrationPatternDisplay);
-        this.currentCalibRoiX = finalCoords.x;
-        this.currentCalibRoiY = finalCoords.y;
-
-        this.updateRoiOverlay(); // Update final box before calc
 
         const x = Math.min(this.calibRoiStartX, this.currentCalibRoiX);
         const y = Math.min(this.calibRoiStartY, this.currentCalibRoiY);
-        const width = Math.abs(this.calibRoiStartX - this.currentCalibRoiX);
-        const height = Math.abs(this.calibRoiStartY - this.currentCalibRoiY);
+        const width = Math.abs(this.currentCalibRoiX - this.calibRoiStartX);
+        const height = Math.abs(this.currentCalibRoiY - this.calibRoiStartY);
 
-        if (width > 5 && height > 5) {
-            this.pendingCalibRoiRect = { x, y, width, height };
-            console.log('Calibration ROI 绘制完成，等待确认:', this.pendingCalibRoiRect);
-        } else {
-            if(this.calibRoiOverlay) this.calibRoiOverlay.style.display = 'none';
-            console.log('Calibration ROI 绘制尺寸过小，未设置');
+        // Update pending calib rect
+        this.pendingCalibRoiRect = { x, y, width, height };
+        this.updateCalibRoiOverlay(); // Update calib overlay visual
+    }
+
+    handleCalibRoiMouseUp(event) {
+        if (!this.isDrawingCalibRoi || !this.isInCalibRoiDrawMode || !this.isShowingCalibrationPattern) return; // Check drawing CALIB ROI
+
+        console.log("Calibration ROI Mouse Up");
+        this.isDrawingCalibRoi = false; // End calib drawing session
+        this.isInCalibRoiDrawMode = false; // Exit calib drawing mode
+
+        // Clean up listeners
+        if (this.calibrationPatternDisplay && this.boundHandleCalibRoiMouseDown) {
+            // Keep mousedown listener attached to element, maybe remove only if needed?
+            // this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+            this.calibrationPatternDisplay.style.cursor = 'default';
         }
-        this.updateControlStates(this.isConnected);
+        if (this.boundHandleCalibRoiMouseMove) window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+        if (this.boundHandleCalibRoiMouseUp) window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
+
+        // Final calculation based on last known coordinates (already done in mouse move)
+        // Check the size of the pending calibration ROI
+        if (this.pendingCalibRoiRect && (this.pendingCalibRoiRect.width < 5 || this.pendingCalibRoiRect.height < 5)) {
+            console.log('Calibration ROI 绘制尺寸过小，未设置');
+            this.pendingCalibRoiRect = null; // Discard small rect
+        } else if (this.pendingCalibRoiRect) {
+            console.log('Calibration ROI 绘制完成，等待确认:', this.pendingCalibRoiRect);
+             // State becomes 'drawn' implicitly by having a pending rect
+        } else {
+             console.log('Calibration ROI mouse up without valid rect.');
+             // State remains 'idle' (or whatever it was before enabling draw mode)
+        }
+
+        this.updateCalibRoiOverlay(); // Update final box display
+        this.updateCalibRoiControlsUI(); // Update button states (confirm/redraw should appear)
     }
 
      confirmCalibRoi() {
-        if (this.pendingCalibRoiRect) {
-            this.finalCalibRoiRect = this.pendingCalibRoiRect;
-            this.pendingCalibRoiRect = null;
-            console.log('校准 ROI 已确认:', this.finalCalibRoiRect);
-            if (this.calibrationPatternDisplay) this.calibrationPatternDisplay.style.cursor = 'default';
-            if (this.enableCalibRoiBtn) this.enableCalibRoiBtn.style.display = 'none'; // Hide enable button
-            this.updateControlStates(this.isConnected);
-            this.updateRoiOverlay(); // Update overlay style
-        }
+        if (this.confirmCalibRoiBtn.disabled || !this.pendingCalibRoiRect || !this.isShowingCalibrationPattern) return;
+
+        this.finalCalibRoiRect = { ...this.pendingCalibRoiRect }; // Copy pending to final
+        this.pendingCalibRoiRect = null; // Clear pending
+        console.log('校准 ROI 已确认:', this.finalCalibRoiRect);
+        if (this.calibrationPatternDisplay) this.calibrationPatternDisplay.style.cursor = 'default';
+        this.isInCalibRoiDrawMode = false; // Ensure exit draw mode
+        // this.isCalibRoiVisible = true; // Ensure visible after confirm? Or keep current visibility? Let's make it visible.
+        this.isCalibRoiVisible = true;
+        this.updateCalibRoiOverlay(); // Update overlay style
+        this.updateCalibRoiControlsUI(); // Update button display (confirm hides, redraw/toggle appear)
+        // TODO: Send confirmed calib ROI to backend if needed
+        // this.saveState(); // Optionally save confirmed calib ROI
     }
 
     redrawCalibRoi() {
+        if (this.redrawCalibRoiBtn.disabled || !this.isShowingCalibrationPattern) return;
+
         this.pendingCalibRoiRect = null;
         this.finalCalibRoiRect = null;
-        this.isInCalibRoiDrawMode = false;
-        if (this.calibRoiOverlay) this.calibRoiOverlay.style.display = 'none';
+        this.isInCalibRoiDrawMode = false; // Ensure exit draw mode if somehow active
+        this.isDrawingCalibRoi = false; // Reset drawing flag
+
         if (this.calibrationPatternDisplay) {
             this.calibrationPatternDisplay.style.cursor = 'default';
+            // Remove mouse down listener if it's still attached (safer)
              if (this.boundHandleCalibRoiMouseDown) {
-                this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+                // this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+                // Let's not remove it, just rely on isInCalibRoiDrawMode flag
             }
         }
+         // Clean up potential global listeners from a previous interrupted draw
+         if (this.boundHandleCalibRoiMouseMove) window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+         if (this.boundHandleCalibRoiMouseUp) window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
+
         console.log('请求重新绘制校准 ROI');
-        if (this.enableCalibRoiBtn) this.enableCalibRoiBtn.style.display = 'inline-block';
-        this.updateControlStates(this.isConnected);
+        this.updateCalibRoiOverlay(); // Hide overlay
+        this.updateCalibRoiControlsUI(); // Update buttons (draw button should appear)
+        // Trigger enabling draw mode again
+        this.enableCalibRoi();
     }
 
     // Helper to cancel drawing if view switches
     cancelFocusRoiDraw() {
-        if (!this.isInRoiDrawMode && !this.isDrawingRoi) return;
+        // Check if we are actually drawing the focus ROI
+        if (!this.isDrawingRoi || this.focusRoiState !== 'drawing') return;
          console.log("取消对焦 ROI 绘制");
          this.isDrawingRoi = false;
-         this.isInRoiDrawMode = false;
-         if (this.simulatedImage && this.boundHandleRoiMouseDown) {
-             this.simulatedImage.removeEventListener('mousedown', this.boundHandleRoiMouseDown);
+         this.focusRoiState = 'idle'; // Revert state to idle
+         if (this.simulatedImage) {
              this.simulatedImage.style.cursor = 'default';
+             // No global listeners to remove for focus ROI in this setup
          }
-         window.removeEventListener('mousemove', this.boundHandleRoiMouseMove);
-         window.removeEventListener('mouseup', this.boundHandleRoiMouseUp);
          this.pendingRoiRect = null; // Discard pending rect if cancelled mid-draw
-         this.updateRoiOverlay();
-         this.updateControlStates(this.isConnected);
+         this.updateRoiOverlay(); // Hide overlay
+         this.updateRoiControlsUI(); // Reset buttons
     }
 
     cancelCalibRoiDraw() {
-        if (!this.isInCalibRoiDrawMode && !this.isDrawingCalibRoi) return;
+        // Check if we are drawing the calibration ROI
+        if (!this.isDrawingCalibRoi || !this.isInCalibRoiDrawMode) return;
          console.log("取消校准 ROI 绘制");
          this.isDrawingCalibRoi = false;
          this.isInCalibRoiDrawMode = false;
-         if (this.calibrationPatternDisplay && this.boundHandleCalibRoiMouseDown) {
-             this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+         if (this.calibrationPatternDisplay) {
              this.calibrationPatternDisplay.style.cursor = 'default';
+             // Remove global listeners if they were attached
+             if (this.boundHandleCalibRoiMouseMove) window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+             if (this.boundHandleCalibRoiMouseUp) window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
          }
-         window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
-         window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
          this.pendingCalibRoiRect = null; // Discard pending rect if cancelled mid-draw
-         this.updateRoiOverlay();
-         this.updateControlStates(this.isConnected);
+         this.updateCalibRoiOverlay(); // Hide overlay
+         this.updateCalibRoiControlsUI(); // Reset buttons
     }
 
    // --- End Calibration ROI Logic ---
@@ -1426,7 +1580,8 @@ class CameraController {
     }
 
     toggleFocusRoiVisibility() {
-        if (!this.finalRoiRect) return; // Only allow toggling confirmed ROI
+        // Ensure we are in camera view and have a confirmed focus ROI
+        if (this.isShowingCalibrationPattern || !this.finalRoiRect || this.focusRoiState !== 'confirmed') return;
 
         this.isFocusRoiVisible = !this.isFocusRoiVisible;
         console.log(`对焦 ROI 可见性: ${this.isFocusRoiVisible}`);
@@ -1503,9 +1658,11 @@ class CameraController {
         const showCalibControls = this.isShowingCalibrationPattern;
         const canInteract = this.isConnected && !this.isFocusing && !this.isCalibrating; // Basic check
 
+        console.log(`[updateCalibRoiControlsUI] showCalibControls: ${showCalibControls}, pending: ${!!this.pendingCalibRoiRect}, final: ${!!this.finalCalibRoiRect}`);
+
         // Hide all calib buttons initially
         if (this.drawCalibRoiBtn) this.drawCalibRoiBtn.style.display = 'none';
-        if (this.calibRoiButtonGroup) this.calibRoiButtonGroup.style.display = 'none';
+        if (this.calibRoiButtonGroup) this.calibRoiButtonGroup.style.display = 'none'; // Use direct reference
         if (this.confirmCalibRoiBtn) this.confirmCalibRoiBtn.style.display = 'none';
         if (this.redrawCalibRoiBtn) this.redrawCalibRoiBtn.style.display = 'none';
         if (this.toggleCalibRoiVisibilityBtn) this.toggleCalibRoiVisibilityBtn.style.display = 'none';
@@ -1513,36 +1670,49 @@ class CameraController {
         if (showCalibControls) {
             if (this.pendingCalibRoiRect) {
                  // State: Drawn, waiting for confirmation
-                if (this.calibRoiButtonGroup) this.calibRoiButtonGroup.style.display = 'flex';
+                if (this.calibRoiButtonGroup) {
+                     this.calibRoiButtonGroup.style.display = 'flex'; // Show the group
+                     console.log("[updateCalibRoiControlsUI] Setting calib group display to 'flex' (pending)");
+                }
                 if (this.confirmCalibRoiBtn) {
-                     this.confirmCalibRoiBtn.style.display = 'inline-block';
+                     this.confirmCalibRoiBtn.style.display = 'inline-block'; // Show Confirm
                      this.confirmCalibRoiBtn.disabled = !canInteract;
                 }
                 if (this.redrawCalibRoiBtn) {
-                     this.redrawCalibRoiBtn.style.display = 'inline-block';
+                     this.redrawCalibRoiBtn.style.display = 'inline-block'; // Show Redraw
                      this.redrawCalibRoiBtn.disabled = !canInteract;
                 }
-                // Optionally allow toggling visibility for pending calib ROI
-                // if (this.toggleCalibRoiVisibilityBtn) this.toggleCalibRoiVisibilityBtn.style.display = 'inline-block';
+                // Toggle visibility usually only shown for confirmed ROI, keep hidden here
+                if (this.toggleCalibRoiVisibilityBtn) this.toggleCalibRoiVisibilityBtn.style.display = 'none';
              } else if (this.finalCalibRoiRect) {
                  // State: Confirmed
-                 if (this.calibRoiButtonGroup) this.calibRoiButtonGroup.style.display = 'flex';
+                 if (this.calibRoiButtonGroup) {
+                     this.calibRoiButtonGroup.style.display = 'flex'; // Show the group
+                     console.log("[updateCalibRoiControlsUI] Setting calib group display to 'flex' (confirmed)");
+                 }
+                 if (this.confirmCalibRoiBtn) this.confirmCalibRoiBtn.style.display = 'none'; // Hide Confirm
                  if (this.redrawCalibRoiBtn) {
-                     this.redrawCalibRoiBtn.style.display = 'inline-block';
+                     this.redrawCalibRoiBtn.style.display = 'inline-block'; // Show Redraw
                      this.redrawCalibRoiBtn.disabled = !canInteract;
                  }
                  if (this.toggleCalibRoiVisibilityBtn) {
-                     this.toggleCalibRoiVisibilityBtn.style.display = 'inline-block';
-                      // Disable based on rect existence, not canInteract
+                     this.toggleCalibRoiVisibilityBtn.style.display = 'inline-block'; // Show Toggle
                       this.toggleCalibRoiVisibilityBtn.disabled = !this.finalCalibRoiRect;
                  }
              } else {
                  // State: Idle (or drawing)
                  if (this.drawCalibRoiBtn) {
-                     this.drawCalibRoiBtn.style.display = 'inline-block';
+                     this.drawCalibRoiBtn.style.display = 'inline-block'; // Show Draw
                      this.drawCalibRoiBtn.disabled = !canInteract || this.isInCalibRoiDrawMode; // Disable if drawing
                  }
+                 if (this.calibRoiButtonGroup) {
+                    this.calibRoiButtonGroup.style.display = 'none'; // Hide group when idle
+                    console.log("[updateCalibRoiControlsUI] Setting calib group display to 'none' (idle)");
+                 }
              }
+        } else {
+             console.log("[updateCalibRoiControlsUI] Not in calibration view, hiding group.");
+             if (this.calibRoiButtonGroup) this.calibRoiButtonGroup.style.display = 'none';
         }
         this.updateCalibRoiToggleButtonState(); // Update toggle button icon/title
     }
@@ -1585,8 +1755,9 @@ class CameraController {
                      }
                  }
                  if (!found) {
-                    this.serialNumberSelect.appendChild(new Option(state.serialNumber, state.serialNumber));
-                    this.serialNumberSelect.value = state.serialNumber;
+                    const newOption = new Option(state.serialNumber, state.serialNumber, false, true); // text, value, defaultSelected, selected
+                    this.serialNumberSelect.appendChild(newOption);
+                    // this.serialNumberSelect.value = state.serialNumber; // Setting value might be more reliable
                  }
             } else if (this.serialNumberSelect) {
                 this.serialNumberSelect.value = ''; // Clear selection if no SN from backend
@@ -1605,44 +1776,55 @@ class CameraController {
             if (this.footerZPos) { this.footerZPos.textContent = currentZStr; }
             if (this.currentZInput) { this.currentZInput.value = currentZStr; }
             if (this.clarityValueInput) { this.clarityValueInput.value = typeof this.currentClarity === 'number' ? this.currentClarity.toFixed(3) : '--'; }
-            this.applyBlur(this.currentClarity);
+            // Only apply blur if not showing pattern view
+             if (!this.isShowingCalibrationPattern) {
+                 this.applyBlur(this.currentClarity);
+             }
 
-            // --- Update Properties Table/Controls --- (Needs more detailed logic based on actual props)
+
+            // --- Update Properties Table/Controls ---
             const properties = state.properties || {};
-            // Example: Find exposure and gain inputs and update their values
-            const exposureInput = document.getElementById('exposure-time');
-            const gainInput = document.getElementById('gain');
-            const exposureKey = '曝光时间(us)'; // Verify key from backend
-            const gainKey = '增益'; // Verify key from backend
-            if (exposureInput && properties[exposureKey]) exposureInput.value = properties[exposureKey].value;
-            if (gainInput && properties[gainKey]) gainInput.value = properties[gainKey].value;
-            // ... Add similar logic for other properties like trigger mode, WB etc. ...
-
-            // --- Update Focus ROI --- 
-            if (state.roiCoords && state.roiEnabled !== false) {
-                this.finalRoiRect = this.backendCoordsToDisplayCoords(state.roiCoords);
-                this.focusRoiState = this.finalRoiRect ? 'confirmed' : 'idle'; // Set state based on valid coords
-                this.isFocusRoiVisible = true; // Assume visible if received from backend
-            } else {
-                this.finalRoiRect = null;
-                this.focusRoiState = 'idle';
+            const propsContainer = document.querySelector('.property-grid'); // Or the table body if applicable
+            if(propsContainer){
+                // Example: Assuming properties have unique IDs or can be found by label
+                Object.entries(properties).forEach(([key, propData]) => {
+                     // Find control based on label text or a data attribute if added
+                     // This is complex without stable IDs, skipping detailed implementation here
+                     // Simplified example:
+                     if (key === '曝光时间(us)' && document.getElementById('exposure-time')) {
+                          document.getElementById('exposure-time').value = propData.value;
+                     } else if (key === '增益' && document.getElementById('gain')) {
+                          document.getElementById('gain').value = propData.value;
+                     } else if (key === '触发模式' && document.getElementById('trigger-mode-select')) {
+                         document.getElementById('trigger-mode-select').value = propData.value;
+                     }
+                     // ... add more properties ...
+                });
             }
+
+
+            // --- Update Focus ROI ---
+             // Backend should send ROI coordinates relative to image, e.g., {l, t, r, b}
+             if (state.roiCoords && state.roiEnabled !== false) {
+                // Convert backend {l,t,r,b} to frontend {x,y,width,height} if needed
+                // Assuming backend sends {l,t,r,b} and getImageCoordinates uses {x,y,w,h}
+                // this.finalRoiRect = this.backendCoordsToDisplayCoords(state.roiCoords); // Need this helper
+                 // For now, assuming backend sends compatible {x,y,w,h} or we handle it elsewhere
+                 this.finalRoiRect = state.roiCoords; // Direct assignment if compatible
+                 this.focusRoiState = this.finalRoiRect ? 'confirmed' : 'idle'; // Set state based on valid coords
+                 this.isFocusRoiVisible = true; // Assume visible if received from backend
+             } else {
+                 this.finalRoiRect = null;
+                 this.focusRoiState = 'idle';
+             }
             this.pendingRoiRect = null; // Clear pending on state update
-            this.updateRoiOverlay();
-            this.updateRoiControlsUI();
 
-            // --- Update Calibration ROI (if applicable) --- 
-            // Assuming backend might also send calibRoiCoords and calibRoiEnabled
-            if (state.calibRoiCoords /* && state.calibRoiEnabled !== false */) { // Adjust condition as needed
-                // Add conversion logic if needed
-                // this.finalCalibRoiRect = this.backendCoordsToDisplayCoords(state.calibRoiCoords); 
-                // this.updateCalibRoiControlsUI(); // Update calib buttons
-                // this.updateCalibRoiOverlay(); // Update calib overlay visual
-            } else {
-                 this.finalCalibRoiRect = null;
-                 // this.updateCalibRoiControlsUI();
-                 // this.updateCalibRoiOverlay();
-            }
+
+             // --- Update Calibration ROI (if applicable) ---
+             // Assuming backend *doesn't* send calib ROI state currently
+             // this.finalCalibRoiRect = state.calibRoiCoords || null;
+             // this.pendingCalibRoiRect = null; // Clear pending
+
 
             // Update Focus Status
             this.updateFocusStatus(state.focusStatus || '空闲');
@@ -1650,15 +1832,20 @@ class CameraController {
             // Update Selected Axis
             this.selectedAxisId = state.selectedAxisId;
             this.updateConfigAxisButtonDisplay(this.selectedAxisId);
-             // --- Trigger ROI UI update after state is loaded ---
-             this.updateRoiControlsUI();
-             this.updateRoiOverlay();
-             // ----------------------------------------------------
+
+            // --- Trigger UI updates AFTER all state is loaded ---
+            this.updateRoiOverlay(); // Update focus ROI visual
+            this.updateCalibRoiOverlay(); // Update calib ROI visual (will hide if needed)
+            this.updateRoiControlsUI(); // Update focus ROI buttons
+            this.updateCalibRoiControlsUI(); // Update calib ROI buttons
+
 
         } else {
             // Handle disconnected state
             this.resetUIData(); // Call a helper to clear most UI fields
-            this.applyBlur(1); // Max blur when disconnected
+            if (!this.isShowingCalibrationPattern) { // Don't modify blur if showing pattern
+                 this.applyBlur(1); // Max blur when disconnected
+             }
             this.updateFocusStatus('未连接');
         }
         this.updateControlStates(this.isConnected); // Update button enable/disable states

@@ -221,9 +221,10 @@
                          <h4 class="roi-heading">校准ROI区域</h4>
                          <!-- Enable/Draw button now IN the header line -->
                          <button id="draw-roi-calib-btn" class="roi-button" style="display: none;" disabled=""><i class="fas fa-pencil-alt"></i> 启用校准ROI</button>
-                         <div class="roi-button-group control-item">
+                         <div id="calib-roi-button-group" class="roi-button-group control-item" style="display: none;">
                             <button id="confirm-roi-calib-btn" class="roi-button" style="display: none;" disabled="">确认</button>
                             <button id="redraw-roi-calib-btn" class="roi-button" style="display: none;" disabled="">重绘</button>
+                            <button id="clear-roi-calib-btn" class="roi-button danger-button" style="display: none;" disabled="">清除</button>
                             <button id="toggle-calib-roi-visibility-btn" class="roi-button mini-button" disabled="" title="切换校准ROI可见性" style="display: none;"><i class="fas fa-eye"></i></button>
                         </div>
                     </div>
