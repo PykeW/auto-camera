@@ -1,27 +1,103 @@
 /* === 表单控件 === */
 
 .control-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: var(--spacing-medium);
+    gap: var(--spacing-medium);
 }
 
-label {
-    display: block;
-    margin-bottom: var(--spacing-small);
-    color: var(--text-medium);
-    font-size: 0.9em;
+.control-item label:first-child {
+    flex-shrink: 0;
+    min-width: 100px;
+    text-align: left;
+    margin-right: var(--spacing-small);
 }
 
-input[type="text"],
-input[type="number"],
-select {
+.control-item > *:last-child:not(label:first-child),
+.control-item .input-group {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.control-item input[type="text"],
+.control-item input[type="number"],
+.control-item input[type="password"],
+.control-item input[type="email"],
+.control-item select {
     width: 100%;
-    background-color: var(--bg-medium);
-    border: 1px solid var(--border-dark);
-    color: var(--text-light);
-    padding: var(--spacing-small) var(--spacing-medium);
+    padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border-color);
     border-radius: var(--border-radius);
-    font-size: inherit;
-    height: 28px;
+    color: var(--input-fg);
+    font-size: 0.9em;
+    box-sizing: border-box;
+}
+
+.control-item input:focus,
+.control-item select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--accent-color-focus);
+}
+
+.control-item input[readonly] {
+    background-color: var(--input-bg-readonly);
+    cursor: not-allowed;
+}
+
+.control-item input::placeholder {
+    color: var(--text-placeholder);
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.input-group input {
+    flex-grow: 1;
+    border-right: none;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.input-group button {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    height: auto;
+    padding-top: var(--input-padding-vertical);
+    padding-bottom: var(--input-padding-vertical);
+    line-height: 1.4;
+}
+
+.toggle-item label.switch {
+    margin-left: auto;
+    /* flex-grow: 0; might be needed if it over-expands */
+}
+
+.range-item > div {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: var(--spacing-small);
+}
+
+.range-item input[type="range"] {
+    flex-grow: 1;
+    width: auto;
+    margin: 0;
+    cursor: pointer;
+}
+
+.range-item .range-value {
+    min-width: 40px;
+    text-align: right;
+    font-size: 0.85em;
+    color: var(--text-medium);
 }
 
 /* 数字输入框 */
@@ -48,7 +124,7 @@ button:disabled {
     background-color: #4a4a4a;
     color: var(--text-medium);
     cursor: not-allowed;
-    border-color: var(--border-dark);
+    border-color: var(--border-medium);
     opacity: 0.7;
 }
 
@@ -66,21 +142,6 @@ select {
     height: 24px;
     padding-top: 2px;
     padding-bottom: 2px;
-}
-
-/* 输入组 */
-.input-group {
-    display: flex;
-    gap: var(--spacing-small);
-}
-
-.input-group input {
-    flex-grow: 1;
-}
-
-.input-group button {
-    flex-shrink: 0;
-    padding: var(--spacing-small) var(--spacing-medium);
 }
 
 /* 属性表格 */
@@ -245,26 +306,16 @@ input[type=range]::-moz-range-thumb {
     flex-grow: 1;
 }
 
-/* 开关 */
-.toggle-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--spacing-medium);
-}
-
-.toggle-item label:first-child {
-    flex-grow: 1;
-    min-width: auto;
-    margin-right: 0;
-    margin-bottom: 0;
+.toggle-item label.switch {
+    margin-left: auto;
+    /* flex-grow: 0; might be needed if it over-expands */
 }
 
 .switch {
     position: relative;
     display: inline-block;
-    width: 38px;
-    height: 24px;
+    width: 40px;
+    height: 20px;
     flex-shrink: 0;
 }
 
@@ -281,52 +332,54 @@ input[type=range]::-moz-range-thumb {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: var(--bg-darker);
-    border: 1px solid var(--border-dark);
+    background-color: var(--bg-medium);
     transition: .4s;
+    border-radius: 20px;
 }
 
 .slider:before {
     position: absolute;
     content: "";
-    height: 16px;
-    width: 16px;
+    height: 14px;
+    width: 14px;
     left: 3px;
     bottom: 3px;
     background-color: var(--text-light);
     transition: .4s;
+    border-radius: 50%;
 }
 
 input:checked + .slider {
     background-color: var(--accent-blue);
-    border-color: var(--accent-blue);
+    transform: translateX(20px);
 }
 
 input:focus + .slider {
     box-shadow: 0 0 1px var(--accent-blue);
 }
 
-input:checked + .slider:before {
-    transform: translateX(16px);
-}
-
-.slider.round {
-    border-radius: 24px;
-}
-.slider.round:before {
-    border-radius: 50%;
-}
-
-.switch input:disabled + .slider {
+.control-item input:disabled,
+.control-item select:disabled,
+.control-item button:disabled {
     cursor: not-allowed;
-    background-color: #3a3a3a;
-    border-color: var(--border-dark);
+    opacity: 0.6;
+}
+
+.control-item input[type="checkbox"]:disabled + .slider {
+    cursor: not-allowed;
+    background-color: var(--bg-dark);
     opacity: 0.7;
 }
-.switch input:disabled + .slider:before {
-    background-color: #777;
+.control-item input[type="checkbox"]:disabled + .slider:before {
+    background-color: var(--text-medium);
 }
-.switch input:checked:disabled + .slider {
-    background-color: #105a9e;
-    opacity: 0.6;
+
+.control-item input[type="checkbox"]:disabled:checked + .slider {
+    background-color: var(--accent-blue);
+    opacity: 0.5;
+}
+
+.control-item input[type="range"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 } 

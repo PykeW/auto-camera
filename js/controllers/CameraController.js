@@ -29,7 +29,6 @@ export class CameraController {
         this.currentClarity = 0;
         this.bestZFound = null;
         this.isConnected = false;
-        this.connectionProcessId = null;
         this.isCapturing = false;
         this.isRecording = false;
         this.isAxisDropdownVisible = false;
@@ -235,12 +234,21 @@ export class CameraController {
 
         } catch (error) {
             console.error("断开相机时出错:", error);
-            alert(`断开连接时出错: ${error.message}`);
-            // Try to reset button state even on error
-            if (this.isConnected) {
-                 this.uiManager.connectBtn.textContent = "断开连接";
+            // Check if the error is due to the 400 Bad Request (already disconnected)
+            if (error.message && error.message.includes("状态码: 400")) {
+                console.warn("尝试断开一个后端认为已断开的连接，将强制更新前端状态。");
+                // Force frontend state to disconnected even if backend responded 400
+                this.isConnected = false; 
+                this.updateUIFromState({ isConnected: false }); // Send minimal disconnected state
+                this.updateControlStates(false);
+                this.fetchAvailableCameras(); // Refresh camera list as we are disconnected
             } else {
-                 this.uiManager.connectBtn.textContent = "连接";
+                // For other errors, show the alert
+                alert(`断开连接时出错: ${error.message}`);
+            }
+            // Try to reset button state even on error
+            if (this.uiManager.connectBtn) {
+                 this.uiManager.connectBtn.textContent = this.isConnected ? "断开连接" : "连接";
             }
         } finally {
              this.uiManager.connectBtn.disabled = this.isFocusing || this.isCapturing || this.isRecording;
@@ -250,10 +258,15 @@ export class CameraController {
     }
 
     // Enables/disables controls based on connection status AND other states
-    updateControlStates(connected) {
+    updateControlStates(connected) { // connected is now always true unless init fails
         console.log(`[updateControlStates] Called with connected: ${connected}`);
+        // Assuming isConnected is true for most operations now
         const isIdle = connected && !this.isFocusing && !this.isCapturing && !this.isRecording;
-        const canStartActivity = isIdle;
+        const canStartActivity = isIdle; // Keep only one definition
+        
+        // --- Re-add the definition for generalControlsDisabled ---
+        const generalControlsDisabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
+        // --------------------------------------------------------
 
         const hasSelectedCamera = this.uiManager.serialNumberSelect && this.uiManager.serialNumberSelect.value !== '';
         const canConnect = !this.isConnected && hasSelectedCamera && !this.connectionProcessId;
@@ -275,59 +288,50 @@ export class CameraController {
         if(this.uiManager.btnRecord) this.uiManager.btnRecord.disabled = !canStartActivity || this.isCapturing || this.isRecording || this.isCalibrating;
         if(this.uiManager.btnTrigger) this.uiManager.btnTrigger.disabled = !canStartActivity || this.isCapturing || this.isRecording || this.isCalibrating;
 
+        // Panel controls (bulk disable first)
         this.uiManager.panelControls.forEach(ctrl => {
-             // Simplified exclusion for testing, refine if needed
-             const coreControls = ['connect-btn', 'serial-number'];
-             if (!coreControls.includes(ctrl.id)) { // Apply general disabled state
-                 // We need finer control for buttons that should be enabled in specific states
-                 // ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || this.isCalibrating;
+             // Always enable axis config buttons for now, refine later if needed
+             const alwaysEnabled = ['config-axis-btn', 'clear-axis-btn']; 
+             // Keep camera name/model enabled if connected
+             const keepEnabled = ['camera-name', 'camera-model']; 
+             if (!alwaysEnabled.includes(ctrl.id) && !keepEnabled.includes(ctrl.id)) {
+                 ctrl.disabled = generalControlsDisabled;
              }
         });
         
-        // Example: Refine specific button states here (this part needs full review later)
-        // ... (rest of the updateControlStates logic for other buttons) ...
+        // Ensure camera name input is enabled when connected (model is readonly)
+        if (this.uiManager.cameraNameInput) {
+            this.uiManager.cameraNameInput.disabled = !connected;
+        }
+        // Ensure model input remains readonly but reflects connection status (visually disabled)
+        if (this.uiManager.cameraModelInput) {
+            this.uiManager.cameraModelInput.disabled = !connected;
+        }
 
-        console.log(`[updateControlStates] Finished. connectBtn disabled: ${connectBtnDisabled}`);
+        // Explicitly enable/disable specific controls based on more detailed state
+        // ... (rest of updateControlStates logic for other buttons) ...
+
+        console.log(`[updateControlStates] Finished.`); 
     }
 
     // --- Event Listeners ---
     initializeEventListeners() {
-        // Use uiManager references for adding listeners
-        if (this.uiManager.connectBtn) {
-             this.uiManager.connectBtn.addEventListener('click', () => {
-                if (this.isConnected) {
-                    this.disconnectCamera();
-                } else {
-                    this.connectCamera();
-                }
-            });
-        }
-
-        if (this.uiManager.serialNumberSelect) {
-             this.uiManager.serialNumberSelect.addEventListener('change', () => {
-                console.log('[Change Listener] Camera selection changed:', this.uiManager.serialNumberSelect.value);
-                console.log('[Change Listener] Calling updateControlStates with isConnected:', this.isConnected);
-                this.updateControlStates(this.isConnected);
-            });
-        }
-
+        // Axis config button listener
         this.uiManager.configAxisBtn?.addEventListener('click', (e) => {
              e.stopPropagation();
              this.fetchAndShowAxisDropdown();
          });
 
+        // Autofocus buttons
         this.uiManager.startFocusBtn?.addEventListener('click', () => this.startAutofocus());
         this.uiManager.stopFocusBtn?.addEventListener('click', () => this.stopAutofocus());
 
+        // Header control buttons (excluding settings)
         this.uiManager.btnPlay?.addEventListener('click', () => this.startCapture());
         this.uiManager.btnStop?.addEventListener('click', () => this.stopCapture());
         this.uiManager.btnCapture?.addEventListener('click', () => this.singleShot());
         this.uiManager.btnRecord?.addEventListener('click', () => this.startRecording());
         this.uiManager.btnTrigger?.addEventListener('click', () => this.softwareTrigger());
-        document.getElementById('btn-settings')?.addEventListener('click', () => alert("模拟：打开设置面板（未实现）")); // Keep direct if not managed by UIManager
-
-        this.uiManager.selectConfigBtn?.addEventListener('click', () => alert("模拟：打开文件选择器选择配置文件"));
-        this.uiManager.selectFolderBtn?.addEventListener('click', () => alert("模拟：打开文件夹选择器选择保存路径"));
 
         // ROI Drawing listeners - might need adjustment based on where state is managed
         this.uiManager.simulatedImage?.addEventListener('mousedown', this.handleRoiMouseDown.bind(this));
@@ -480,31 +484,78 @@ export class CameraController {
 
     // --- Initial Setup ---
     initUI() {
-        // Methods inside initUI will be moved or adapted for UIManager
-        this.updateControlStates(false);
-        this.fetchAvailableCameras();
+        // Assume connected from the start
+        this.isConnected = true;
+        this.uiManager.updateFocusStatus('空闲'); // Set initial status to Idle
+        this.updateControlStates(true); // Update controls assuming connected
+        this.loadState(); // Load saved state (using default SN)
+        
+        // Simulate fetching initial state from backend for the default camera
+        this.fetchInitialBackendState(); 
 
+        // Initial UI setup for overlays etc. based on potentially loaded state
         if (this.uiManager.simulatedImage) {
             this.uiManager.simulatedImage.onload = () => {
                 if(this.uiManager.statusBarImageDims) this.uiManager.statusBarImageDims.textContent = `${this.uiManager.simulatedImage.naturalWidth}, ${this.uiManager.simulatedImage.naturalHeight}`;
                 this.updateRoiOverlay();
                 this.updateCalibRoiOverlay();
             };
-            // Ensure dimensions are updated if image is already loaded/cached
             if (this.uiManager.simulatedImage.complete && this.uiManager.simulatedImage.naturalWidth > 0) {
                  if(this.uiManager.statusBarImageDims) this.uiManager.statusBarImageDims.textContent = `${this.uiManager.simulatedImage.naturalWidth}, ${this.uiManager.simulatedImage.naturalHeight}`;
             }
         }
-
-        // Initial draw/hide of overlays and controls
         this.updateRoiOverlay();
         this.updateCalibRoiOverlay();
         this.updateRoiControlsUI();
         this.updateCalibRoiControlsUI();
-        this.loadState(); // Load saved state after initial UI setup
-        // Call again after loadState to reflect potentially loaded ROI
-        this.updateRoiOverlay();
-        this.updateCalibRoiOverlay();
+    }
+
+    // NEW method to simulate getting initial state
+    async fetchInitialBackendState() {
+        console.log("模拟: 获取默认相机的初始状态...");
+        try {
+            // Replace with actual fetch if backend endpoint exists
+            await this.wait(100); // Short delay simulation
+            // Simulate a typical initial state response
+            const initialState = {
+                camera_info: { // Nest camera specific info
+                    name: '模拟相机 Alpha', // Example name
+                    model: 'SimCam-X100',  // Example model
+                    config_file: '/path/to/default.cfg', // Example config
+                    save_path: '/data/images/simulated', // Example path
+                    status: 'connected', // Indicate connected
+                    serialNumber: this.DEFAULT_CAMERA_SN, // Use default SN
+                    // --- Added Camera Properties ---
+                    exposure_time: 15000, // Example exposure (us)
+                    gain: 8.5,            // Example gain (dB?)
+                    trigger_mode: '连续采集', // Default trigger mode
+                    is_enabled: true,      // Example enabled state
+                    auto_white_balance: false, // Example WB state
+                    white_balance_rgb: { r: 130, g: 125, b: 145 }, // Example WB values
+                    image_format: 'MONO8', // Example image format
+                    // Add other relevant properties from backend state if needed
+                    // --- End Added Properties ---
+                },
+                focus: { // Nest focus related info
+                    status: '空闲',         // Initial focus status
+                    clarity: 0.65,        // Initial clarity
+                    best_z: null,         // No best Z initially
+                },
+                z_axis: { // Nest Z-axis info
+                    position: 12.345,     // Initial Z position
+                    selected_id: null,    // No axis selected initially
+                },
+                is_streaming: false,    // Not streaming initially
+                is_recording: false,    // Not recording initially
+            };
+            console.log("模拟: 收到初始状态:", JSON.stringify(initialState, null, 2));
+            this.updateUIFromState(initialState);
+            this.loadState(); // Load any specific saved state over the defaults
+        } catch (error) {
+            console.error("获取初始相机状态失败:", error);
+             this.uiManager.updateFocusStatus('错误');
+             this.updateControlStates(false); // Set controls to disabled state
+        }
     }
 
     getImageCoordinates(event, targetElement) {
@@ -962,14 +1013,13 @@ export class CameraController {
     }
 
     saveState() {
-        if (!this.isConnected || !this.uiManager.serialNumberSelect.value) return;
-        const cameraSN = this.uiManager.serialNumberSelect.value;
+        const cameraSN = this.DEFAULT_CAMERA_SN; // Use default SN
         const stateToSave = {
             selectedAxisId: this.selectedAxisId,
             bestZFound: this.bestZFound,
             calibrationRatio: this.calibrationRatio,
-            // Save ROI state? Depends on requirements
-            // finalFocusRoi: this.finalRoiRect,
+            // Save ROI state if needed
+            // finalFocusRoi: this.finalRoiRect, 
             // finalCalibRoi: this.finalCalibRoiRect,
             // calibSquareSize: parseFloat(this.uiManager.calibSquareSizeInput.value)
         };
@@ -982,8 +1032,7 @@ export class CameraController {
     }
 
     loadState() {
-        if (!this.isConnected || !this.uiManager.serialNumberSelect.value) return;
-        const cameraSN = this.uiManager.serialNumberSelect.value;
+        const cameraSN = this.DEFAULT_CAMERA_SN; // Use default SN
         try {
             const savedStateJSON = localStorage.getItem(`cameraState_${cameraSN}`);
             if (savedStateJSON) {
@@ -999,7 +1048,7 @@ export class CameraController {
                 if (savedState.hasOwnProperty('bestZFound')) {
                     this.bestZFound = savedState.bestZFound;
                     // Potentially update focus status if best Z implies 'Focused'
-                    // if (this.bestZFound !== null) { this.uiManager.updateFocusStatus('已对焦'); }
+                     if (this.bestZFound !== null && this.isConnected) { this.uiManager.updateFocusStatus('已对焦'); }
                 }
                 if (savedState.hasOwnProperty('calibrationRatio')) {
                     this.calibrationRatio = savedState.calibrationRatio;
@@ -1013,29 +1062,25 @@ export class CameraController {
                 // if (savedState.finalCalibRoi) { this.finalCalibRoiRect = savedState.finalCalibRoi; /* Update state? */ }
                 // if (savedState.calibSquareSize) { this.uiManager.calibSquareSizeInput.value = savedState.calibSquareSize; }
 
-                this.updateControlStates(this.isConnected); // Update controls based on loaded state
-                // Need to redraw overlays based on loaded ROI state
-                this.updateRoiOverlay();
-                this.updateCalibRoiOverlay();
+                // NO NEED to call updateControlStates here, it's called after loadState in initUI
+                // Need to redraw overlays based on loaded ROI state ONLY IF ROI was loaded
+                // this.updateRoiOverlay();
+                // this.updateCalibRoiOverlay();
             } else {
-                console.log(`未找到相机 ${cameraSN} 的已保存状态。`);
-                // Apply default state if no saved state?
-                this.resetUIData(); // Reset relevant parts
+                console.log(`未找到相机 ${cameraSN} 的已保存状态。将使用默认值/初始值。`);
+                // --- REMOVE resetUIData call --- 
+                // this.resetUIData(); // Don't reset here, let initialState persist
+                // ---
             }
         } catch (e) {
             console.error("从 localStorage 加载状态时出错:", e);
-            // Handle error, maybe clear corrupted state?
-            // localStorage.removeItem(`cameraState_${cameraSN}`);
-            this.resetUIData();
+            // Optionally reset specific parts or log, but avoid full reset if possible
+            // this.resetUIData(); 
         }
     }
 
     resetUIData() {
         // Clear text inputs and status displays managed by UIManager
-        if (this.uiManager.configFileInput) this.uiManager.configFileInput.value = '';
-        if (this.uiManager.savePathInput) this.uiManager.savePathInput.value = '';
-        if (this.uiManager.cameraNameInput) this.uiManager.cameraNameInput.value = '';
-        if (this.uiManager.cameraModelInput) this.uiManager.cameraModelInput.value = '';
         if (this.uiManager.currentZInput) this.uiManager.currentZInput.value = '--';
         if (this.uiManager.clarityValueInput) this.uiManager.clarityValueInput.value = '--';
         if (this.uiManager.footerZPos) this.uiManager.footerZPos.textContent = '--';
@@ -1077,6 +1122,19 @@ export class CameraController {
 
             // Populate dropdown via UIManager
             this.uiManager.populateCameraDropdown(cameraList);
+
+            // --- ADD LISTENER HERE ---
+            // Ensure listener is added *after* population and only if the element exists
+            if (this.uiManager.serialNumberSelect && !this.serialNumberChangeListenerAttached) {
+                this.uiManager.serialNumberSelect.addEventListener('change', () => {
+                    console.log('[Change Listener] Camera selection changed:', this.uiManager.serialNumberSelect.value);
+                    console.log('[Change Listener] Calling updateControlStates with isConnected:', this.isConnected);
+                    this.updateControlStates(this.isConnected);
+                });
+                this.serialNumberChangeListenerAttached = true; // Flag to prevent adding multiple listeners
+                console.log('[fetchAvailableCameras] Added change listener to serialNumberSelect.');
+            }
+            // ------------------------
 
             // Set dropdown enabled/disabled state via UIManager
             const hasCameras = cameraList && cameraList.length > 0;
@@ -1482,120 +1540,119 @@ export class CameraController {
     }
 
     updateUIFromState(state) {
-        if (!state) return;
-        console.log('Backend state received in updateUIFromState:', JSON.stringify(state));
-
-        this.isConnected = state.isConnected;
-
-        if (this.isConnected) {
-            // Update Camera Select Dropdown (if SN provided)
-            if (this.uiManager.serialNumberSelect && state.serialNumber) {
-                 let found = false;
-                 for(let i=0; i<this.uiManager.serialNumberSelect.options.length; i++){
-                     if(this.uiManager.serialNumberSelect.options[i].value === state.serialNumber){
-                         this.uiManager.serialNumberSelect.selectedIndex = i;
-                         found = true;
-                         break;
-                     }
-                 }
-                 if (!found) { // Add if not present
-                    const newOption = new Option(state.serialNumber, state.serialNumber, false, true);
-                    this.uiManager.serialNumberSelect.appendChild(newOption);
-                 }
-            } else if (this.uiManager.serialNumberSelect) {
-                this.uiManager.serialNumberSelect.value = ''; // Select placeholder if no SN
-            }
-
-            // Update Info Fields
-            if (this.uiManager.configFileInput) { this.uiManager.configFileInput.value = state.configFile || ''; }
-            if (this.uiManager.savePathInput) { this.uiManager.savePathInput.value = state.savePath || ''; }
-            if (this.uiManager.cameraNameInput) { this.uiManager.cameraNameInput.value = state.cameraName || ''; }
-            if (this.uiManager.cameraModelInput) { this.uiManager.cameraModelInput.value = state.cameraModel || ''; }
-
-            // Update Z and Clarity (handle undefined)
-            this.currentZ = state.currentZ !== undefined ? state.currentZ : '--';
-            this.currentClarity = state.clarity;
-
-            const currentZStr = typeof this.currentZ === 'number' ? this.currentZ.toFixed(2) : '--';
-            if (this.uiManager.footerZPos) { this.uiManager.footerZPos.textContent = currentZStr; }
-            if (this.uiManager.currentZInput) { this.uiManager.currentZInput.value = currentZStr; }
-            // Apply blur uses clarity, clarity input updated within applyBlur/updateFocusStatus
-            if (!this.isShowingCalibrationPattern) {
-                 // Call UIManager's method
-                 this.uiManager.applyBlur(this.currentClarity, this.MAX_BLUR);
-             }
-
-            // Update Camera Properties (Example for Exposure, Gain, Trigger Mode)
-            const properties = state.properties || {};
-            const propsContainer = document.querySelector('.property-grid'); // Query here or cache in UIManager
-            if(propsContainer){ // Check if container exists
-                Object.entries(properties).forEach(([key, propData]) => {
-                     // Example: Find elements by a more robust method if IDs change
-                     const exposureInput = document.getElementById('exposure-time');
-                     const gainInput = document.getElementById('gain');
-                     const triggerSelect = document.getElementById('trigger-mode-select');
-
-                     if (key === '曝光时间(us)' && exposureInput) {
-                          exposureInput.value = propData.value;
-                     } else if (key === '增益' && gainInput) {
-                          gainInput.value = propData.value;
-                     } else if (key === '触发模式' && triggerSelect) {
-                         // Ensure the value exists as an option before setting
-                         if ([...triggerSelect.options].some(opt => opt.value === propData.value)) {
-                              triggerSelect.value = propData.value;
-                         }
-                     }
-                     // Add more properties as needed
-                });
-            }
-
-            // Update Focus ROI based on backend state
-            if (state.roiCoords && state.roiEnabled !== false) {
-                 // Assuming backend sends roiCoords in {l, t, r, b} format
-                 // Convert to {x, y, width, height}
-                 this.finalRoiRect = {
-                      x: state.roiCoords.l,
-                      y: state.roiCoords.t,
-                      width: state.roiCoords.r - state.roiCoords.l,
-                      height: state.roiCoords.b - state.roiCoords.t
-                 };
-                 this.focusRoiState = this.finalRoiRect ? 'confirmed' : 'idle';
-                 this.isFocusRoiVisible = true; // Assume visible if sent
-             } else {
-                 this.finalRoiRect = null;
-                 this.focusRoiState = 'idle';
-             }
-            this.pendingRoiRect = null; // Clear any pending local ROI
-
-            // Update Focus Status Text and Style via UIManager
-            this.uiManager.updateFocusStatus(state.focusStatus || '空闲');
-
-            // Update Selected Axis
-            this.selectedAxisId = state.selectedAxisId;
-             // Update axis button text via UIManager
-            this.uiManager.updateConfigAxisButtonDisplay(this.selectedAxisId);
-
-            // Refresh Overlays and Controls based on the new state
-            this.updateRoiOverlay();
-            this.updateCalibRoiOverlay(); // Update even if not visible, state might change
-            this.updateRoiControlsUI();
-            this.updateCalibRoiControlsUI();
-
-        } else { // If disconnected
-            this.resetUIData(); // Clear UI fields
-            if (!this.isShowingCalibrationPattern) {
-                 // Call UIManager's method
-                 this.uiManager.applyBlur(1, this.MAX_BLUR); // Set image to sharp (max clarity)
-             }
-             // Update status via UIManager
-            this.uiManager.updateFocusStatus('未连接');
+        console.log("Updating UI from state:", state);
+        if (!state || !state.camera_info) {
+            console.warn("updateUIFromState called with invalid state or missing camera_info");
+            this.resetUIData(); // Reset UI if state is invalid
+            this.updateControlStates(false); // Disable controls
+            return;
         }
-        // Always update control enabled/disabled states based on the final connection status
-        this.updateControlStates(this.isConnected);
+
+        const cameraInfo = state.camera_info;
+        const isConnected = cameraInfo.status === 'connected'; // Assuming status exists
+
+        // Update Camera Info Section
+        if (this.uiManager.cameraNameInput) {
+            this.uiManager.cameraNameInput.value = cameraInfo.name || 'N/A';
+        }
+        if (this.uiManager.cameraModelInput) {
+            this.uiManager.cameraModelInput.value = cameraInfo.model || 'N/A';
+        }
+        if (this.uiManager.configFileDisplay) {
+            this.uiManager.configFileDisplay.value = cameraInfo.config_file || '';
+            this.uiManager.configFileDisplay.placeholder = cameraInfo.config_file ? '' : '未加载配置';
+        }
+        if (this.uiManager.savePathDisplay) {
+            this.uiManager.savePathDisplay.value = cameraInfo.save_path || '';
+            this.uiManager.savePathDisplay.placeholder = cameraInfo.save_path ? '' : '未设置路径';
+        }
+
+        // Update Camera Properties & Controls Section
+        // ... (existing updates for exposure, gain, trigger, etc.)
+        if (this.uiManager.exposureInput) this.uiManager.exposureInput.value = cameraInfo.exposure_time ?? -1;
+        if (this.uiManager.gainInput) this.uiManager.gainInput.value = cameraInfo.gain ?? -1;
+        if (this.uiManager.triggerModeSelect) this.uiManager.triggerModeSelect.value = cameraInfo.trigger_mode || '连续采集';
+        if (this.uiManager.enableCameraCheckbox) this.uiManager.enableCameraCheckbox.checked = cameraInfo.is_enabled || false;
+        if (this.uiManager.autoWhiteBalanceCheckbox) {
+            this.uiManager.autoWhiteBalanceCheckbox.checked = cameraInfo.auto_white_balance || false;
+            this.uiManager.toggleManualWBControls(!cameraInfo.auto_white_balance);
+        }
+        // --- Add image format update ---
+        if (this.uiManager.imageFormatSelect) {
+            const formatValue = cameraInfo.image_format || 'MONO8'; // Default to MONO8
+            // Ensure the value exists in the dropdown options
+            let formatExists = false;
+            for (let option of this.uiManager.imageFormatSelect.options) {
+                if (option.value === formatValue || option.text === formatValue) { // Check value or text
+                    this.uiManager.imageFormatSelect.value = option.value || option.text;
+                    formatExists = true;
+                    break;
+                }
+            }
+            if (!formatExists) {
+                console.warn(`Image format '${formatValue}' not found in select options. Defaulting.`);
+                // Find the default value ('MONO8') or the first option
+                let defaultOptionValue = 'MONO8';
+                let foundDefault = false;
+                for (let option of this.uiManager.imageFormatSelect.options) {
+                    if (option.value === defaultOptionValue || option.text === defaultOptionValue) {
+                        this.uiManager.imageFormatSelect.value = option.value || option.text;
+                        foundDefault = true;
+                        break;
+                    }
+                }
+                if (!foundDefault && this.uiManager.imageFormatSelect.options.length > 0) {
+                    // Fallback to the very first option if 'MONO8' isn't present
+                    this.uiManager.imageFormatSelect.selectedIndex = 0;
+                }
+            }
+        }
+        // ---
+        if (cameraInfo.white_balance_rgb) {
+            if(this.uiManager.wbRedSlider) this.uiManager.wbRedSlider.value = cameraInfo.white_balance_rgb.r ?? 128;
+            if(this.uiManager.wbGreenSlider) this.uiManager.wbGreenSlider.value = cameraInfo.white_balance_rgb.g ?? 128;
+            if(this.uiManager.wbBlueSlider) this.uiManager.wbBlueSlider.value = cameraInfo.white_balance_rgb.b ?? 128;
+            this.uiManager.updateWBValues(); // Update displayed numbers
+        }
+
+        // Update Z Axis / Focus Section
+        if (this.uiManager.currentZDisplay) {
+            // Only update if not actively focusing to avoid flickering
+            if (this.currentFocusState !== 'running' && this.currentFocusState !== 'simulating') {
+                 this.uiManager.currentZDisplay.value = state.z_axis?.position?.toFixed(3) ?? '--';
+            }
+        }
+        if (this.uiManager.clarityValueDisplay) {
+            // Only update if not actively focusing
+             if (this.currentFocusState !== 'running' && this.currentFocusState !== 'simulating') {
+                this.uiManager.clarityValueDisplay.value = state.focus?.clarity?.toFixed(4) ?? '--';
+            }
+        }
+        // Update focus status display using the dedicated method in UIManager
+        this.uiManager.updateFocusStatus(state.focus?.status || 'unknown');
+
+        // Update blur effect based on clarity
+        // Optional: Only apply blur if not manually drawing ROI or focusing?
+        const clarity = state.focus?.clarity;
+        this.uiManager.applyBlur(clarity);
+
+
+        // Update general control states (enabled/disabled)
+        this.updateControlStates(isConnected, state.is_streaming, state.is_recording);
+
+        // Update Axis Config Dropdown Button State
+        this.uiManager.updateConfigAxisButtonDisplay(this.selectedAxisName !== null);
+
+        // Update footer status
+        this.uiManager.updateFooterStatus(state);
+
     }
 
     // --- Method updateFocusStatus removed, moved to UIManager ---
     // updateFocusStatus(status) { ... }
 
     // -----------------------------------------
+
+    // Define the default camera SN at the class level or constructor
+    DEFAULT_CAMERA_SN = 'DefaultSimCamera';
 } // End Class

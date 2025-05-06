@@ -1,102 +1,108 @@
 /* === 主布局 === */
 
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden; /* Prevent body scrollbars */
+}
+
 .app-container {
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
+    display: grid; /* Use Grid */
     height: 100vh;
+    grid-template-columns: 1fr auto; /* Left column flexible, right column auto width */
+    grid-template-rows: auto 1fr auto; /* Header auto, main content flexible, footer auto */
+    grid-template-areas:
+        "header   control-panel"
+        "main     control-panel"
+        "footer   footer";
+    overflow: hidden; /* Prevent container scroll */
 }
 
 /* 头部 */
 .header {
-    background-color: var(--bg-dark);
-    height: var(--header-height);
+    grid-area: header;
+    /* Remove background if needed, or adjust */
+    background-color: var(--header-bg);
+    color: var(--header-fg);
+    padding: 5px 10px;
     display: flex;
+    justify-content: space-between; /* Keep controls left, title right (removed now) */
     align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--spacing-medium);
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--border-dark);
+    border-bottom: 1px solid var(--border-color);
+    height: var(--header-height);
+    box-sizing: border-box;
 }
 
 .header-controls {
     display: flex;
-    gap: var(--spacing-small);
-}
-
-.header-title {
-    font-weight: normal;
-    font-size: 1.1em;
+    align-items: center;
 }
 
 /* 主内容区 */
 .main-content {
-    display: flex;
-    flex-grow: 1;
-    overflow: hidden;
+    grid-area: main;
+    display: flex; /* Keep flex for camera-view if needed, or simplify */
+    /* Removed flex: 1; as grid handles sizing */
+    overflow: hidden; /* Prevent scroll within main area */
+    background-color: var(--main-bg);
 }
 
 /* 相机视图 */
 .camera-view {
-    flex-grow: 1;
-    background-color: #666;
-    position: relative;
-    overflow: hidden;
+    flex: 1; /* Allow camera view to fill the main grid area */
+    position: relative; /* For absolute positioning of overlays/buttons */
     display: flex;
     justify-content: center;
     align-items: center;
+    background-color: #000;
+    overflow: hidden; /* Hide parts of image/svg that might overflow */
 }
 
 #camera-display-container {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-#simulated-image {
-    display: block;
-    object-fit: contain;
-    transition: filter 0.1s linear;
-    background-color: var(--bg-dark);
-    border: 1px solid var(--border-dark);
     max-width: 100%;
     max-height: 100%;
+    position: relative; /* Needed for overlays inside */
+    overflow: hidden;
+}
+
+#camera-display-container img,
+#camera-display-container #calibration-pattern-display {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; /* Scale image/svg while preserving aspect ratio */
 }
 
 /* 控制面板 */
 .control-panel {
-    width: var(--panel-width);
-    background-color: var(--bg-dark);
-    padding: 0;
-    overflow-y: auto;
-    flex-shrink: 0;
-    color: var(--text-light);
-    border-left: 1px solid var(--border-dark);
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    grid-area: control-panel;
+    width: var(--control-panel-width); /* Keep fixed width */
+    background-color: var(--panel-bg);
+    padding: 15px;
+    border-left: 1px solid var(--border-color);
+    overflow-y: auto; /* Allow scrolling ONLY on the panel */
+    height: calc(100vh - var(--footer-height)); /* Full height minus footer */
+    box-sizing: border-box;
 }
-.control-panel::-webkit-scrollbar {
-    display: none;
+
+.status-bar {
+    grid-area: footer;
+    background-color: var(--footer-bg);
+    color: var(--footer-fg);
+    padding: 5px 10px;
+    font-size: 0.8em;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: var(--footer-height);
+    box-sizing: border-box;
 }
 
 /* 状态栏 */
-.status-bar {
-    background-color: var(--bg-dark);
-    height: var(--statusbar-height);
-    display: flex;
-    align-items: center;
-    padding: 0 var(--spacing-medium);
-    gap: var(--spacing-large);
-    font-size: 12px;
-    color: var(--text-medium);
-    flex-shrink: 0;
-    border-top: 1px solid var(--border-dark);
-}
-
 .status-bar span {
     white-space: nowrap;
     border-right: 1px solid var(--border-dark);
@@ -110,36 +116,7 @@
 
 /* 面板区块 */
 .panel-section {
-    padding: var(--spacing-medium) var(--spacing-large);
-    border-bottom: 1px solid var(--border-dark);
-}
-
-.panel-section:last-child {
-    border-bottom: none;
-    margin-top: var(--spacing-small);
-}
-
-.panel-section h3 {
-    margin-bottom: var(--spacing-medium);
-    font-size: 1.1em;
-    color: var(--text-light);
-    border-bottom: 1px solid var(--border-medium);
-    padding-bottom: var(--spacing-medium);
-    font-weight: normal;
-}
-
-.panel-section p.description,
-.small-description {
-    font-size: 0.9em;
-    color: var(--text-medium);
-    margin-top: var(--spacing-small);
-    line-height: 1.4;
-}
-
-.small-description {
-    font-size: 0.85em;
-    margin-bottom: var(--spacing-small);
-    margin-top: 0;
+    margin-bottom: 20px;
 }
 
 /* === 响应式布局 === */
@@ -154,4 +131,19 @@
     .main-content {
         flex-direction: column;
     }
+}
+
+/* Hide scrollbar styles (optional, for aesthetics) */
+.control-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.control-panel::-webkit-scrollbar-track {
+    background: var(--scrollbar-track-bg);
+}
+
+.control-panel::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb-bg);
+    border-radius: 4px;
+    border: 2px solid var(--scrollbar-track-bg);
 } 

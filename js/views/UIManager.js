@@ -1,13 +1,10 @@
 export class UIManager {
     constructor() {
         // --- DOM Element References ---
-        this.connectBtn = document.getElementById('connect-btn');
-        this.serialNumberSelect = document.getElementById('serial-number');
         this.footerStatus = document.getElementById('footer-status');
         this.configAxisBtn = document.getElementById('config-axis-btn');
         this.axisDropdown = document.getElementById('axis-config-dropdown');
         this.axisListUl = document.getElementById('axis-list');
-        this.dropdownCameraSN = document.getElementById('dropdown-camera-sn');
         this.startFocusBtn = document.getElementById('start-focus-btn');
         this.stopFocusBtn = document.getElementById('stop-focus-btn');
         this.focusStatusText = document.getElementById('focus-status-text');
@@ -40,20 +37,94 @@ export class UIManager {
         this.redrawCalibRoiBtn = document.getElementById('redraw-roi-calib-btn');
         this.toggleCalibRoiVisibilityBtn = document.getElementById('toggle-calib-roi-visibility-btn');
         this.calibRoiButtonGroup = document.getElementById('calib-roi-button-group');
-        this.configFileInput = document.getElementById('config-file');
-        this.savePathInput = document.getElementById('save-path');
+        this.configFileDisplay = document.getElementById('config-file');
+        this.savePathDisplay = document.getElementById('save-path');
         this.cameraNameInput = document.getElementById('camera-name');
         this.cameraModelInput = document.getElementById('camera-model');
         this.currentZInput = document.getElementById('current-z');
-        this.clarityValueInput = document.getElementById('clarity-value');
+        this.clarityValueDisplay = document.getElementById('clarity-value');
         this.footerZPos = document.getElementById('footer-z-pos');
+        this.wbRedSlider = document.getElementById('wb-red');
+        this.wbGreenSlider = document.getElementById('wb-green');
+        this.wbBlueSlider = document.getElementById('wb-blue');
+        this.wbRedValueSpan = this.wbRedSlider?.nextElementSibling;
+        this.wbGreenValueSpan = this.wbGreenSlider?.nextElementSibling;
+        this.wbBlueValueSpan = this.wbBlueSlider?.nextElementSibling;
 
-        // Query all controls within the panel for bulk enable/disable
-        this.panelControls = document.querySelectorAll('#control-panel-content button, #control-panel-content select, #control-panel-content input');
+        // --- New element reference ---
+        this.imageFormatSelect = document.getElementById('image-format-select');
+        this.exposureInput = document.getElementById('exposure-time');
+        this.gainInput = document.getElementById('gain');
+        this.triggerModeSelect = document.getElementById('trigger-mode-select');
+        this.enableCameraCheckbox = document.getElementById('enable-camera-cb');
+        this.autoWhiteBalanceCheckbox = document.getElementById('white-balance-cb');
+        this.manualWBControls = document.querySelectorAll('.manual-wb-control');
+
+        // Cache other potentially needed elements
+        this.currentZDisplay = document.getElementById('current-z');
+        this.clarityValueDisplay = document.getElementById('clarity-value');
+
+        // Collect all panel controls for easy enabling/disabling (can be refined)
+        // Query only within the control panel to avoid selecting header buttons etc.
+        const controlPanel = document.getElementById('control-panel-content');
+        if (controlPanel) {
+            this.panelControls = controlPanel.querySelectorAll(
+                'input, select, button:not(#connect-btn)' // Select inputs, selects, and buttons inside the panel (excluding connect)
+            );
+        } else {
+            this.panelControls = [];
+            console.error("Control panel element not found!");
+        }
         
         console.log("UIManager initialized and DOM elements cached.");
+
+        this.addEventListeners();
     }
     
+    addEventListeners() {
+        // Add listeners to update WB value spans when sliders change
+        if (this.wbRedSlider) {
+            this.wbRedSlider.addEventListener('input', () => this.updateWBValues());
+        }
+        if (this.wbGreenSlider) {
+            this.wbGreenSlider.addEventListener('input', () => this.updateWBValues());
+        }
+        if (this.wbBlueSlider) {
+            this.wbBlueSlider.addEventListener('input', () => this.updateWBValues());
+        }
+        // Add listener for auto WB checkbox to toggle manual controls
+        if (this.autoWhiteBalanceCheckbox) {
+            this.autoWhiteBalanceCheckbox.addEventListener('change', (event) => {
+                this.toggleManualWBControls(!event.target.checked);
+            });
+        }
+    }
+
+    /**
+     * Updates the text content of the white balance value spans based on the current slider values.
+     */
+    updateWBValues() {
+        if (this.wbRedValueSpan && this.wbRedSlider) {
+            this.wbRedValueSpan.textContent = `(${this.wbRedSlider.value})`;
+        }
+        if (this.wbGreenValueSpan && this.wbGreenSlider) {
+            this.wbGreenValueSpan.textContent = `(${this.wbGreenSlider.value})`;
+        }
+        if (this.wbBlueValueSpan && this.wbBlueSlider) {
+            this.wbBlueValueSpan.textContent = `(${this.wbBlueSlider.value})`;
+        }
+    }
+
+    /**
+     * Shows or hides the manual white balance control elements.
+     * @param {boolean} show - True to show, false to hide.
+     */
+    toggleManualWBControls(show) {
+        this.manualWBControls.forEach(control => {
+            control.style.display = show ? 'flex' : 'none'; // Assuming 'flex' is the default display
+        });
+    }
+
     // --- Moved UI update methods ---
 
     applyBlur(clarity, maxBlur) {
@@ -63,8 +134,8 @@ export class UIManager {
         const blurPx = (1 - normalizedClarity) * maxBlur;
         this.simulatedImage.style.filter = `blur(${blurPx.toFixed(1)}px)`;
         // Also update the clarity display input if it exists
-        if (this.clarityValueInput) {
-            this.clarityValueInput.value = normalizedClarity.toFixed(3);
+        if (this.clarityValueDisplay) {
+            this.clarityValueDisplay.value = normalizedClarity.toFixed(3);
         }
     }
 
@@ -117,9 +188,6 @@ export class UIManager {
         if (this.axisDropdown) {
             this.axisDropdown.classList.add('show');
         }
-        if (this.dropdownCameraSN && this.serialNumberSelect) {
-             this.dropdownCameraSN.textContent = `相机: ${this.serialNumberSelect.value}`;
-        }
          if (this.axisListUl) {
              this.axisListUl.innerHTML = '<li class="axis-list-loading">加载中...</li>';
          }
@@ -154,49 +222,52 @@ export class UIManager {
          }
     }
 
-    // --- Camera Select Dropdown Updates ---
-    showCameraSelectLoading() {
-        if (this.serialNumberSelect) {
-            this.serialNumberSelect.innerHTML = '<option value="">加载中...</option>';
-            this.serialNumberSelect.disabled = true;
+    /**
+     * Updates the footer status bar based on the provided state object.
+     * @param {object} state - The current state object containing status, fps, z_pos, etc.
+     */
+    updateFooterStatus(state) {
+        if (!state) return;
+        const isConnected = state.camera_info?.status === 'connected';
+
+        if (this.footerStatus) {
+            let statusText = '状态: 未连接';
+            if (isConnected) {
+                if (state.is_recording) statusText = '状态: 录制中...';
+                else if (state.is_streaming) statusText = '状态: 采集中...';
+                else if (state.focus?.status && state.focus.status !== '空闲' && state.focus.status !== '已对焦' && state.focus.status !== '错误') statusText = `状态: ${state.focus.status}...`;
+                else statusText = '状态: 已连接 (空闲)';
+            } else if (state.isConnecting) { // Hypothetical state for connecting process
+                 statusText = '状态: 连接中...';
+            }
+            this.footerStatus.textContent = statusText;
         }
-        // Also disable connect button while loading cameras
-        if (this.connectBtn) {
-            this.connectBtn.disabled = true;
+
+        // Assuming fps element exists
+        const fpsElement = this.footerStatus?.parentElement?.querySelector('span:nth-child(2)'); 
+        if (fpsElement) {
+            fpsElement.textContent = `帧率: ${state.fps ?? '--'} FPS`; // Use state.fps if available
+        }
+
+        if (this.footerZPos) {
+            const zPos = state.z_axis?.position;
+            this.footerZPos.textContent = (typeof zPos === 'number') ? zPos.toFixed(3) : '--';
+        }
+
+        // Update image dimensions (redundant? UIManager might handle this elsewhere)
+        if (this.statusBarImageDims) {
+            // You might need a way to get current image dimensions if not directly in state
+            // Example: if (this.simulatedImage) {
+            // this.statusBarImageDims.textContent = `${this.simulatedImage.naturalWidth || '---'}, ${this.simulatedImage.naturalHeight || '---'}`; }
+             this.statusBarImageDims.textContent = `${state.image_width || '---'}, ${state.image_height || '---'}`; // Assuming state contains dims
+        }
+
+        // Zoom level (assuming a state property exists or is fixed)
+        const zoomElement = this.footerStatus?.parentElement?.querySelector('span:nth-child(6)');
+        if(zoomElement) {
+             zoomElement.textContent = `缩放: ${state.zoom_level || '100%'}`; // Use state.zoom_level if available
         }
     }
-
-    populateCameraDropdown(cameraList) {
-        if (!this.serialNumberSelect) return;
-        this.serialNumberSelect.innerHTML = ''; // Clear existing options
-
-        if (cameraList && cameraList.length > 0) {
-            this.serialNumberSelect.appendChild(new Option('请选择相机...', '')); // Add placeholder
-            cameraList.forEach(sn => {
-                this.serialNumberSelect.appendChild(new Option(sn, sn));
-            });
-        } else {
-            this.serialNumberSelect.appendChild(new Option('未找到相机', ''));
-        }
-    }
-
-    setCameraSelectReady(hasCameras) {
-         if (this.serialNumberSelect) {
-             this.serialNumberSelect.disabled = !hasCameras;
-         }
-         // Connect button state will be handled by updateControlStates in Controller
-    }
-
-    setCameraSelectError() {
-        if (this.serialNumberSelect) {
-            this.serialNumberSelect.innerHTML = '<option value="">加载失败</option>';
-            this.serialNumberSelect.disabled = true;
-        }
-         if (this.connectBtn) {
-             this.connectBtn.disabled = true;
-         }
-    }
-    // -------------------------------------
 
     // More UI update methods will be moved here later...
 } 
