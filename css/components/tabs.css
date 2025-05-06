@@ -1,0 +1,109 @@
+/* === 标签页 === */
+
+.tabs {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 标签页导航 */
+.tab-nav {
+    display: flex;
+    background-color: var(--bg-dark);
+    border-bottom: 1px solid var(--border-dark);
+    position: relative;
+    height: 32px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none; /* Firefox */
+}
+
+.tab-nav::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Edge */
+}
+
+/* 标签页按钮 */
+.tab-button {
+    padding: var(--spacing-small) var(--spacing-medium);
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-medium);
+    cursor: pointer;
+    white-space: nowrap;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    min-width: 80px;
+    font-size: 0.9em;
+}
+
+.tab-button:hover {
+    color: var(--text-light);
+    background-color: var(--bg-medium);
+}
+
+.tab-button.active {
+    color: var(--text-light);
+    border-bottom: 2px solid var(--accent-blue);
+    background-color: var(--bg-dark);
+}
+
+.tab-button svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* 标签页内容 */
+.tab-content {
+    flex: 1;
+    overflow: auto;
+    background-color: var(--bg-dark);
+    position: relative;
+}
+
+.tab-panel {
+    display: none;
+    height: 100%;
+    padding: var(--spacing-medium);
+}
+
+.tab-panel.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 垂直标签页 */
+.tabs.vertical {
+    flex-direction: row;
+    height: 100%;
+}
+
+.tabs.vertical .tab-nav {
+    flex-direction: column;
+    height: 100%;
+    width: 120px;
+    border-bottom: none;
+    border-right: 1px solid var(--border-dark);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.tabs.vertical .tab-button {
+    border-bottom: none;
+    border-right: 2px solid transparent;
+    justify-content: flex-start;
+    height: 32px;
+    width: 100%;
+    min-width: auto;
+}
+
+.tabs.vertical .tab-button.active {
+    border-bottom: none;
+    border-right: 2px solid var(--accent-blue);
+}
+
+.tabs.vertical .tab-content {
+    flex: 1;
+} 

@@ -1,0 +1,116 @@
+/* === 对焦控制 === */
+
+/* 对焦控制按钮组 */
+.focus-controls {
+    display: flex;
+    gap: var(--spacing-medium);
+}
+
+.focus-controls button {
+    flex-grow: 1;
+    height: 32px;
+}
+
+/* 对焦状态 */
+.focus-status label {
+    display: inline-block;
+    margin-bottom: 0;
+}
+
+#focus-status-text {
+    font-weight: bold;
+    margin-left: var(--spacing-small);
+    padding: 2px 6px;
+    border-radius: var(--border-radius);
+    display: inline-block;
+}
+
+/* 状态颜色 */
+.status-未连接,
+.status-空闲 { 
+    background-color: var(--bg-medium); 
+    color: var(--text-medium); 
+}
+
+.status-初始化-检查,
+.status-请求Z轴控制权,
+.status-保存参数中 { 
+    background-color: var(--accent-blue); 
+    color: var(--text-light); 
+}
+
+.status-粗对焦中,
+.status-精细对焦中,
+.status-移动到最佳位置,
+.status-当量计算-模拟- { 
+    background-color: var(--accent-yellow); 
+    color: var(--text-dark); 
+}
+
+.status-已对焦 { 
+    background-color: var(--accent-green); 
+    color: var(--text-dark); 
+}
+
+.status-已停止,
+.status-错误 { 
+    background-color: var(--accent-red); 
+    color: var(--text-light); 
+}
+
+/* ROI区域 */
+.roi-header-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-small);
+}
+
+.roi-header-line h4 {
+    flex-grow: 1;
+    margin-bottom: 0;
+    margin-right: var(--spacing-medium);
+}
+
+.roi-header-line > .roi-button,
+.roi-header-line .roi-button-group {
+    flex-shrink: 0;
+    margin-left: auto;
+    margin-top: 0;
+}
+
+.roi-header-line > .roi-button {
+    padding-left: var(--spacing-medium);
+    padding-right: var(--spacing-medium);
+    width: auto;
+}
+
+.roi-button {
+    margin-top: var(--spacing-medium);
+    width: 100%;
+}
+
+.roi-button-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-medium);
+}
+
+.roi-button-group .roi-button {
+    margin-top: 0;
+    flex-shrink: 0;
+    padding: var(--spacing-small) var(--spacing-medium);
+    width: auto;
+}
+
+.roi-button-group .mini-button i {
+    margin-right: 0;
+}
+
+.roi-button-group .roi-button i {
+    margin-right: var(--spacing-small);
+    width: 1em;
+    text-align: center;
+    vertical-align: middle;
+} 

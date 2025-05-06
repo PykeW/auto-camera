@@ -1,0 +1,32 @@
+/* === 全局变量 === */
+
+:root {
+    /* 背景色 */
+    --bg-darker: #1e1e1e;
+    --bg-dark: #2d2d2d;
+    --bg-medium: #3d3d3d;
+
+    /* 文本色 */
+    --text-light: #e0e0e0;
+    --text-medium: #b0b0b0;
+    --text-dark: #111;
+
+    /* 边框色 */
+    --border-dark: #444;
+    --border-medium: #555;
+
+    /* 主题色 */
+    --accent-blue: #1890ff;
+    --accent-red: #ff4d4f;
+    --accent-yellow: #faad14;
+    --accent-green: #52c41a;
+
+    /* 布局尺寸 */
+    --header-height: 40px;
+    --statusbar-height: 24px;
+    --panel-width: 320px;
+    --border-radius: 4px;
+    --spacing-small: 4px;
+    --spacing-medium: 8px;
+    --spacing-large: 16px;
+} 

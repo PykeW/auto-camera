@@ -1,0 +1,151 @@
+/* === 通知提示 === */
+
+/* 通知容器 */
+.notifications-container {
+    position: fixed;
+    top: var(--spacing-large);
+    right: var(--spacing-large);
+    width: 300px;
+    max-width: calc(100vw - var(--spacing-large) * 2);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-medium);
+    pointer-events: none;
+}
+
+/* 通知项 */
+.notification {
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-medium);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-medium);
+    pointer-events: auto;
+    transform: translateX(120%);
+    transition: transform 0.3s;
+}
+
+.notification.visible {
+    transform: translateX(0);
+}
+
+/* 通知图标 */
+.notification-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.notification-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* 通知内容 */
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    font-weight: bold;
+    font-size: 0.9em;
+    margin-bottom: var(--spacing-small);
+    color: var(--text-light);
+    display: flex;
+    justify-content: space-between;
+}
+
+.notification-message {
+    font-size: 0.85em;
+    color: var(--text-medium);
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* 关闭按钮 */
+.notification-close {
+    background: none;
+    border: none;
+    color: var(--text-medium);
+    cursor: pointer;
+    font-size: 1em;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-left: var(--spacing-small);
+    flex-shrink: 0;
+}
+
+.notification-close:hover {
+    color: var(--text-light);
+}
+
+/* 通知类型 */
+.notification.success .notification-icon {
+    color: var(--accent-green);
+}
+
+.notification.success {
+    border-left: 3px solid var(--accent-green);
+}
+
+.notification.error .notification-icon {
+    color: var(--alert-red);
+}
+
+.notification.error {
+    border-left: 3px solid var(--alert-red);
+}
+
+.notification.warning .notification-icon {
+    color: var(--accent-yellow);
+}
+
+.notification.warning {
+    border-left: 3px solid var(--accent-yellow);
+}
+
+.notification.info .notification-icon {
+    color: var(--accent-blue);
+}
+
+.notification.info {
+    border-left: 3px solid var(--accent-blue);
+}
+
+/* 自动消失进度条 */
+.notification-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background-color: rgba(255, 255, 255, 0.3);
+    width: 100%;
+}
+
+.notification-progress-inner {
+    height: 100%;
+    width: 100%;
+    background-color: var(--accent-blue);
+    transform-origin: left;
+    animation: progress-shrink 5s linear forwards;
+}
+
+@keyframes progress-shrink {
+    0% {
+        transform: scaleX(1);
+    }
+    100% {
+        transform: scaleX(0);
+    }
+} 

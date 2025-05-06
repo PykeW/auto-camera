@@ -1,0 +1,147 @@
+/* === 面板 === */
+
+/* 面板容器 */
+.panel {
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* 面板标题栏 */
+.panel-header {
+    background-color: var(--bg-medium);
+    padding: var(--spacing-small) var(--spacing-medium);
+    border-bottom: 1px solid var(--border-dark);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 32px;
+}
+
+.panel-title {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: var(--text-light);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+}
+
+.panel-title svg {
+    width: 16px;
+    height: 16px;
+}
+
+.panel-actions {
+    display: flex;
+    gap: var(--spacing-small);
+}
+
+.panel-header .btn {
+    font-size: 0.8em;
+    height: 22px;
+    min-width: 22px;
+    padding: 0 var(--spacing-small);
+}
+
+.panel-header .btn.icon-only {
+    width: 22px;
+}
+
+/* 面板内容 */
+.panel-body {
+    flex: 1;
+    overflow: auto;
+    padding: var(--spacing-medium);
+}
+
+.panel-body.no-padding {
+    padding: 0;
+}
+
+/* 可折叠面板 */
+.panel.collapsible {
+    transition: height 0.3s;
+}
+
+.panel.collapsed .panel-body {
+    display: none;
+}
+
+.panel.collapsed {
+    height: 32px;
+}
+
+/* 侧边面板 */
+.sidebar-panel {
+    width: var(--panel-width);
+    position: relative;
+    background-color: var(--bg-dark);
+    border-right: 1px solid var(--border-dark);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-panel.right {
+    border-right: none;
+    border-left: 1px solid var(--border-dark);
+}
+
+/* 面板分割线 */
+.panel-divider {
+    height: 1px;
+    background-color: var(--border-dark);
+    margin: var(--spacing-medium) 0;
+}
+
+/* 卡片式面板 */
+.card-panel {
+    padding: var(--spacing-medium);
+    background-color: var(--bg-medium);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-medium);
+}
+
+.card-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-medium);
+}
+
+.card-panel-title {
+    font-weight: bold;
+    color: var(--text-light);
+    font-size: 0.9em;
+    margin: 0;
+}
+
+/* 面板内表格 */
+.panel-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.panel-table th,
+.panel-table td {
+    padding: var(--spacing-small) var(--spacing-medium);
+    text-align: left;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.panel-table th {
+    color: var(--text-medium);
+    font-weight: normal;
+    font-size: 0.85em;
+    background-color: var(--bg-medium);
+}
+
+.panel-table tr:hover td {
+    background-color: var(--bg-medium);
+} 

@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+name: project
+---
+# 项目结构规则
+
+本项目包含前端代码：
+
+- `index.html`: [index.html](mdc:index.html) - Web 应用的主要 HTML 文件。
+- `css/`: 包含 CSS 样式文件。
+  - `base.css`: [base.css](mdc:css/base.css) - 基础样式。
+  - `variables.css`: [variables.css](mdc:css/variables.css) - CSS 变量定义。
+  - `layout.css`: [layout.css](mdc:css/layout.css) - 页面布局样式。
+  - `main.css`: [main.css](mdc:css/main.css) - 主要样式。
+  - `camera-view.css`: [camera-view.css](mdc:css/camera-view.css) - 相机视图特定样式。
+  - `components/`: 包含 UI 组件样式。
+    - `buttons.css`: [buttons.css](mdc:css/components/buttons.css)
+    - `form-controls.css`: [form-controls.css](mdc:css/components/form-controls.css)
+    - `tabs.css`: [tabs.css](mdc:css/components/tabs.css)
+    - `panels.css`: [panels.css](mdc:css/components/panels.css)
+    - `tooltip.css`: [tooltip.css](mdc:css/components/tooltip.css)
+    - `notifications.css`: [notifications.css](mdc:css/components/notifications.css)
+    - `modal.css`: [modal.css](mdc:css/components/modal.css)
+  - `features/`: 包含特定功能样式。
+    - `axis-config.css`: [axis-config.css](mdc:css/features/axis-config.css)
+    - `focus-controls.css`: [focus-controls.css](mdc:css/features/focus-controls.css)
+    - `calibration.css`: [calibration.css](mdc:css/features/calibration.css)
+- `js/`: 包含 JavaScript 文件。
+  - `main.js`: [main.js](mdc:js/main.js) - JavaScript 入口文件。
+  - `views/`: 包含视图相关的 JS 逻辑。
+  - `controllers/`: 包含控制器相关的 JS 逻辑。
+    - `CameraController.js`: [CameraController.js](mdc:js/controllers/CameraController.js)
+  - `utils/`: 包含工具函数。
+- `app.py`: [app.py](mdc:app.py) - Python 后端应用（可能是 Flask 或 FastAPI）。
+- `Pipfile` / `Pipfile.lock`: [Pipfile](mdc:Pipfile) [Pipfile.lock](mdc:Pipfile.lock) - Python 依赖管理文件 (pipenv)。
+- `README.md`: [README.md](mdc:README.md) - 项目说明文件。
+- `.gitignore`: [.gitignore](mdc:.gitignore) - 指定 Git 应忽略的文件。
+- `favicon.png`: [favicon.png](mdc:favicon.png) - 网站图标。
+- `.git/`: Git 版本控制目录。
+- `.cursor/`: Cursor 相关配置和规则目录。
+
+
+
+
+
+

@@ -1,0 +1,127 @@
+/* === 工具提示 === */
+
+.tooltip {
+    position: absolute;
+    background-color: var(--bg-darker);
+    color: var(--text-light);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-small) var(--spacing-medium);
+    font-size: 0.8em;
+    max-width: 300px;
+    z-index: 1100;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s;
+}
+
+.tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 工具提示箭头 */
+.tooltip::before {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-dark);
+    transform: rotate(45deg);
+}
+
+/* 工具提示位置 */
+.tooltip.top::before {
+    bottom: -5px;
+    left: 50%;
+    margin-left: -4px;
+    border-top: none;
+    border-left: none;
+}
+
+.tooltip.bottom::before {
+    top: -5px;
+    left: 50%;
+    margin-left: -4px;
+    border-bottom: none;
+    border-right: none;
+}
+
+.tooltip.left::before {
+    right: -5px;
+    top: 50%;
+    margin-top: -4px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.tooltip.right::before {
+    left: -5px;
+    top: 50%;
+    margin-top: -4px;
+    border-left: none;
+    border-top: none;
+}
+
+/* 带有触发器的工具提示 */
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--bg-darker);
+    color: var(--text-light);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-small) var(--spacing-medium);
+    font-size: 0.8em;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    z-index: 1100;
+    pointer-events: none;
+}
+
+[data-tooltip]:hover::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 8px;
+    height: 8px;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-dark);
+    border-top: none;
+    border-left: none;
+    z-index: 1101;
+    pointer-events: none;
+}
+
+/* 气泡提示 */
+.bubble {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--bg-medium);
+    color: var(--text-medium);
+    font-size: 0.7em;
+    margin-left: var(--spacing-small);
+}
+
+.bubble:hover {
+    background-color: var(--accent-blue);
+    color: var(--text-light);
+} 

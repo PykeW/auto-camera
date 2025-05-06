@@ -1,0 +1,53 @@
+/* === 相机视图 === */
+
+/* 相机视图容器 */
+.camera-view {
+    flex-grow: 1;
+    background-color: #666;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#camera-display-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#simulated-image {
+    display: block;
+    object-fit: contain;
+    transition: filter 0.1s linear;
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-dark);
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* 焦点区域覆盖层 */
+.focus-overlay {
+    position: absolute;
+    border: 2px dashed var(--accent-yellow);
+    pointer-events: none;
+    background-color: rgba(255, 255, 0, 0.08);
+    opacity: 0;
+    transition: opacity 0.15s linear;
+    box-shadow: 0 0 10px rgba(255, 255, 0, 0.2);
+}
+
+/* 视图切换按钮 */
+#toggle-view-btn {
+    position: absolute;
+    top: var(--spacing-medium);
+    left: var(--spacing-medium);
+    z-index: 10;
+    flex-grow: 0;
+    width: auto;
+} 

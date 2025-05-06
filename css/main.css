@@ -1,0 +1,21 @@
+/* 主样式文件 - 引入所有组件 */
+
+/* 基础样式 */
+@import 'variables.css';
+@import 'base.css';
+@import 'layout.css';
+
+/* 组件样式 */
+@import 'components/buttons.css';
+@import 'components/form-controls.css';
+@import 'components/tabs.css';
+@import 'components/modal.css';
+@import 'components/panels.css';
+@import 'components/tooltip.css';
+@import 'components/notifications.css';
+
+/* 功能样式 */
+@import 'camera-view.css';
+@import 'features/axis-config.css';
+@import 'features/focus-controls.css';
+@import 'features/calibration.css'; 

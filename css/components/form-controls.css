@@ -1,0 +1,332 @@
+/* === 表单控件 === */
+
+.control-item {
+    margin-bottom: var(--spacing-medium);
+}
+
+label {
+    display: block;
+    margin-bottom: var(--spacing-small);
+    color: var(--text-medium);
+    font-size: 0.9em;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+    width: 100%;
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    color: var(--text-light);
+    padding: var(--spacing-small) var(--spacing-medium);
+    border-radius: var(--border-radius);
+    font-size: inherit;
+    height: 28px;
+}
+
+/* 数字输入框 */
+input[type="number"] {
+    padding-right: 15px;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* 禁用状态 */
+input:read-only {
+    background-color: #4a4a4a;
+    cursor: default;
+}
+
+input:disabled,
+select:disabled,
+button:disabled {
+    background-color: #4a4a4a;
+    color: var(--text-medium);
+    cursor: not-allowed;
+    border-color: var(--border-dark);
+    opacity: 0.7;
+}
+
+/* 下拉框 */
+select {
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right var(--spacing-medium) center;
+    background-size: .65em auto;
+    padding-right: 2.5em;
+}
+
+.compact-select {
+    height: 24px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+
+/* 输入组 */
+.input-group {
+    display: flex;
+    gap: var(--spacing-small);
+}
+
+.input-group input {
+    flex-grow: 1;
+}
+
+.input-group button {
+    flex-shrink: 0;
+    padding: var(--spacing-small) var(--spacing-medium);
+}
+
+/* 属性表格 */
+.property-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--spacing-medium);
+}
+
+.property-table th,
+.property-table td {
+    border: 1px solid var(--border-dark);
+    padding: var(--spacing-small) var(--spacing-medium);
+    text-align: left;
+    height: 28px;
+    vertical-align: middle;
+}
+
+.property-table th {
+    background-color: var(--bg-medium);
+    font-weight: normal;
+    color: var(--text-medium);
+    width: 40%;
+}
+
+.property-table td {
+     padding: 0;
+}
+
+.property-table select,
+.property-table input {
+    border: none;
+    border-radius: 0;
+    height: 100%;
+    padding: var(--spacing-small) var(--spacing-medium);
+    background-color: inherit;
+    color: inherit;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 滑块 */
+input[type="range"],
+.property-table input[type="range"] {
+    padding: 0;
+    cursor: pointer;
+    height: auto;
+    vertical-align: middle;
+    background-color: transparent !important;
+    border: none !important;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+  background: var(--border-dark);
+  height: 4px;
+  border-radius: 2px;
+}
+input[type=range]::-moz-range-track {
+  background: var(--border-dark);
+  height: 4px;
+  border-radius: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -4px;
+}
+input[type=range]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.range-value {
+    font-size: 0.9em;
+    color: var(--text-medium);
+    min-width: 35px;
+    text-align: right;
+}
+
+/* 属性网格 */
+.property-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-small);
+}
+
+.property-grid .control-item {
+    gap: var(--spacing-medium);
+    width: 100%;
+    margin-bottom: var(--spacing-small);
+}
+
+.property-grid .control-item,
+.control-item.side-by-side {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-medium);
+}
+
+.property-grid .control-item label,
+.control-item.side-by-side label {
+    flex-shrink: 0;
+    width: auto;
+    min-width: 80px;
+    text-align: left;
+    margin-bottom: 0;
+}
+
+.property-grid .control-item select,
+.property-grid .control-item input[type="number"],
+.property-grid .control-item input[type="text"],
+.control-item.side-by-side input,
+.control-item.side-by-side span {
+    flex-grow: 1;
+    width: auto;
+}
+
+.control-item.side-by-side input,
+.control-item.side-by-side span {
+    text-align: right;
+}
+
+.property-grid .range-item label {
+    min-width: 40px;
+}
+.property-grid .range-item input[type="range"] {
+    flex-grow: 1;
+}
+
+.focus-status.side-by-side span {
+    flex-grow: 0;
+}
+
+#calibration-result-value {
+    text-align: right;
+    flex-grow: 1;
+    display: inline-block;
+    width: auto;
+}
+
+/* 相机信息网格 */
+.camera-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-medium);
+}
+
+.camera-info-grid .control-item label {
+    min-width: auto;
+    flex-grow: 0;
+}
+.camera-info-grid .control-item input {
+    flex-grow: 1;
+}
+
+/* 开关 */
+.toggle-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-medium);
+}
+
+.toggle-item label:first-child {
+    flex-grow: 1;
+    min-width: auto;
+    margin-right: 0;
+    margin-bottom: 0;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-dark);
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-light);
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px var(--accent-blue);
+}
+
+input:checked + .slider:before {
+    transform: translateX(16px);
+}
+
+.slider.round {
+    border-radius: 24px;
+}
+.slider.round:before {
+    border-radius: 50%;
+}
+
+.switch input:disabled + .slider {
+    cursor: not-allowed;
+    background-color: #3a3a3a;
+    border-color: var(--border-dark);
+    opacity: 0.7;
+}
+.switch input:disabled + .slider:before {
+    background-color: #777;
+}
+.switch input:checked:disabled + .slider {
+    background-color: #105a9e;
+    opacity: 0.6;
+} 
