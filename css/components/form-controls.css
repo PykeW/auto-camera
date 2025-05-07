@@ -2,17 +2,18 @@
 
 .control-item {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    margin-bottom: var(--spacing-medium);
+    margin-bottom: calc(var(--spacing-medium) + 2px);
     gap: var(--spacing-medium);
 }
 
 .control-item label:first-child {
     flex-shrink: 0;
-    min-width: 100px;
-    text-align: left;
-    margin-right: var(--spacing-small);
+    min-width: 110px;
+    text-align: right;
+    padding-top: 3px;
+    color: var(--text-medium);
 }
 
 .control-item > *:last-child:not(label:first-child),
@@ -27,13 +28,14 @@
 .control-item input[type="email"],
 .control-item select {
     width: 100%;
-    padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+    padding: calc(var(--input-padding-vertical) - 1px) var(--input-padding-horizontal);
     background-color: var(--input-bg);
     border: 1px solid var(--input-border-color);
     border-radius: var(--border-radius);
     color: var(--input-fg);
     font-size: 0.9em;
     box-sizing: border-box;
+    height: 28px;
 }
 
 .control-item input:focus,
@@ -63,27 +65,42 @@
     border-right: none;
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
+    height: 28px;
+    padding: calc(var(--input-padding-vertical) - 1px) var(--input-padding-horizontal);
 }
 
 .input-group button {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    height: auto;
-    padding-top: var(--input-padding-vertical);
-    padding-bottom: var(--input-padding-vertical);
-    line-height: 1.4;
+    height: 28px;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-left: none;
+    margin-left: -1px;
+}
+
+.toggle-item {
+    align-items: center;
+}
+
+.toggle-item label:first-child {
+    padding-top: 0;
 }
 
 .toggle-item label.switch {
+    display: inline-flex;
     margin-left: auto;
-    /* flex-grow: 0; might be needed if it over-expands */
+}
+
+.range-item {
+    align-items: baseline;
 }
 
 .range-item > div {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     width: 100%;
-    gap: var(--spacing-small);
+    gap: var(--spacing-medium);
 }
 
 .range-item input[type="range"] {
@@ -94,10 +111,10 @@
 }
 
 .range-item .range-value {
-    min-width: 40px;
+    min-width: 45px;
     text-align: right;
-    font-size: 0.85em;
-    color: var(--text-medium);
+    font-size: 0.9em;
+    color: var(--text-light);
 }
 
 /* 数字输入框 */
@@ -314,7 +331,7 @@ input[type=range]::-moz-range-thumb {
 .switch {
     position: relative;
     display: inline-block;
-    width: 40px;
+    width: 36px;
     height: 20px;
     flex-shrink: 0;
 }
@@ -351,11 +368,14 @@ input[type=range]::-moz-range-thumb {
 
 input:checked + .slider {
     background-color: var(--accent-blue);
-    transform: translateX(20px);
+}
+
+input:checked + .slider:before {
+    left: 19px;
 }
 
 input:focus + .slider {
-    box-shadow: 0 0 1px var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.4);
 }
 
 .control-item input:disabled,
@@ -382,4 +402,19 @@ input:focus + .slider {
 .control-item input[type="range"]:disabled {
     cursor: not-allowed;
     opacity: 0.5;
+}
+
+/* 新增：用于改善按钮组布局的类 */
+.button-group-row {
+    display: flex;
+    flex-wrap: wrap; /* 允许在空间不足时换行 */
+    gap: var(--spacing-small); /* 使用已定义的间距变量 */
+    align-items: center; /* 垂直居中对齐（如果换行） */
+}
+
+/* 可选: 如果希望按钮在组内有特定的大小行为，例如不拉伸 */
+.button-group-row > .btn,
+.button-group-row > button {
+    flex-grow: 0; /* 按钮默认不拉伸以填充空间 */
+    flex-shrink: 0; /* 按钮默认不收缩 */
 } 

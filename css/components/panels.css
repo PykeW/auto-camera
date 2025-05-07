@@ -144,4 +144,28 @@
 
 .panel-table tr:hover td {
     background-color: var(--bg-medium);
+}
+
+/* 控制面板内的 Section 标题 */
+.control-panel .panel-section > h3,
+.control-panel .panel-section > h4 {
+    color: var(--text-light);
+    font-size: 1.05em; /* 稍微加大字体 */
+    font-weight: 600; /* 稍微加粗 */
+    margin-bottom: var(--spacing-large); /* 增加标题下方间距 */
+    padding-bottom: var(--spacing-small); /* 增加底部 padding */
+    border-bottom: 1px solid var(--border-medium); /* 添加下划线 */
+    margin-top: var(--spacing-large); /* 增加顶部间距，第一个除外 */
+}
+
+.control-panel .panel-section:first-child > h3,
+.control-panel .panel-section:first-child > h4 {
+    margin-top: 0; /* 移除第一个标题的顶部间距 */
+}
+
+/* 调整 Section 自身间距 */
+.control-panel .panel-section {
+    margin-bottom: var(--spacing-large); /* 统一使用 large 间距 */
+    /* 移除面板本身的 padding，如果 layout.css 里有的话 */
+    /* padding: 0; */ 
 } 
