@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>相机定位模拟器 - 自动相机系统</title>
+  <link rel="icon" href="favicon.png">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+    }
+    header {
+      background-color: #333;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    footer {
+      background-color: #333;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      margin-top: 2rem;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>自动相机系统 - 相机定位模拟器</h1>
+  </header>
+  
+  <div class="container">
+    <!-- 模拟器将会被动态加载到这里 -->
+  </div>
+  
+  <footer>
+    <p>&copy; 2025 自动相机系统</p>
+  </footer>
+
+  <!-- 使用type="module"以支持ES模块导入 -->
+  <script type="module">
+    import PositionSimulatorDemo from './src/js/views/PositionSimulatorDemo.js';
+    // 页面加载后自动初始化
+  </script>
+</body>
+</html> 
