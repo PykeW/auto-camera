@@ -62,6 +62,15 @@ export class CameraController {
         this.isCalibRoiVisible = true; // Default to visible when exists
 
         this.backendUrl = 'http://localhost:5000';
+        
+        // 导入FocusController
+        import('./FocusController.js').then(module => {
+            const FocusController = module.FocusController;
+            this.focusController = new FocusController(this);
+            console.log("FocusController 初始化完成");
+        }).catch(error => {
+            console.error("初始化FocusController时出错:", error);
+        });
 
         this.initializeEventListeners();
         this.initUI();
@@ -818,110 +827,36 @@ export class CameraController {
 
     // --- Autofocus Logic ---
     async startAutofocus() {
-        if (this.isFocusing || !this.isConnected || !this.selectedAxisId) return;
-
-        console.log("--------- 开始自动对焦流程 --------- ");
-        this.isFocusing = true;
-        this.bestZFound = null; // Reset previous best Z
-        let bestClarityRough = -1;
-        let bestZRough = null;
-        this.updateFocusStatus('初始化检查'); // Method defined below
-        await this.wait(this.INIT_DELAY);
-
-        try {
-            this.updateFocusStatus('请求Z轴控制权');
-            // In real app, await backend call here
-            await this.wait(this.CONTROL_REQUEST_DELAY);
-
-            this.updateFocusStatus('粗对焦中');
-            console.log('粗对焦: 扫描范围', this.Z_RANGE, '步长', this.Z_STEP_ROUGH);
-            for (let z = this.Z_RANGE.min; z <= this.Z_RANGE.max; z += this.Z_STEP_ROUGH) {
-                if (!this.isFocusing) throw new Error('对焦已手动停止');
-                await this.simulateZMovement(z);
-                const clarity = this.currentClarity; // Use the value calculated in simulateZMovement
-                console.log(`  Z=${z.toFixed(2)}, 清晰度=${clarity.toFixed(3)}`);
-                if (clarity > bestClarityRough) {
-                    bestClarityRough = clarity;
-                    bestZRough = z;
-                }
-                await this.wait(this.SCAN_DELAY_ROUGH);
-            }
-            console.log(`粗对焦完成: 最佳 Z ≈ ${bestZRough?.toFixed(2)}, 清晰度 ≈ ${bestClarityRough.toFixed(3)}`);
-
-            if (bestZRough === null) throw new Error('粗对焦未能找到最佳位置');
-
-            this.updateFocusStatus('精细对焦中');
-            const fineRangeMin = Math.max(this.Z_RANGE.min, bestZRough - this.Z_STEP_ROUGH);
-            const fineRangeMax = Math.min(this.Z_RANGE.max, bestZRough + this.Z_STEP_ROUGH);
-            let bestClarityFine = -1;
-            let bestZFine = null;
-            console.log('精细对焦: 扫描范围', { min: fineRangeMin, max: fineRangeMax }, '步长', this.Z_STEP_FINE);
-            for (let z = fineRangeMin; z <= fineRangeMax; z += this.Z_STEP_FINE) {
-                const currentZFine = parseFloat(z.toFixed(2)); // Use precise float for comparison
-                if (!this.isFocusing) throw new Error('对焦已手动停止');
-                await this.simulateZMovement(currentZFine);
-                const clarity = this.currentClarity; // Use value from simulateZMovement
-                console.log(`    Z=${currentZFine.toFixed(2)}, 清晰度=${clarity.toFixed(3)}`);
-                if (clarity > bestClarityFine) {
-                    bestClarityFine = clarity;
-                    bestZFine = currentZFine;
-                }
-                await this.wait(this.SCAN_DELAY_FINE);
-            }
-            this.bestZFound = bestZFine;
-            console.log(`精细对焦完成: 最佳 Z = ${this.bestZFound?.toFixed(2)}, 清晰度 = ${bestClarityFine.toFixed(3)}`);
-
-            if (this.bestZFound === null) throw new Error('精细对焦未能找到最佳位置');
-
-            this.updateFocusStatus('移动到最佳位置');
-            await this.simulateZMovement(this.bestZFound);
-            await this.wait(this.CONTROL_REQUEST_DELAY); // Simulate time for movement and settling
-
-            this.updateFocusStatus('保存参数中');
-            this.saveState(); // Save the best Z found
-            await this.wait(this.SAVE_DELAY);
-
-           this.updateFocusStatus('已对焦');
-           console.log("--------- 自动对焦流程成功完成 --------- ");
-
-        } catch (error) {
-            console.error("自动对焦过程中出错:", error);
-            if (this.isFocusing) {
-                // If error occurred during focusing, not due to manual stop
-                this.updateFocusStatus('错误');
-                alert(`自动对焦失败: ${error.message}`);
-            } else {
-                // If error is '对焦已手动停止'
-                this.updateFocusStatus('已停止');
-            }
-        } finally {
-            this.isFocusing = false;
-            this.focusProcessId = null; // Clear the process ID
-            this.updateControlStates(this.isConnected);
+        console.log("CameraController: 调用FocusController的自动对焦方法");
+        
+        if (!this.focusController) {
+            console.error("错误: 无法开始自动对焦，FocusController未初始化");
+            return;
         }
+        
+        // 调用FocusController的自动对焦方法
+        this.focusController.startAutofocus();
     }
 
+    // --- 停止自动对焦 ---
     stopAutofocus() {
-        if (!this.isFocusing) return;
-        console.log("请求停止自动对焦...");
-        this.isFocusing = false; // Set flag immediately
-        // Cancel any pending wait timer associated with autofocus
-        if (this.focusProcessId) {
-             clearTimeout(this.focusProcessId);
-             this.focusProcessId = null;
-             console.log("自动对焦定时器已清除。");
+        console.log("CameraController: 调用FocusController的停止自动对焦方法");
+        
+        if (!this.focusController) {
+            console.error("错误: 无法停止自动对焦，FocusController未初始化");
+            return;
         }
-        this.updateControlStates(this.isConnected); // Update buttons immediately
-         // Update status via UIManager
-        this.uiManager.updateFocusStatus('已停止');
-        console.log("停止信号已发送。对焦循环将在下一次检查时退出。");
+        
+        // 调用FocusController的停止自动对焦方法
+        this.focusController.stopAutofocus();
     }
     // ---------------------
 
     // --- 获取并显示轴配置下拉列表 ---
     async fetchAndShowAxisDropdown() {
-        if (!this.isConnected) return;
-
+        // 模拟连接状态
+        this.isConnected = true;
+        
         if (this.isAxisDropdownVisible) {
             this.hideAxisDropdown(); // Call the controller's logic hiding method
             return;
@@ -948,6 +883,11 @@ export class CameraController {
             // Populate dropdown via UIManager
             this.uiManager.populateAxisDropdown(availableAxes);
             
+            // 创建一个state对象用于保存状态
+            if (!this.state) {
+                this.state = {};
+            }
+            
             // Add event listeners after populating
             this.uiManager.axisListUl.querySelectorAll('li[data-axis-id]').forEach(li => {
                  li.addEventListener('click', () => this.selectAxis(li.dataset.axisId));
@@ -955,7 +895,7 @@ export class CameraController {
 
         } catch (error) {
             // Check if error is due to cancellation (stop during wait)
-            if (error.message.includes('Stopped during wait')) {
+            if (error.message && error.message.includes('Stopped during wait')) {
                  console.log("模拟: 轴列表获取被取消。");
             } else {
                  console.error("模拟: 获取轴列表时出错:", error);
@@ -978,7 +918,17 @@ export class CameraController {
 
     selectAxis(axisId) {
         console.log(`选择了轴: ${axisId}`);
+        
+        // 创建一个state对象用于保存状态
+        if (!this.state) {
+            this.state = {};
+        }
+        
         this.selectedAxisId = axisId;
+        
+        // 保存到state
+        this.state.selectedAxisId = axisId;
+        
         // Update button via UIManager
         this.uiManager.updateConfigAxisButtonDisplay(axisId);
         this.hideAxisDropdown(); // Use controller method to hide
@@ -1655,4 +1605,19 @@ export class CameraController {
 
     // Define the default camera SN at the class level or constructor
     DEFAULT_CAMERA_SN = 'DefaultSimCamera';
+
+    // --- 更新对焦状态 ---
+    updateFocusStatus(status) {
+        // 确保state存在
+        if (!this.state) {
+            this.state = {};
+        }
+        
+        // 更新状态
+        this.state.focusStatus = status;
+        
+        // 通过UI管理器更新显示
+        this.uiManager.updateFocusStatus(status);
+        console.log(`对焦状态更新为: ${status}`);
+    }
 } // End Class

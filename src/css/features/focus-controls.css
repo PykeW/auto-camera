@@ -1,0 +1,354 @@
+/* === 对焦控制 === */
+
+/* 对焦控制按钮组 */
+.focus-controls {
+    display: flex;
+    gap: var(--spacing-medium);
+}
+
+.focus-controls button {
+    flex-grow: 1;
+    height: 32px;
+}
+
+/* 对焦状态 */
+.focus-status label {
+    display: inline-block;
+    margin-bottom: 0;
+}
+
+#focus-status-text {
+    font-weight: bold;
+    margin-left: var(--spacing-small);
+    padding: 2px 6px;
+    border-radius: var(--border-radius);
+    display: inline-block;
+}
+
+/* 状态颜色 */
+.status-未连接,
+.status-空闲 { 
+    background-color: var(--bg-medium); 
+    color: var(--text-medium); 
+}
+
+.status-初始化-检查,
+.status-请求Z轴控制权,
+.status-保存参数中 { 
+    background-color: var(--accent-blue); 
+    color: var(--text-light); 
+}
+
+.status-粗对焦中,
+.status-精细对焦中,
+.status-移动到最佳位置,
+.status-当量计算-模拟- { 
+    background-color: var(--accent-yellow); 
+    color: var(--text-dark); 
+}
+
+.status-已对焦 { 
+    background-color: var(--accent-green); 
+    color: var(--text-dark); 
+}
+
+.status-已停止,
+.status-错误 { 
+    background-color: var(--accent-red); 
+    color: var(--text-light); 
+}
+
+/* ROI区域 */
+.roi-header-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-small);
+}
+
+.roi-header-line h4 {
+    flex-grow: 1;
+    margin-bottom: 0;
+    margin-right: var(--spacing-medium);
+}
+
+.roi-header-line > .roi-button,
+.roi-header-line .roi-button-group {
+    flex-shrink: 0;
+    margin-left: auto;
+    margin-top: 0;
+}
+
+.roi-header-line > .roi-button {
+    padding-left: var(--spacing-medium);
+    padding-right: var(--spacing-medium);
+    width: auto;
+}
+
+.roi-button {
+    margin-top: var(--spacing-medium);
+    width: 100%;
+}
+
+.roi-button-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-medium);
+}
+
+.roi-button-group .roi-button {
+    margin-top: 0;
+    flex-shrink: 0;
+    padding: var(--spacing-small) var(--spacing-medium);
+    width: auto;
+}
+
+.roi-button-group .mini-button i {
+    margin-right: 0;
+}
+
+.roi-button-group .roi-button i {
+    margin-right: var(--spacing-small);
+    width: 1em;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/**
+ * 自动对焦相关样式
+ * 根据focus-guide.mdc规则实现
+ */
+
+/* 对焦控制面板 */
+.focus-control-panel {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #e0e0e0;
+}
+
+.focus-control-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #333;
+  display: flex;
+  align-items: center;
+}
+
+.focus-control-title svg {
+  margin-right: 8px;
+}
+
+/* ROI控制 */
+.focus-roi-controls {
+  margin-bottom: 15px;
+}
+
+.focus-roi-controls .button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* 绘制模式 */
+.drawing-roi-mode {
+  cursor: crosshair !important;
+  position: relative;
+}
+
+.drawing-roi-mode::before {
+  content: "绘制ROI";
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* 焦点ROI显示 */
+.focus-roi-overlay {
+  position: absolute;
+  border: 2px dashed #ffcc00;
+  background-color: rgba(255, 204, 0, 0.2);
+  z-index: 10;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* 确认/取消按钮 */
+.focus-roi-button-group {
+  position: absolute;
+  display: none; /* 默认隐藏，绘制后显示 */
+  flex-direction: column;
+  gap: 5px;
+  z-index: 20;
+  background-color: white;
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 对焦状态显示 */
+.focus-status {
+  display: flex;
+  align-items: center;
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+}
+
+.focus-status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+/* 状态颜色 */
+.focus-status.idle .focus-status-indicator {
+  background-color: #999;
+}
+
+.focus-status.focusing .focus-status-indicator {
+  background-color: #2196F3;
+  animation: pulse 1.5s infinite;
+}
+
+.focus-status.focused .focus-status-indicator {
+  background-color: #4CAF50;
+}
+
+.focus-status.failed .focus-status-indicator,
+.focus-status.stopped .focus-status-indicator {
+  background-color: #F44336;
+}
+
+/* 对焦进度 */
+.focus-progress {
+  height: 5px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.focus-progress-inner {
+  height: 100%;
+  width: 0; /* 初始宽度为0 */
+  background-color: #3498db;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+/* 对焦结果 */
+.focus-result {
+  margin-top: 15px;
+  display: none; /* 默认隐藏，对焦完成后显示 */
+}
+
+.focus-result.visible {
+  display: block;
+}
+
+.focus-result-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+/* 动画 */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* 自动对焦范围和步进设置 */
+.focus-range-controls {
+  margin-top: 15px;
+  padding: 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.focus-range-controls h5 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ddd;
+}
+
+.focus-param-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.focus-param-row label {
+  flex: 0 0 100px;
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.focus-param-row input {
+  width: 100%;
+  padding: 4px 8px;
+  background-color: #333;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #fff;
+}
+
+/* 移动到拍照位按钮 */
+.photo-position-button {
+  background-color: #673AB7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.photo-position-button i {
+  margin-right: 5px;
+}
+
+.photo-position-button:hover {
+  background-color: #5E35B1;
+}
+
+.photo-position-button:active {
+  background-color: #512DA8;
+}
+
+/* Z轴控制分组 */
+.z-axis-controls {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+} 

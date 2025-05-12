@@ -1,0 +1,252 @@
+/* === 校准 === */
+
+/* 校准按钮组 */
+.calibration-buttons {
+    display: flex;
+    gap: var(--spacing-medium);
+}
+
+.calibration-buttons #calibrate-btn {
+    flex-grow: 1;
+}
+
+.calibration-buttons button {
+    flex-shrink: 1;
+    padding: var(--spacing-small);
+}
+
+/* 校准按钮样式 */
+.calibrate-button {
+    background-color: var(--accent-green);
+    border-color: var(--accent-green);
+    margin-right: var(--spacing-medium);
+}
+
+.calibrate-button:hover {
+    background-color: #60b060;
+    border-color: #60b060;
+}
+
+.calibrate-button:active {
+    background-color: #50a050;
+    border-color: #50a050;
+}
+
+/* 校准结果 */
+#calibration-result-value {
+    text-align: right;
+    flex-grow: 1;
+    display: inline-block;
+    width: auto;
+}
+
+/* 校准按钮图标 */
+#calibrate-btn i {
+    margin-right: var(--spacing-small);
+    width: 1em;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/**
+ * 自动标定相关样式
+ * 根据calibration-guide.mdc规则实现
+ */
+
+/* 标定控制面板 */
+.calibration-control-panel {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #e0e0e0;
+}
+
+.calibration-control-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #333;
+  display: flex;
+  align-items: center;
+}
+
+.calibration-control-title svg {
+  margin-right: 8px;
+}
+
+/* 标定参数输入 */
+.calibration-params {
+  margin-bottom: 15px;
+}
+
+.calibration-params-group {
+  margin-bottom: 10px;
+}
+
+.calibration-param-label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.calibration-param-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+.calibration-param-input.error {
+  border-color: #e74c3c;
+}
+
+.calibration-param-error {
+  color: #e74c3c;
+  font-size: 12px;
+  display: none;
+}
+
+.calibration-param-error.visible {
+  display: block;
+}
+
+/* 标定类型选择 */
+.calibration-type-select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  margin-bottom: 15px;
+}
+
+/* 标定ROI控制 */
+.calibration-roi-controls {
+  margin-bottom: 15px;
+}
+
+.calibration-roi-controls .button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* 标定ROI显示 */
+.calibration-roi-overlay {
+  position: absolute;
+  border: 2px dashed #3498db;
+  background-color: rgba(52, 152, 219, 0.2);
+  z-index: 10;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* 确认/取消按钮 */
+.calibration-roi-button-group {
+  position: absolute;
+  display: none; /* 默认隐藏，绘制后显示 */
+  flex-direction: column;
+  gap: 5px;
+  z-index: 20;
+  background-color: white;
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 标定状态显示 */
+.calibration-status {
+  display: flex;
+  align-items: center;
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #f0f0f0;
+}
+
+.calibration-status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+/* 状态颜色 */
+.calibration-status.idle .calibration-status-indicator {
+  background-color: #999;
+}
+
+.calibration-status.calibrating .calibration-status-indicator {
+  background-color: #3498db;
+  animation: pulse 1.5s infinite;
+}
+
+.calibration-status.calibrated .calibration-status-indicator {
+  background-color: #2ecc71;
+}
+
+.calibration-status.failed .calibration-status-indicator {
+  background-color: #e74c3c;
+}
+
+/* 标定结果 */
+.calibration-result {
+  margin-top: 15px;
+  padding: 15px;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+  display: none; /* 默认隐藏，标定完成后显示 */
+}
+
+.calibration-result.visible {
+  display: block;
+}
+
+.calibration-result-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.calibration-result-value {
+  font-size: 18px;
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.calibration-result-unit {
+  color: #666;
+  margin-left: 5px;
+}
+
+/* 标定质量指标 */
+.calibration-quality {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+}
+
+.calibration-quality-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.calibration-quality-label {
+  color: #666;
+}
+
+.calibration-quality-value {
+  font-weight: 500;
+}
+
+/* 标定板视图控制 */
+.calibration-pattern-view {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.pattern-switch-btn {
+  margin-bottom: 10px;
+} 

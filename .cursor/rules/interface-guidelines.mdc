@@ -1,0 +1,144 @@
+---
+description: 相机控制系统中通知系统和ROI绘制的交互规范和设计指南
+globs: 
+alwaysApply: false
+---
+---
+description: 相机控制系统中通知系统和ROI绘制的交互规范和设计指南
+globs: src/css/components/notifications.css,src/css/features/*.css
+alwaysApply: false
+---
+# 相机控制系统用户界面指南
+
+本文档定义了相机控制系统中通知系统和ROI绘制的交互规范和设计指南。
+
+## 1. 通知系统设计规范
+
+### 1.1 通知类型和样式
+
+系统支持四种类型的通知，每种类型有特定用途和样式：
+
+- **信息通知** (`info`): 蓝色边框，用于一般信息和操作提示
+- **成功通知** (`success`): 绿色边框，用于确认操作成功完成
+- **警告通知** (`warning`): 黄色边框，用于提示潜在问题
+- **错误通知** (`error`): 红色边框，用于显示操作失败或错误
+
+### 1.2 通知组件结构
+
+每个通知包含以下元素：
+```html
+<div class="notification info|success|warning|error">
+  <div class="notification-icon"><!-- SVG图标 --></div>
+  <div class="notification-content">
+    <div class="notification-title">
+      通知标题
+      <button class="notification-close">×</button>
+    </div>
+    <p class="notification-message">通知内容文本</p>
+  </div>
+  <div class="notification-progress">
+    <div class="notification-progress-inner"></div>
+  </div>
+</div>
+```
+
+### 1.3 通知显示规则
+
+- **位置**: 通知显示在屏幕中央，确保用户不会错过
+- **持续时间**: 默认显示5秒，重要通知可延长
+- **动画**: 渐入渐出效果，底部进度条显示剩余时间
+- **堆叠**: 多个通知垂直堆叠，最新通知在顶部
+- **关闭方式**: 可通过关闭按钮手动关闭，或等待自动关闭
+
+### 1.4 通知使用场景
+
+| 通知类型 | 使用场景 | 示例消息 |
+|---------|---------|---------|
+| `info` | 操作引导、状态改变 | "请在图像上绘制ROI区域" |
+| `success` | 操作成功完成 | "ROI区域设置成功" |
+| `warning` | 轻微问题、需要注意 | "绘制的区域太小，请重新绘制" |
+| `error` | 操作失败、严重问题 | "无法完成对焦操作" |
+
+## 2. ROI绘制交互规范
+
+### 2.1 ROI绘制流程规范
+
+对焦和标定ROI绘制遵循统一的交互模式：
+
+1. **初始状态**:
+   - 显示单个"绘制"按钮
+   - 按钮使用铅笔图标表示绘制功能
+
+2. **绘制状态**:
+   - 鼠标指针变为十字形状
+   - 图像底部显示"绘制ROI"提示
+   - "绘制"按钮文本变为"正在绘制..."并高亮
+
+3. **已绘制状态**:
+   - 显示矩形选区和操作按钮组
+   - 按钮组包含：确认、重绘按钮
+
+4. **已确认状态**:
+   - 显示最终ROI矩形框
+   - 显示操作按钮组：重绘、清除、可见性切换
+
+### 2.2 视觉反馈
+
+ROI绘制过程中提供清晰的视觉反馈：
+
+- **光标状态**: 绘制模式使用十字光标 (`cursor: crosshair`)
+- **区域样式**: 
+  - 对焦ROI: 黄色虚线边框，半透明黄色填充
+  - 标定ROI: 蓝色虚线边框，半透明蓝色填充
+- **过渡动画**: 确认、清除操作有平滑过渡效果
+
+### 2.3 辅助元素
+
+为提高用户体验，添加以下辅助元素：
+
+- **帮助提示**: 主界面顶部显示简短操作指南
+- **状态指示器**: 在状态栏显示当前模式和坐标
+- **按钮状态**: 根据当前状态自动启用/禁用相关按钮
+
+```css
+/* ROI绘制模式的视觉提示 */
+.drawing-roi-mode {
+    cursor: crosshair !important;
+    position: relative;
+}
+
+.drawing-roi-mode::before {
+    content: "绘制ROI";
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 100;
+}
+```
+
+## 3. 无障碍设计考虑
+
+为确保系统可访问性：
+
+- **颜色对比度**: 所有UI元素符合WCAG AA级标准
+- **键盘导航**: 所有功能支持键盘访问
+- **屏幕阅读**: 关键元素有适当的ARIA标签
+- **状态反馈**: 通过多种方式（颜色、文本、图标）传达状态变化
+
+## 4. 响应式设计
+
+界面在不同屏幕尺寸下保持可用性：
+
+- **通知适应**: 在小屏幕设备上通知宽度自适应
+- **按钮布局**: 在空间受限时简化按钮组布局
+- **触摸支持**: 交互元素有足够大小适应触摸操作
+
+
+

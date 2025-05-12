@@ -4,9 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>相机控制系统 - 完整流程模拟</title>
-    <!-- Font Awesome 6.0.0 - Ensure integrity and crossorigin attributes are present -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="stylesheet" href="css/main.css">
+    <!-- 引入基础样式 -->
+    <link rel="stylesheet" href="src/css/base.css">
+    <link rel="stylesheet" href="src/css/main.css">
+    <link rel="stylesheet" href="src/css/layout.css">
+    <link rel="stylesheet" href="src/css/camera-view.css">
+    
+    <!-- 引入组件样式 -->
+    <link rel="stylesheet" href="src/css/components/buttons.css">
+    <link rel="stylesheet" href="src/css/components/form-controls.css">
+    <link rel="stylesheet" href="src/css/components/notifications.css">
+    <link rel="stylesheet" href="src/css/components/tabs.css">
+    <link rel="stylesheet" href="src/css/components/panels.css">
+    
+    <!-- 引入功能样式 -->
+    <link rel="stylesheet" href="src/css/features/axis-config.css">
+    <link rel="stylesheet" href="src/css/features/focus-controls.css">
+    <link rel="stylesheet" href="src/css/features/calibration.css">
+    
+    <!-- 字体图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="favicon.png" type="image/png">
 </head>
 <body>
     <div class="app-container">
@@ -23,12 +43,24 @@
 
         <main class="main-content">
             <section class="camera-view">
+                <!-- 用户提示区域 -->
+                <div class="help-tips">
+                    <div class="tips-title">操作指南：</div>
+                    <div class="tips-content">
+                        <ul>
+                            <li>绘制ROI：请点击"绘制"按钮，然后在图像上按住鼠标左键拖动绘制矩形区域</li>
+                            <li>完成绘制后可以：确认、重绘或清除ROI区域</li>
+                            <li>校准ROI：请先显示标定板，再进行校准区域绘制</li>
+                        </ul>
+                    </div>
+                </div>
+                
                 <!-- Moved Toggle Button Here -->
                 <button id="toggle-view-btn" class="select-button" disabled="" style="position: absolute; z-index: 10;"><i class="fas fa-sync-alt"></i> 显示标定板</button>
 
                 <!-- Container for image/svg -->
                 <div id="camera-display-container">
-                    <img id="simulated-image" src="favicon.png" alt="模拟相机图像">
+                    <img id="simulated-image" src="/favicon.png" alt="模拟相机图像">
                     <div id="calibration-pattern-display" style="display: none; width: 100%; height: 100%;">
                         <!-- SVG will be injected here by JS -->
                     </div>
@@ -152,13 +184,18 @@
                     <label for="current-z">当前 Z (mm):</label>
                     <input type="text" id="current-z" value="--" readonly="">
                 </div>
-                 <div class="control-item">
+                <div class="control-item">
                     <label for="clarity-value">当前清晰度:</label>
                     <input type="text" id="clarity-value" value="--" readonly="">
                 </div>
-                 <div class="control-item focus-status">
+                <div class="control-item focus-status">
                     <label>对焦状态:</label>
                     <span id="focus-status-text" class="status-text status-错误">错误</span>
+                </div>
+
+                <!-- 添加移到拍照位按钮 -->
+                <div class="control-item">
+                    <button id="move-to-photo-pos-btn" class="photo-position-button"><i class="fas fa-camera-retro"></i> 移到拍照位</button>
                 </div>
 
                 <!-- Focus ROI Controls -->
@@ -172,15 +209,36 @@
                             <button id="clear-roi-focus-btn" class="roi-button danger-button" style="display: none;">清除</button>
                             <button id="toggle-focus-roi-visibility-btn" class="roi-button mini-button" title="隐藏对焦ROI" style="display: none;"><i class="fas fa-eye"></i></button>
                         </div>
-                     </div>
+                    </div>
+                </div>
+
+                <!-- 自动对焦参数设置 -->
+                <div class="focus-range-controls">
+                    <h5>对焦参数设置</h5>
+                    <div class="focus-param-row">
+                        <label>起始位置 (mm):</label>
+                        <input type="number" id="focus-start-z" value="10" min="0" step="0.5">
+                    </div>
+                    <div class="focus-param-row">
+                        <label>结束位置 (mm):</label>
+                        <input type="number" id="focus-end-z" value="40" min="0" step="0.5">
+                    </div>
+                    <div class="focus-param-row">
+                        <label>粗调步进 (mm):</label>
+                        <input type="number" id="focus-coarse-step" value="5" min="0.1" step="0.1">
+                    </div>
+                    <div class="focus-param-row">
+                        <label>精调步进 (mm):</label>
+                        <input type="number" id="focus-fine-step" value="1" min="0.01" step="0.01">
+                    </div>
                 </div>
 
                 <div class="control-item focus-controls">
-                     <label>对焦操作:</label>
-                     <div>
-                         <button id="start-focus-btn" class="primary-button"><i class="fas fa-crosshairs"></i> 开始自动对焦</button>
-                         <button id="stop-focus-btn" class="danger-button"><i class="fas fa-stop-circle"></i> 停止</button>
-                     </div>
+                    <label>对焦操作:</label>
+                    <div>
+                        <button id="start-focus-btn" class="primary-button"><i class="fas fa-crosshairs"></i> 开始自动对焦</button>
+                        <button id="stop-focus-btn" class="danger-button"><i class="fas fa-stop-circle"></i> 停止</button>
+                    </div>
                 </div>
              </div>
 
@@ -249,7 +307,8 @@
             <span>缩放: 100%</span>
         </footer>
 
-        <script type="module" src="js/main.js"></script>
+        <!-- 引入JavaScript脚本 -->
+        <script type="module" src="src/js/main.js"></script>
     </div>
 </body>
 </html> 

@@ -1,47 +1,118 @@
 ---
-description: 
+description: 项目结构规则
 globs: 
 alwaysApply: false
 ---
 ---
 name: project
+description: 相机自动对焦和标定系统的项目结构说明
 ---
 # 项目结构规则
 
-本项目包含前端代码：
+本项目是相机自动对焦和自动标定系统，主要包含前端代码。
 
-- `index.html`: [index.html](mdc:index.html) - Web 应用的主要 HTML 文件。
-- `css/`: 包含 CSS 样式文件。
-  - `base.css`: [base.css](mdc:css/base.css) - 基础样式。
-  - `variables.css`: [variables.css](mdc:css/variables.css) - CSS 变量定义。
-  - `layout.css`: [layout.css](mdc:css/layout.css) - 页面布局样式。
-  - `main.css`: [main.css](mdc:css/main.css) - 主要样式。
-  - `camera-view.css`: [camera-view.css](mdc:css/camera-view.css) - 相机视图特定样式。
-  - `components/`: 包含 UI 组件样式。
-    - `buttons.css`: [buttons.css](mdc:css/components/buttons.css)
-    - `form-controls.css`: [form-controls.css](mdc:css/components/form-controls.css)
-    - `tabs.css`: [tabs.css](mdc:css/components/tabs.css)
-    - `panels.css`: [panels.css](mdc:css/components/panels.css)
-    - `tooltip.css`: [tooltip.css](mdc:css/components/tooltip.css)
-    - `notifications.css`: [notifications.css](mdc:css/components/notifications.css)
-    - `modal.css`: [modal.css](mdc:css/components/modal.css)
-  - `features/`: 包含特定功能样式。
-    - `axis-config.css`: [axis-config.css](mdc:css/features/axis-config.css)
-    - `focus-controls.css`: [focus-controls.css](mdc:css/features/focus-controls.css)
-    - `calibration.css`: [calibration.css](mdc:css/features/calibration.css)
-- `js/`: 包含 JavaScript 文件。
-  - `main.js`: [main.js](mdc:js/main.js) - JavaScript 入口文件。
-  - `views/`: 包含视图相关的 JS 逻辑。
-  - `controllers/`: 包含控制器相关的 JS 逻辑。
-    - `CameraController.js`: [CameraController.js](mdc:js/controllers/CameraController.js)
-  - `utils/`: 包含工具函数。
-- `app.py`: [app.py](mdc:app.py) - Python 后端应用（可能是 Flask 或 FastAPI）。
-- `Pipfile` / `Pipfile.lock`: [Pipfile](mdc:Pipfile) [Pipfile.lock](mdc:Pipfile.lock) - Python 依赖管理文件 (pipenv)。
-- `README.md`: [README.md](mdc:README.md) - 项目说明文件。
-- `.gitignore`: [.gitignore](mdc:.gitignore) - 指定 Git 应忽略的文件。
+## 1. 根目录文件
+
+- `index.html`: [index.html](mdc:index.html) - Web 应用的主要入口文件。包含应用的基本布局和组件。
 - `favicon.png`: [favicon.png](mdc:favicon.png) - 网站图标。
-- `.git/`: Git 版本控制目录。
-- `.cursor/`: Cursor 相关配置和规则目录。
+- `README.md`: [README.md](mdc:README.md) - 项目说明文件，包含安装和使用说明。
+- `.gitignore`: [.gitignore](mdc:.gitignore) - 指定 Git 版本控制应忽略的文件。
+
+## 2. 依赖管理
+
+- `package.json`: [package.json](mdc:package.json) - Node.js 包配置文件，定义了项目依赖和脚本。
+- `package-lock.json`: [package-lock.json](mdc:package-lock.json) - 锁定 Node.js 依赖版本。
+- `Pipfile`: [Pipfile](mdc:Pipfile) - Python 依赖管理文件，使用 pipenv 管理。
+- `Pipfile.lock`: [Pipfile.lock](mdc:Pipfile.lock) - Python 依赖版本锁定文件。
+
+## 3. CSS 样式目录 (src/css/)
+
+### 3.1 核心样式
+
+- `base.css`: [src/css/base.css](mdc:src/css/base.css) - 基础样式重置和通用样式。
+- `variables.css`: [src/css/variables.css](mdc:src/css/variables.css) - CSS 变量定义，包含颜色、尺寸等。
+- `layout.css`: [src/css/layout.css](mdc:src/css/layout.css) - 页面布局样式，网格和容器定义。
+- `main.css`: [src/css/main.css](mdc:src/css/main.css) - 主样式表，导入其他样式文件。
+- `camera-view.css`: [src/css/camera-view.css](mdc:src/css/camera-view.css) - 相机视图特定样式。
+
+### 3.2 组件样式 (src/css/components/)
+
+- `buttons.css`: [src/css/components/buttons.css](mdc:src/css/components/buttons.css) - 各类按钮样式。
+- `form-controls.css`: [src/css/components/form-controls.css](mdc:src/css/components/form-controls.css) - 表单控件样式。
+- `tabs.css`: [src/css/components/tabs.css](mdc:src/css/components/tabs.css) - 标签页样式。
+- `panels.css`: [src/css/components/panels.css](mdc:src/css/components/panels.css) - 面板样式。
+- `tooltip.css`: [src/css/components/tooltip.css](mdc:src/css/components/tooltip.css) - 工具提示样式。
+- `notifications.css`: [src/css/components/notifications.css](mdc:src/css/components/notifications.css) - 通知系统样式。
+- `modal.css`: [src/css/components/modal.css](mdc:src/css/components/modal.css) - 模态框样式。
+
+### 3.3 功能样式 (src/css/features/)
+
+- `axis-config.css`: [src/css/features/axis-config.css](mdc:src/css/features/axis-config.css) - 轴配置界面样式。
+- `focus-controls.css`: [src/css/features/focus-controls.css](mdc:src/css/features/focus-controls.css) - 焦点控制相关样式，包括ROI绘制。
+- `calibration.css`: [src/css/features/calibration.css](mdc:src/css/features/calibration.css) - 校准功能相关样式。
+
+## 4. JavaScript 目录 (src/js/)
+
+### 4.1 核心文件
+
+- `main.js`: [src/js/main.js](mdc:src/js/main.js) - JavaScript 入口文件，初始化应用。
+
+### 4.2 视图层 (src/js/views/)
+
+- `CameraView.js`: [src/js/views/CameraView.js](mdc:src/js/views/CameraView.js) - 相机视图组件，处理图像显示。
+- `UIManager.js`: [src/js/views/UIManager.js](mdc:src/js/views/UIManager.js) - UI 管理器，处理界面元素组织。
+
+### 4.3 控制器层 (src/js/controllers/)
+
+- `CameraController.js`: [src/js/controllers/CameraController.js](mdc:src/js/controllers/CameraController.js) - 相机控制器，处理相机连接和图像获取。
+- `UIController.js`: [src/js/controllers/UIController.js](mdc:src/js/controllers/UIController.js) - UI 控制器，处理用户交互和事件监听。
+- `AxisController.js`: [src/js/controllers/AxisController.js](mdc:src/js/controllers/AxisController.js) - 轴控制器，处理XYZ轴电机移动。
+- `FocusController.js`: [src/js/controllers/FocusController.js](mdc:src/js/controllers/FocusController.js) - 焦点控制器，实现自动对焦算法。
+- `CalibrationController.js`: [src/js/controllers/CalibrationController.js](mdc:src/js/controllers/CalibrationController.js) - 校准控制器，处理相机标定功能。
+
+### 4.4 工具类 (src/js/utils/)
+
+- `Utilities.js`: [src/js/utils/Utilities.js](mdc:src/js/utils/Utilities.js) - 通用工具函数，包括通知系统。
+- `ImageProcessing.js`: [src/js/utils/ImageProcessing.js](mdc:src/js/utils/ImageProcessing.js) - 图像处理工具，用于对焦和标定。
+- `Logger.js`: [src/js/utils/Logger.js](mdc:src/js/utils/Logger.js) - 日志工具，记录系统事件和错误。
+
+## 5. Cursor规则目录 (.cursor/rules/)
+
+- `camera-features.mdc`: [.cursor/rules/camera-features.mdc](mdc:.cursor/rules/camera-features.mdc) - 相机自动对焦功能实现规则。
+- `focus-guide.mdc`: [.cursor/rules/focus-guide.mdc](mdc:.cursor/rules/focus-guide.mdc) - 自动对焦功能操作指南。
+- `calibration-guide.mdc`: [.cursor/rules/calibration-guide.mdc](mdc:.cursor/rules/calibration-guide.mdc) - 自动标定功能操作指南。
+- `interface-guidelines.mdc`: [.cursor/rules/interface-guidelines.mdc](mdc:.cursor/rules/interface-guidelines.mdc) - 用户界面交互规范。
+- `project.mdc`: [.cursor/rules/project.mdc](mdc:.cursor/rules/project.mdc) - 本项目结构规则文件。
+- `cursor-rules.mdc`: [.cursor/rules/cursor-rules.mdc](mdc:.cursor/rules/cursor-rules.mdc) - Cursor规则添加和管理指南。
+
+## 6. 项目架构
+
+本项目采用MVC架构模式：
+- **模型层**：由各控制器内部的数据结构和状态管理组成
+- **视图层**：由HTML模板和CSS样式以及视图类组成
+- **控制器层**：由各功能控制器组成，处理业务逻辑
+
+### 6.1 数据流向
+
+1. 用户操作UI → UIController接收事件
+2. UIController调用相应功能控制器（FocusController/CalibrationController）
+3. 功能控制器通过CameraController获取图像数据
+4. 功能控制器处理数据并通过AxisController控制硬件
+5. 处理结果通过UIController更新到视图
+
+### 6.2 通信机制
+
+组件间通信主要通过以下方式：
+- 直接方法调用
+- 自定义事件
+- 状态回调函数
+
+## 7. 开发规范
+
+- **命名规范**：使用驼峰命名法，类使用大驼峰，方法和变量使用小驼峰
+- **注释规范**：使用JSDoc格式，关键方法和复杂逻辑必须添加注释
+- **CSS规范**：使用BEM命名方法，组件样式隔离
+- **代码组织**：按功能模块组织，保持单一职责原则
 
 
 

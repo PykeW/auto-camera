@@ -1,8 +1,11 @@
+import { Utilities } from '../utils/Utilities.js';
+
 class CalibrationController {
     constructor(cameraController) {
         this.cameraController = cameraController; // Reference to the main controller
         this.ui = cameraController.uiController; // Reference UI Controller if needed
         this.state = cameraController.state; // Reference shared state if needed
+        this.utilities = new Utilities(); // 引用工具类
 
         // --- Calibration Elements ---
         this.calibrationPatternDisplay = document.getElementById('calibration-pattern-display');
@@ -70,8 +73,6 @@ class CalibrationController {
             this.updateCalibRoiOverlay(); // Update overlay visibility
         });
 
-        // Mouse listeners for drawing need to be attached to the pattern display when enabled
-        // See enableCalibRoi and handleCalibRoiMouseDown
     }
 
     // --- New Calibration Simulation Logic ---
@@ -201,8 +202,19 @@ class CalibrationController {
         this.finalCalibRoiRect = null;   // Clear final rect as well if redraw is intended
         this.isDrawingCalibRoi = false;
 
+        // 显示通知
+        this.utilities.showNotification(
+            'info',
+            '校准ROI绘制',
+            '请在标定板图像上按住鼠标左键并拖动以绘制校准区域，确保包含足够多的标定点',
+            5000
+        );
+
         if (this.calibrationPatternDisplay) {
              this.calibrationPatternDisplay.style.cursor = 'crosshair';
+             // 添加绘制模式视觉提示
+             this.calibrationPatternDisplay.classList.add('drawing-roi-mode');
+             
             // Add listeners directly to the pattern display, ensure they are removed later
             if (!this.boundHandleCalibRoiMouseDown) {
                  this.boundHandleCalibRoiMouseDown = this.handleCalibRoiMouseDown.bind(this);
@@ -280,18 +292,36 @@ class CalibrationController {
 
         if (this.pendingCalibRoiRect && (this.pendingCalibRoiRect.width < 5 || this.pendingCalibRoiRect.height < 5)) {
             console.log('Calibration ROI 绘制尺寸过小，未设置');
+            
+            // 显示区域过小提示
+            this.utilities.showNotification(
+                'warning',
+                '校准ROI过小',
+                '绘制的区域太小，请重新绘制一个包含足够多标定点的区域',
+                5000
+            );
+            
             this.pendingCalibRoiRect = null; // Discard small rect
             this.isInCalibRoiDrawMode = false; // Exit draw mode if rect is invalid
-             if(this.calibrationPatternDisplay) this.calibrationPatternDisplay.style.cursor = 'default';
+             if(this.calibrationPatternDisplay) {
+                 this.calibrationPatternDisplay.style.cursor = 'default';
+                 this.calibrationPatternDisplay.classList.remove('drawing-roi-mode');
+             }
         } else if (this.pendingCalibRoiRect) {
             console.log('Calibration ROI 绘制完成，等待确认:', this.pendingCalibRoiRect);
             // Don't change isInCalibRoiDrawMode yet
             // Keep cursor as crosshair? Or change to default? Let's keep it default.
-            if(this.calibrationPatternDisplay) this.calibrationPatternDisplay.style.cursor = 'default';
+            if(this.calibrationPatternDisplay) {
+                this.calibrationPatternDisplay.style.cursor = 'default';
+                // 不移除绘制模式类，直到确认或取消
+            }
         } else {
             console.log('Calibration ROI mouse up without valid rect.');
             this.isInCalibRoiDrawMode = false; // Exit draw mode if no rect drawn
-             if(this.calibrationPatternDisplay) this.calibrationPatternDisplay.style.cursor = 'default';
+             if(this.calibrationPatternDisplay) {
+                 this.calibrationPatternDisplay.style.cursor = 'default';
+                 this.calibrationPatternDisplay.classList.remove('drawing-roi-mode');
+             }
         }
 
         this.updateCalibRoiOverlay();
@@ -305,8 +335,17 @@ class CalibrationController {
         this.pendingCalibRoiRect = null; // Clear pending
         console.log('校准 ROI 已确认:', this.finalCalibRoiRect);
 
+        // 显示确认通知
+        this.utilities.showNotification(
+            'success',
+            '校准ROI已确认',
+            '校准区域设置成功，系统将使用此区域进行相机标定',
+            5000
+        );
+
         if (this.calibrationPatternDisplay) {
             this.calibrationPatternDisplay.style.cursor = 'default';
+            this.calibrationPatternDisplay.classList.remove('drawing-roi-mode');
             // Remove mouse down listener if it's still attached
             if (this.boundHandleCalibRoiMouseDown) {
                  this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
@@ -325,6 +364,15 @@ class CalibrationController {
         if (this.redrawCalibRoiBtn?.disabled || !this.isShowingCalibrationPattern) return;
 
         console.log('请求重新绘制校准 ROI');
+        
+        // 显示重绘通知
+        this.utilities.showNotification(
+            'info',
+            '重新绘制校准ROI',
+            '请在标定板图像上重新绘制校准区域，请选择包含完整标定点的区域',
+            5000
+        );
+        
         this.pendingCalibRoiRect = null; // Clear pending rect
         this.finalCalibRoiRect = null;   // Clear confirmed rect
         this.isInCalibRoiDrawMode = false; // Ensure we exit previous draw mode if any
@@ -332,6 +380,7 @@ class CalibrationController {
 
         if (this.calibrationPatternDisplay) {
             this.calibrationPatternDisplay.style.cursor = 'default'; // Reset cursor first
+            this.calibrationPatternDisplay.classList.remove('drawing-roi-mode');
             // Remove old listeners if they somehow persist
             if (this.boundHandleCalibRoiMouseDown) {
                  this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
@@ -350,25 +399,38 @@ class CalibrationController {
         if (!this.isDrawingCalibRoi && !this.isInCalibRoiDrawMode) return; // Nothing to cancel
 
         console.log("取消校准 ROI 绘制");
+        
+        // 显示取消通知
+        this.utilities.showNotification(
+            'info',
+            '校准ROI绘制已取消',
+            '已取消校准区域绘制操作，保持原有设置不变',
+            5000
+        );
+        
         const wasDrawing = this.isDrawingCalibRoi;
         this.isDrawingCalibRoi = false;
-        this.isInCalibRoiDrawMode = false;
-
+        this.isInCalibRoiDrawMode = false; // Exit calibration ROI draw mode
+        
+        // 移除视觉提示
         if (this.calibrationPatternDisplay) {
             this.calibrationPatternDisplay.style.cursor = 'default';
+            this.calibrationPatternDisplay.classList.remove('drawing-roi-mode');
+            
             // Remove listeners only if they were added
             if (this.boundHandleCalibRoiMouseDown) {
-                 this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
-                 this.boundHandleCalibRoiMouseDown = null;
+                this.calibrationPatternDisplay.removeEventListener('mousedown', this.boundHandleCalibRoiMouseDown);
+                this.boundHandleCalibRoiMouseDown = null;
             }
             if (wasDrawing) { // Only remove move/up if drawing was in progress
-                 if (this.boundHandleCalibRoiMouseMove) window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
-                 if (this.boundHandleCalibRoiMouseUp) window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
+                if (this.boundHandleCalibRoiMouseMove) window.removeEventListener('mousemove', this.boundHandleCalibRoiMouseMove);
+                if (this.boundHandleCalibRoiMouseUp) window.removeEventListener('mouseup', this.boundHandleCalibRoiMouseUp);
             }
         }
+
         this.pendingCalibRoiRect = null; // Clear any partially drawn rect
         this.updateCalibRoiOverlay(); // Hide overlay
-        this.updateCalibRoiControlsUI(); // Reset buttons
+        this.updateCalibRoiControlsUI(); // Update buttons
     }
 
     // --- UI Update Functions ---

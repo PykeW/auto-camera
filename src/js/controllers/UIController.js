@@ -1,6 +1,9 @@
+import { Utilities } from '../utils/Utilities.js';
+
 class UIController {
     constructor(cameraController) {
         this.cameraController = cameraController; // Reference main controller
+        this.utilities = new Utilities(); // 引用工具类
 
         // --- Element References ---
         // Status Bar & Footer
@@ -243,18 +246,30 @@ class UIController {
         // Validate the drawn ROI size
         if (this.pendingRoiRect && (this.pendingRoiRect.width < 5 || this.pendingRoiRect.height < 5)) {
             console.log("Focus ROI too small, canceling draw.");
+            
+            // 显示区域过小提示
+            this.utilities.showNotification(
+                'warning',
+                'ROI 过小',
+                '绘制的区域太小，请重新绘制一个更大的区域',
+                5000
+            );
+            
             this.focusRoiState = 'idle'; // Revert state to idle
             this.pendingRoiRect = null; // Discard the small rectangle
-        } else if (this.pendingRoiRect) {
-            // ROI is valid size, move to 'drawn' state, awaiting confirmation
-            this.focusRoiState = 'drawn';
-            console.log("Focus ROI 绘制完成，等待确认:", this.pendingRoiRect);
-        } else {
-            // Mouse up occurred without a valid pending rectangle (e.g., click without drag)
-            console.log("Focus ROI mouse up without drawing.");
-            this.focusRoiState = 'idle'; // Revert state to idle
-            this.pendingRoiRect = null;
+            
+            // 移除绘制模式视觉提示
+            if (this.simulatedImage) {
+                this.simulatedImage.classList.remove('drawing-roi-mode');
+            }
+            
+            this.updateFocusRoiOverlay(); // Hide the tiny rect
+            this.updateRoiControlsUI(); // Update buttons
+            return;
         }
+
+        this.focusRoiState = 'drawn';
+        console.log("Focus ROI 绘制完成，等待确认:", this.pendingRoiRect);
 
         // Reset cursor
         if (this.simulatedImage) {
@@ -266,87 +281,125 @@ class UIController {
     }
 
     startFocusRoiDraw(isRedraw = false) {
-         // Check conditions allowing ROI drawing (connected, not busy)
-         if (!this.cameraController.isConnected || this.cameraController.isFocusing || this.cameraController.calibrationController?.isCalibrating || this.cameraController.calibrationController?.isShowingCalibrationPattern) {
-             console.warn("Cannot draw focus ROI: Camera not ready or in calibration view.");
-             return;
-         }
-
-        if (isRedraw) {
-            console.log("开始重绘对焦 ROI");
-            this.finalRoiRect = null; // Clear confirmed ROI if redrawing
-        } else {
-            console.log("开始绘制对焦 ROI");
-        }
+        console.log("开始绘制对焦 ROI");
         this.focusRoiState = 'drawing';
-        this.pendingRoiRect = null; // Clear any previous pending ROI
-        this.isDrawingRoi = false; // Ensure drawing flag is reset initially
-        if (this.simulatedImage) {
-            this.simulatedImage.style.cursor = 'crosshair'; // Change cursor to indicate drawing mode
+        this.updateRoiControlsUI();
+
+        // 显示通知
+        this.utilities.showNotification(
+            'info',
+            'ROI 绘制',
+            '请在图像上按住鼠标左键并拖动以绘制矩形对焦区域，松开鼠标完成绘制',
+            5000
+        );
+        
+        // 清除按钮组显示
+        this.focusRoiButtonGroup.style.display = 'none';
+        // 设置主绘制按钮
+        this.drawRoiFocusBtn.textContent = '正在绘制...';
+        this.drawRoiFocusBtn.style.backgroundColor = 'var(--accent-blue)';
+        this.drawRoiFocusBtn.style.color = 'white';
+
+        // 清除之前的选择 (if redrawing)
+        if (isRedraw) {
+            this.clearFocusRoi(true); // Pass silent flag to avoid notification on clear
         }
-        this.updateFocusRoiOverlay(); // Hide existing overlay if any
-        this.updateRoiControlsUI(); // Update buttons (e.g., hide Draw button)
+        
+        // 添加绘制模式视觉提示
+        if (this.simulatedImage) {
+            this.simulatedImage.classList.add('drawing-roi-mode');
+        }
+        
+        // Ensure overlay is visible
+        this.focusRoiOverlay.style.display = 'block';
     }
 
     confirmFocusRoi() {
-        // Check if confirmation is valid (state is 'drawn', pending rect exists)
-        if (this.focusRoiState !== 'drawn' || !this.pendingRoiRect) {
-             console.warn("Cannot confirm focus ROI: Invalid state or no pending ROI.");
-             return;
+        console.log("确认对焦 ROI");
+        
+        // 移除绘制模式视觉提示
+        if (this.simulatedImage) {
+            this.simulatedImage.classList.remove('drawing-roi-mode');
         }
-
-        this.finalRoiRect = { ...this.pendingRoiRect }; // Copy pending to final
-        this.focusRoiState = 'confirmed';
-        this.pendingRoiRect = null; // Clear pending rect
-        this.isFocusRoiVisible = true; // Ensure ROI is visible after confirmation
-
-        console.log("对焦 ROI 已确认:", this.finalRoiRect);
-
-        // Update UI
-        this.updateFocusRoiOverlay();
-        this.updateRoiControlsUI();
-        // Potentially trigger recalculation of clarity or other actions in main controller
-         this.cameraController.focusController?.updateClarityAndBlur(); // Example: Update clarity based on new ROI
-         this.cameraController.saveState(); // Persist ROI
+        
+        if (this.pendingRoiRect) {
+            this.focusRoiState = 'confirmed';
+            this.finalRoiRect = { ...this.pendingRoiRect }; // Copy the pending rect to final
+            this.pendingRoiRect = null; // Clear pending
+            
+            // 显示确认通知
+            this.utilities.showNotification(
+                'success',
+                'ROI 已确认',
+                '对焦区域设置成功，系统将使用此区域进行自动对焦',
+                5000
+            );
+            
+            this.updateRoiControlsUI();
+            this.updateFocusRoiOverlay();
+            // Save ROI state to persist configuration
+            this.saveFocusRoiState();
+        }
     }
 
-    clearFocusRoi() {
-        // Check if there is an ROI to clear (state is not idle)
-        if (this.focusRoiState === 'idle') return;
-
+    clearFocusRoi(silent = false) {
         console.log("清除对焦 ROI");
+        
+        // 移除绘制模式视觉提示
+        if (this.simulatedImage) {
+            this.simulatedImage.classList.remove('drawing-roi-mode');
+        }
+        
         this.focusRoiState = 'idle';
         this.finalRoiRect = null;
         this.pendingRoiRect = null;
-        this.isDrawingRoi = false; // Ensure drawing flag is off
-        this.isFocusRoiVisible = true; // Reset visibility toggle state (though ROI is gone)
-
-        // Reset cursor if it was changed
-        if (this.simulatedImage) {
-            this.simulatedImage.style.cursor = 'default';
+        this.isDrawingRoi = false;
+        this.updateRoiControlsUI();
+        this.updateFocusRoiOverlay();
+        
+        // 显示通知（除非是静默模式）
+        if (!silent) {
+            this.utilities.showNotification(
+                'info',
+                'ROI 已清除',
+                '对焦区域已重置，将使用整个图像进行对焦',
+                5000
+            );
         }
-
-        // Update UI
-        this.updateFocusRoiOverlay(); // Hide overlay
-        this.updateRoiControlsUI(); // Reset buttons to initial state
-        // Potentially trigger recalculation of clarity or other actions in main controller
-        this.cameraController.focusController?.updateClarityAndBlur(); // Example: Update clarity based on ROI removal
-        this.cameraController.saveState(); // Persist removal of ROI
+        
+        // Reset buttons
+        this.drawRoiFocusBtn.textContent = '绘制';
+        this.drawRoiFocusBtn.style.backgroundColor = '';
+        this.drawRoiFocusBtn.style.color = '';
+        
+        // Save the cleared state
+        this.saveFocusRoiState();
     }
 
-     cancelFocusRoiDraw() {
-        // Only cancel if currently in the drawing state
-        if (!this.isDrawingRoi || this.focusRoiState !== 'drawing') return;
-
-        console.log("取消对焦 ROI 绘制");
-        this.isDrawingRoi = false;
-        this.focusRoiState = 'idle'; // Revert to idle state
+    cancelFocusRoiDraw() {
+        console.log("取消绘制对焦 ROI");
+        
+        // 移除绘制模式视觉提示
         if (this.simulatedImage) {
-            this.simulatedImage.style.cursor = 'default'; // Reset cursor
+            this.simulatedImage.classList.remove('drawing-roi-mode');
         }
-        this.pendingRoiRect = null; // Discard any partially drawn rectangle
-        this.updateFocusRoiOverlay(); // Hide the overlay
-        this.updateRoiControlsUI(); // Reset the control buttons
+        
+        if (this.focusRoiState === 'drawing') {
+            this.focusRoiState = this.finalRoiRect ? 'confirmed' : 'idle';
+            this.isDrawingRoi = false;
+            this.pendingRoiRect = null;
+            
+            // 显示取消通知
+            this.utilities.showNotification(
+                'info',
+                'ROI 绘制已取消',
+                '已取消绘制操作，保持原有设置不变',
+                5000
+            );
+            
+            this.updateRoiControlsUI();
+            this.updateFocusRoiOverlay();
+        }
     }
 
     toggleFocusRoiVisibility() {

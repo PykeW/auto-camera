@@ -1,3 +1,5 @@
+import '../css/main.css'; // Added for Vite
+
 // main.js - 主文件，用于初始化和组织其他模块
 import { CameraController } from './controllers/CameraController.js';
 
