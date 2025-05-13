@@ -8,14 +8,15 @@ let cameraState = {
     YPosition: null,
     ZPosition: null,
     UPosition: null,
-    isZConfigured: false, // 新增：Z轴是否已配置标志
+    isZConfigured: false,
+    isDrawingROI: false,
+    roiEnabled: false,
     axisLimits: {
         X: { min: -100.0, max: 100.0 },
         Y: { min: -100.0, max: 100.0 },
         Z: { min: 0.0, max: 50.0 },
         U: { min: -180.0, max: 180.0 }
     },
-    // 添加自动对焦参数
     focusParams: {
         rangeUp: 5.0,
         rangeDown: 5.0,
@@ -23,6 +24,14 @@ let cameraState = {
         steps: 10,
         exposure: 5000,
         gain: 1.0
+    },
+    // 新增PLC轴数据和映射
+    plcAxes: [],
+    axisMapping: {
+        "1": "X",
+        "2": "Y", 
+        "3": "Z",
+        "4": "U"
     }
 };
 
@@ -79,6 +88,16 @@ function initializeDOMReferences() {
     // ROI相关控件
     drawRoiFocusBtn = document.getElementById('draw-roi-focus-btn');
     focusRoiButtonGroup = document.getElementById('focus-roi-button-group');
+    
+    // 对焦控制按钮
+    startFocusBtn = document.getElementById('start-focus-btn');
+    stopFocusBtn = document.getElementById('stop-focus-btn');
+
+    // ROI相关按钮
+    const confirmRoiBtn = document.getElementById('confirm-roi-focus-btn');
+    const redrawRoiBtn = document.getElementById('redraw-roi-focus-btn');
+    const clearRoiBtn = document.getElementById('clear-roi-focus-btn');
+    const toggleRoiVisibilityBtn = document.getElementById('toggle-focus-roi-visibility-btn');
 
     // 自动对焦参数设置控件
     focusParamsModal = document.getElementById('focus-params-modal');
@@ -98,6 +117,18 @@ function initializeDOMReferences() {
     }
     if (drawRoiFocusBtn) {
         drawRoiFocusBtn.addEventListener('click', toggleRoiDrawing);
+    }
+    if (confirmRoiBtn) {
+        confirmRoiBtn.addEventListener('click', confirmRoi);
+    }
+    if (redrawRoiBtn) {
+        redrawRoiBtn.addEventListener('click', redrawRoi);
+    }
+    if (clearRoiBtn) {
+        clearRoiBtn.addEventListener('click', clearRoi);
+    }
+    if (toggleRoiVisibilityBtn) {
+        toggleRoiVisibilityBtn.addEventListener('click', toggleRoiVisibility);
     }
 
     // 自动对焦参数设置相关事件监听
@@ -179,6 +210,10 @@ function updateAxisDisplay(state) {
 async function jogAxis(axis, direction) {
     if (!cameraState.isConnected) return;
     
+    // 获取对应的轴ID
+    const axisId = getAxisIdByName(axis);
+    if (!axisId) return;
+    
     const stepSelect = document.querySelector(`.step-select[data-axis="${axis}"]`);
     const step = parseFloat(stepSelect.value) * direction;
     const currentPos = cameraState[`${axis}Position`];
@@ -193,7 +228,7 @@ async function jogAxis(axis, direction) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                axis: axis,
+                axis: axisId,  // 发送轴ID
                 step: step
             })
         });
@@ -234,25 +269,29 @@ function updateStatus(state) {
         clarityInput.value = state.clarity ? state.clarity.toFixed(3) : '--';
     }
     
+    // 更新按钮状态
+    if (startFocusBtn) {
+        startFocusBtn.disabled = !state.isConnected || state.isFocusing;
+    }
+    if (stopFocusBtn) {
+        stopFocusBtn.disabled = !state.isConnected || !state.isFocusing;
+    }
+    if (drawRoiFocusBtn) {
+        drawRoiFocusBtn.disabled = !state.isConnected || state.isFocusing;
+    }
+    
+    // 更新ROI按钮组状态
+    const roiButtons = focusRoiButtonGroup.getElementsByTagName('button');
+    for (const btn of roiButtons) {
+        btn.disabled = !state.isConnected || state.isFocusing;
+    }
+    
     // 更新配置文件和保存路径显示
     if (configFileInput && state.configFile) {
         configFileInput.value = state.configFile;
     }
     if (savePathInput && state.savePath) {
         savePathInput.value = state.savePath;
-    }
-    
-    // 更新按钮状态
-    if (selectConfigBtn) {
-        selectConfigBtn.disabled = !state.isConnected;
-    }
-    if (selectFolderBtn) {
-        selectFolderBtn.disabled = !state.isConnected;
-    }
-
-    // 更新ROI按钮状态
-    if (drawRoiFocusBtn) {
-        drawRoiFocusBtn.disabled = !state.isConnected;
     }
     
     // 更新对焦参数设置按钮状态
@@ -361,10 +400,46 @@ async function stopAutoFocus() {
     }
 }
 
+// 加载PLC轴列表
+async function loadPlcAxes() {
+    try {
+        const response = await fetch('/api/axes');
+        const axes = await response.json();
+        cameraState.plcAxes = axes;
+        
+        // 填充轴选择下拉框
+        populateAxisSelect();
+        
+        console.log('PLC轴列表已加载:', axes);
+    } catch (error) {
+        console.error('加载PLC轴列表失败:', error);
+    }
+}
+
+// 填充轴选择下拉框
+function populateAxisSelect() {
+    const select = document.getElementById('axis-select');
+    if (!select) return;
+    
+    // 清空当前选项
+    select.innerHTML = '';
+    
+    // 添加新选项
+    cameraState.plcAxes.forEach(axis => {
+        const option = document.createElement('option');
+        option.value = axis.id;
+        option.textContent = axis.name;
+        select.appendChild(option);
+    });
+}
+
 // 显示轴配置弹窗
 function showAxisConfigModal(axis) {
-    // 设置当前选中的轴
-    axisSelect.value = axis;
+    // 设置当前选中的轴ID
+    const axisId = getAxisIdByName(axis);
+    if (axisSelect && axisId) {
+        axisSelect.value = axisId;
+    }
     
     // 获取当前轴的配置
     const config = axisConfigs[axis];
@@ -387,6 +462,21 @@ function showAxisConfigModal(axis) {
     axisConfigModal.classList.add('show');
 }
 
+// 根据轴名称获取对应的PLC轴ID
+function getAxisIdByName(axisName) {
+    for (const [id, name] of Object.entries(cameraState.axisMapping)) {
+        if (name === axisName) {
+            return id;
+        }
+    }
+    return null;
+}
+
+// 根据轴ID获取轴名称
+function getAxisNameById(axisId) {
+    return cameraState.axisMapping[axisId] || axisId;
+}
+
 // 隐藏轴配置弹窗
 function hideAxisConfigModal() {
     axisConfigModal.classList.remove('show');
@@ -394,7 +484,8 @@ function hideAxisConfigModal() {
 
 // 保存轴配置
 function saveAxisConfig() {
-    const axis = axisSelect.value;
+    const axisId = axisSelect.value;
+    const axisName = getAxisNameById(axisId);
     const config = {
         ratio: parseFloat(axisRatio.value),
         backlash: parseFloat(axisBacklash.value),
@@ -406,18 +497,18 @@ function saveAxisConfig() {
     const min = parseFloat(softLimitMin.value);
     const max = parseFloat(softLimitMax.value);
     if (min < max) {
-        cameraState.axisLimits[axis] = { min, max };
+        cameraState.axisLimits[axisName] = { min, max };
     }
     
     // 更新配置
-    axisConfigs[axis] = config;
+    axisConfigs[axisName] = config;
     
-    // 发送到后端（这里需要添加实际的API调用）
+    // 发送到后端
     fetch('/save_axis_config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            axis,
+            axis: axisId,
             config,
             limits: { min, max }
         })
@@ -542,21 +633,120 @@ async function saveFocusParams() {
     }
 }
 
-// ROI绘制相关
+// ROI绘制相关函数
 function toggleRoiDrawing() {
     if (!cameraState.isConnected) return;
     
-    const isDrawing = drawRoiFocusBtn.classList.contains('active');
-    if (!isDrawing) {
+    cameraState.isDrawingROI = !cameraState.isDrawingROI;
+    
+    if (cameraState.isDrawingROI) {
         // 开始绘制
         drawRoiFocusBtn.classList.add('active');
         focusRoiButtonGroup.style.display = 'flex';
-        // 这里添加ROI绘制的具体实现
+        // 启用ROI绘制模式
+        enableRoiDrawing();
     } else {
         // 取消绘制
         drawRoiFocusBtn.classList.remove('active');
         focusRoiButtonGroup.style.display = 'none';
+        // 禁用ROI绘制模式
+        disableRoiDrawing();
     }
+}
+
+function enableRoiDrawing() {
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (overlay) {
+        overlay.style.display = 'block';
+        // 这里添加鼠标事件监听器用于绘制ROI
+        // 实现ROI绘制的具体逻辑
+    }
+}
+
+function disableRoiDrawing() {
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+        // 移除鼠标事件监听器
+    }
+}
+
+function confirmRoi() {
+    if (!cameraState.isDrawingROI) return;
+    
+    // 确认当前ROI
+    cameraState.roiEnabled = true;
+    cameraState.isDrawingROI = false;
+    drawRoiFocusBtn.classList.remove('active');
+    
+    // 发送ROI数据到后端
+    updateRoiOnServer();
+}
+
+function redrawRoi() {
+    if (!cameraState.isDrawingROI) return;
+    
+    // 清除当前ROI
+    clearRoi();
+    // 重新开始绘制
+    enableRoiDrawing();
+}
+
+function clearRoi() {
+    cameraState.roiEnabled = false;
+    cameraState.isDrawingROI = false;
+    drawRoiFocusBtn.classList.remove('active');
+    
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+        overlay.innerHTML = '';
+    }
+    
+    // 通知后端清除ROI
+    fetch('/clear_roi', { method: 'POST' })
+        .then(response => response.json())
+        .catch(error => console.error('清除ROI失败:', error));
+}
+
+function toggleRoiVisibility() {
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (overlay) {
+        overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+async function updateRoiOnServer() {
+    try {
+        const response = await fetch('/update_roi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                enabled: cameraState.roiEnabled,
+                coords: getRoiCoordinates()
+            })
+        });
+        const result = await response.json();
+        if (!result.success) {
+            console.error('更新ROI失败:', result.message);
+        }
+    } catch (error) {
+        console.error('更新ROI失败:', error);
+    }
+}
+
+function getRoiCoordinates() {
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (!overlay) return null;
+    
+    // 获取ROI的坐标信息
+    // 这里需要根据实际的ROI绘制实现来获取坐标
+    return {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0
+    };
 }
 
 // 事件监听器
@@ -635,10 +825,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const axisSelect = document.getElementById('axis-select');
     if (axisSelect) {
         axisSelect.addEventListener('change', (e) => {
-            const axis = e.target.value;
-            if (axis && axisConfigs[axis] && cameraState.axisLimits && cameraState.axisLimits[axis]) {
-                const config = axisConfigs[axis];
-                const limits = cameraState.axisLimits[axis];
+            const axisId = e.target.value;
+            if (!axisId) return;
+            
+            // 获取轴名称
+            const axisName = getAxisNameById(axisId);
+            if (!axisName) return;
+            
+            if (axisConfigs[axisName] && cameraState.axisLimits && cameraState.axisLimits[axisName]) {
+                const config = axisConfigs[axisName];
+                const limits = cameraState.axisLimits[axisName];
                 
                 document.getElementById('axis-ratio').value = config.ratio;
                 document.getElementById('axis-backlash').value = config.backlash;
@@ -646,10 +842,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('axis-acc').value = config.acc;
                 document.getElementById('soft-limit-min').value = limits.min;
                 document.getElementById('soft-limit-max').value = limits.max;
-                document.getElementById('encoder-value').value = cameraState[`${axis}Position`] || 0;
+                document.getElementById('encoder-value').value = cameraState[`${axisName}Position`] || 0;
             }
         });
     }
+
+    // 加载PLC轴数据
+    loadPlcAxes();
 
     // 自动连接
     setTimeout(autoConnect, 500); // 延迟500ms后自动连接

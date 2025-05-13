@@ -61,11 +61,19 @@ stop_focus_flag = threading.Event()
 
 # --- 模拟 PLC 提供的轴数据 ---
 simulated_plc_axes = [
-    {"id": "X", "name": "X轴", "range_min": -100.0, "range_max": 100.0},
-    {"id": "Y", "name": "Y轴", "range_min": -100.0, "range_max": 100.0},
-    {"id": "Z", "name": "Z轴", "range_min": 0.0, "range_max": 50.0},
-    {"id": "U", "name": "U轴", "range_min": -180.0, "range_max": 180.0}
+    {"id": "1", "name": "轴1", "range_min": -100.0, "range_max": 100.0},
+    {"id": "2", "name": "轴2", "range_min": -100.0, "range_max": 100.0},
+    {"id": "3", "name": "轴3", "range_min": 0.0, "range_max": 50.0},
+    {"id": "4", "name": "轴4", "range_min": -180.0, "range_max": 180.0}
 ]
+
+# --- 轴ID映射到原始轴名称 ---
+axis_id_mapping = {
+    "1": "X",
+    "2": "Y",
+    "3": "Z",
+    "4": "U"
+}
 
 # --- 辅助函数 ---
 def calculate_clarity(z):
@@ -415,15 +423,15 @@ def set_axis_config():
     if not axis_id or not camera_sn:
          return jsonify({"status": "error", "message": "缺少 axisId 或 cameraSN"}), 400
     
-    # 验证 axis_id 是否在可用列表中 (可选)
+    # 验证 axis_id 是否在可用列表中
     if not any(axis['id'] == axis_id for axis in simulated_plc_axes):
          return jsonify({"status": "error", "message": f"无效的轴 ID: {axis_id}"}), 400
 
     # 更新状态 (模拟保存到PLC)
     camera_state['selectedAxisId'] = axis_id
-    print(f"后端: 模拟保存相机 '{camera_sn}' 的轴配置为 ID: {axis_id}")
+    print(f"后端: 模拟保存相机 '{camera_sn}' 的轴配置为 ID: {axis_id} (轴{axis_id})")
     
-    # 返回成功状态和当前配置 (可选)
+    # 返回成功状态和当前配置
     return jsonify({"status": "ok", "selectedAxisId": axis_id})
 
 @app.route('/jog_axis', methods=['POST'])
@@ -433,18 +441,23 @@ def jog_axis():
         return jsonify({"status": "error", "message": "相机未连接"}), 400
     
     data = request.json
-    axis = data.get('axis')
+    axis_id = data.get('axis')
     step = data.get('step')
     
-    if not axis or step is None:
+    if not axis_id or step is None:
         return jsonify({"status": "error", "message": "缺少必要参数"}), 400
     
+    # 如果是数字ID，转换为原始轴名称
+    axis_name = axis_id_mapping.get(axis_id, axis_id)
+    
     # 获取当前位置和限制
-    current_pos = camera_state[f"{axis}Position"]
-    if axis in ['X', 'Y']:
+    current_pos = camera_state[f"{axis_name}Position"]
+    
+    # 根据不同轴确定限制范围
+    if axis_name in ['X', 'Y']:
         min_limit = -100.0
         max_limit = 100.0
-    elif axis == 'Z':
+    elif axis_name == 'Z':
         min_limit = 0.0
         max_limit = 50.0
     else:  # U轴
@@ -456,17 +469,17 @@ def jog_axis():
     
     # 检查限制
     if new_pos < min_limit or new_pos > max_limit:
-        return jsonify({"status": "error", "message": f"{axis}轴超出范围限制"}), 400
+        return jsonify({"status": "error", "message": f"轴{axis_id}超出范围限制"}), 400
     
     # 更新位置
-    camera_state[f"{axis}Position"] = round(new_pos, 3)
+    camera_state[f"{axis_name}Position"] = round(new_pos, 3)
     
     # 如果是Z轴移动，同时更新currentZ和清晰度
-    if axis == 'Z':
+    if axis_name == 'Z':
         camera_state["currentZ"] = new_pos
         camera_state["clarity"] = calculate_clarity(new_pos)
     
-    print(f"后端: {axis}轴点动 {step:+.3f}, 新位置: {new_pos:.3f}")
+    print(f"后端: 轴{axis_id}点动 {step:+.3f}, 新位置: {new_pos:.3f}")
     return jsonify(camera_state)
 
 @app.route('/save_axis_config', methods=['POST'])
@@ -475,15 +488,18 @@ def save_axis_config():
         return jsonify({"status": "error", "message": "相机未连接"}), 400
     
     data = request.json
-    axis = data.get('axis')
+    axis_id = data.get('axis')
     config = data.get('config')
     limits = data.get('limits')
     
-    if not all([axis, config, limits]):
+    if not all([axis_id, config, limits]):
         return jsonify({"status": "error", "message": "缺少必要参数"}), 400
     
+    # 转换为原始轴名称
+    axis_name = axis_id_mapping.get(axis_id, axis_id)
+    
     # 验证轴
-    if axis not in ['X', 'Y', 'Z', 'U']:
+    if axis_name not in ['X', 'Y', 'Z', 'U']:
         return jsonify({"status": "error", "message": "无效的轴"}), 400
     
     # 验证配置参数
@@ -505,17 +521,17 @@ def save_axis_config():
         return jsonify({"status": "error", "message": f"参数无效: {str(e)}"}), 400
     
     # 更新轴配置（这里只是模拟，实际应用中需要与运动控制系统交互）
-    camera_state["axisLimits"][axis] = {"min": min_limit, "max": max_limit}
+    camera_state["axisLimits"][axis_name] = {"min": min_limit, "max": max_limit}
     
-    print(f"后端: 已保存{axis}轴配置 - 当量:{ratio}, 间隙:{backlash}, 速度:{speed}, 加速度:{acc}")
-    print(f"后端: {axis}轴限位更新为 [{min_limit}, {max_limit}]")
+    print(f"后端: 已保存轴{axis_id}配置 - 当量:{ratio}, 间隙:{backlash}, 速度:{speed}, 加速度:{acc}")
+    print(f"后端: 轴{axis_id}限位更新为 [{min_limit}, {max_limit}]")
     
     return jsonify({
         "status": "ok",
-        "message": f"{axis}轴配置已保存",
-        "axis": axis,
+        "message": f"轴{axis_id}配置已保存",
+        "axis": axis_id,
         "config": config,
-        "limits": camera_state["axisLimits"][axis]
+        "limits": camera_state["axisLimits"][axis_name]
     })
 
 # 添加文件选择和路径相关的API端点
@@ -631,6 +647,36 @@ def update_focus_params():
         
     except (ValueError, TypeError) as e:
         return jsonify({"success": False, "message": str(e)}), 400
+
+# --- ROI相关API端点 ---
+@app.route('/update_roi', methods=['POST'])
+def update_roi():
+    """更新ROI设置"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "无效的ROI数据"}), 400
+    
+    camera_state["roiEnabled"] = data.get('enabled', False)
+    if 'coords' in data and data['coords']:
+        camera_state["roiCoords"] = data['coords']
+    
+    print(f"后端: ROI已更新 - 启用状态: {camera_state['roiEnabled']}, 坐标: {camera_state['roiCoords']}")
+    return jsonify({"success": True})
+
+@app.route('/clear_roi', methods=['POST'])
+def clear_roi():
+    """清除ROI设置"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    camera_state["roiEnabled"] = False
+    camera_state["roiCoords"] = {"l": 150, "t": 100, "r": 450, "b": 400}  # 重置为默认值
+    
+    print("后端: ROI已清除")
+    return jsonify({"success": True})
 
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义

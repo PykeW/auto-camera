@@ -249,18 +249,26 @@
                     <div class="roi-header-line">
                         <h4 class="roi-heading">对焦ROI区域</h4>
                         <!-- Draw button now IN the header line -->
-                        <button id="draw-roi-focus-btn" class="roi-button" style="display: flex;" disabled=""><i class="fas fa-pencil-alt"></i> 绘制</button>
-                        <div id="focus-roi-button-group" class="roi-button-group control-item" style="display: none;">
-                            <button id="confirm-roi-focus-btn" class="roi-button" style="display: none;" disabled="">确认</button>
-                            <button id="redraw-roi-focus-btn" class="roi-button" style="display: none;" disabled="">重绘</button>
-                            <button id="clear-roi-focus-btn" class="roi-button danger-button" style="display: none;" disabled="">清除</button>
-                            <button id="toggle-focus-roi-visibility-btn" class="roi-button mini-button" disabled="" title="切换对焦ROI可见性" style="display: none;"><i class="fas fa-eye"></i></button>
+                        <button id="draw-roi-focus-btn" class="roi-button">
+                            <i class="fas fa-pencil-alt"></i> 绘制
+                        </button>
+                        <div id="focus-roi-button-group" class="roi-button-group">
+                            <button id="confirm-roi-focus-btn" class="roi-button">确认</button>
+                            <button id="redraw-roi-focus-btn" class="roi-button">重绘</button>
+                            <button id="clear-roi-focus-btn" class="roi-button danger-button">清除</button>
+                            <button id="toggle-focus-roi-visibility-btn" class="roi-button mini-button" title="切换对焦ROI可见性">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
                     </div>
 
                     <div class="control-item focus-controls">
-                        <button id="start-focus-btn" class="primary-button" disabled=""><i class="fas fa-crosshairs"></i> 开始自动对焦</button>
-                        <button id="stop-focus-btn" class="danger-button" disabled=""><i class="fas fa-stop-circle"></i> 停止</button>
+                        <button id="start-focus-btn" class="primary-button">
+                            <i class="fas fa-crosshairs"></i> 开始自动对焦
+                        </button>
+                        <button id="stop-focus-btn" class="danger-button">
+                            <i class="fas fa-stop-circle"></i> 停止
+                        </button>
                     </div>
 
                     <hr class="separator">
@@ -322,10 +330,7 @@
                     <div class="control-item">
                         <label for="axis-select">选择轴：</label>
                         <select id="axis-select">
-                            <option value="X">X轴</option>
-                            <option value="Y">Y轴</option>
-                            <option value="Z">Z轴</option>
-                            <option value="U">U轴</option>
+                            <!-- 轴选项将由JavaScript根据PLC回传的轴数据动态填充 -->
                         </select>
                     </div>
                     <div class="control-item">
