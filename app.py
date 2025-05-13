@@ -3,13 +3,15 @@ from flask_cors import CORS
 import time
 import threading
 import random
+import webbrowser
+import os
 
 app = Flask(__name__)
 CORS(app)  # 允许所有来源的跨域请求
 
 # --- 模拟状态 ---
 camera_state = {
-    "isConnected": False,
+    "isConnected": True,  # 默认已连接
     "isFocusing": False,
     "isCapturing": False,
     "isRecording": False,
@@ -18,13 +20,17 @@ camera_state = {
     "bestZ": 15.5, # 模拟最佳对焦点
     "zRange": {"min": 5.0, "max": 25.0},
     "clarity": 0.0,
-    "focusStatus": "未连接",
-    "serialNumber": None,
-    "configFile": None,
-    "savePath": None,
-    "cameraName": None,
-    "cameraModel": None,
-    "properties": {},
+    "focusStatus": "空闲",  # 修改为空闲状态
+    "serialNumber": "SN_Backend_123",  # 提供默认值
+    "configFile": "C:/CameraConfigs/backend_sim.cfg",  # 提供默认值
+    "savePath": "D:/Captures/BackendSim/",  # 提供默认值
+    "cameraName": "模拟相机 SN_Backend_123",  # 提供默认值
+    "cameraModel": "FlaskSim v1.0",  # 提供默认值
+    "properties": {
+        '曝光时间(us)': {'type': 'number', 'value': 12000, 'min': 10, 'max': 1000000, 'step': 10},
+        '增益': {'type': 'number', 'value': 1.5, 'min': 0, 'max': 16, 'step': 0.1},
+        '触发模式': {'type': 'select', 'options': ['连续采集', '软件触发'], 'value': '连续采集'},
+    },
     "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400}
 }
 
@@ -290,5 +296,15 @@ def set_property():
 
 
 if __name__ == '__main__':
+    # 启动浏览器的函数
+    def open_browser():
+        # 等待1秒让服务器启动
+        time.sleep(1)
+        # 打开本地HTML文件
+        webbrowser.open('file://' + os.path.realpath('index.html'))
+    
+    # 在新线程中启动浏览器，这样不会阻塞Flask服务器启动
+    threading.Thread(target=open_browser, daemon=True).start()
+    
     # 使用 0.0.0.0 允许外部访问，端口可以自定义
     app.run(host='0.0.0.0', port=5000, debug=True) 

@@ -61,7 +61,6 @@ class CameraController {
         this.configAxisBtn = document.getElementById('config-axis-btn');
         this.headerButtons = document.querySelectorAll('.header-controls .header-button:not(#btn-settings)'); // Exclude settings button
         this.panelControls = document.querySelectorAll('.requires-connection input, .requires-connection select, .requires-connection button, .requires-connection table input, .requires-connection table select');
-        this.stationSelect = document.getElementById('station-select');
         this.calibrateBtn = document.getElementById('calibrate-btn');
         // Header Buttons
         this.btnPlay = document.getElementById('btn-play');
@@ -98,7 +97,7 @@ class CameraController {
         // ---------------------------
 
         // --- Simulated PLC Data ---
-        this.simulatedAxes = ["主Z轴", "副Z轴-A", "Z轴-工位2", "龙门Z轴"];
+        this.simulatedAxes = ["主Z轴", "副Z轴-A", "龙门Z轴"];
         this.selectedAxis = null; // Store the selected axis for the "connected" camera
         // ---------------------------
 
@@ -259,7 +258,6 @@ class CameraController {
                   ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
              }
         });
-        if(this.stationSelect) this.stationSelect.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
 
         // File/Folder Select Buttons
         if(this.selectConfigBtn) this.selectConfigBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
@@ -281,11 +279,6 @@ class CameraController {
         document.querySelectorAll('#property-table input, #property-table select').forEach(ctrl => {
              ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
          });
-
-        // Reset station select if disconnected
-        if (!connected && this.stationSelect) {
-             this.stationSelect.disabled = true;
-        }
 
         // Config Axis Button
         if (this.configAxisBtn) this.configAxisBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
@@ -411,7 +404,7 @@ class CameraController {
             this.updateFocusStatus('初始化/检查');
             console.log("模拟: [控制器] 确认PLC处于手动模式");
             await this.wait(this.INIT_DELAY);
-            console.log("模拟: [控制器] 获取工位-相机-轴映射");
+            console.log("模拟: [控制器] 获取相机-轴映射");
             await this.wait(this.INIT_DELAY);
             currentStage = "请求控制权";
             this.updateFocusStatus('请求Z轴控制权');
@@ -492,7 +485,6 @@ class CameraController {
              currentStage = "完成";
              this.updateFocusStatus('已对焦'); // Final success state
              console.log("--------- 自动对焦流程完成 --------- ");
-             console.log("模拟: [控制器] 可选择继续下一工位");
 
         } catch (error) {
             if (error.message.startsWith("Stopped")) {
@@ -750,5 +742,40 @@ class CameraController {
 
 // Initialize the controller when the DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    new CameraController();
+    const controller = new CameraController();
+    // 获取后端相机状态
+    setTimeout(() => {
+        fetch('http://localhost:5000/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.isConnected) {
+                    // 同步后端的相机状态
+                    console.log("获取到相机状态：已连接");
+                    controller.isConnected = true;
+                    controller.currentZ = data.currentZ;
+                    controller.currentClarity = data.clarity;
+                    controller.bestZFound = data.bestZ;
+                    controller.selectedAxis = data.selectedAxis;
+                    
+                    // 更新UI显示
+                    controller.footerStatus.textContent = "状态: 已连接";
+                    controller.connectBtn.textContent = "断开连接";
+                    controller.connectBtn.disabled = false;
+                    
+                    // 填充数据并更新状态
+                    controller.populateSimulatedData();
+                    controller.updateControlStates(true);
+                    controller.updateUI();
+                    controller.updateFocusStatus(data.focusStatus);
+                } else {
+                    // 后端状态不是已连接，尝试连接
+                    controller.connectCamera();
+                }
+            })
+            .catch(error => {
+                console.error("获取相机状态失败:", error);
+                // 连接失败时尝试手动连接
+                controller.connectCamera();
+            });
+    }, 500); // 延迟500ms确保UI已完全加载
 }); 

@@ -1,0 +1,36 @@
+---
+description: 相机控制系统项目结构
+globs: 
+alwaysApply: false
+---
+# 相机控制系统项目结构
+
+这是一个前后端分离的相机控制系统模拟应用作为原型设计使用。
+
+## 主要组件
+
+### 前端
+- [index.html](mdc:index.html) - 主HTML页面，包含UI结构
+- [styles.css](mdc:styles.css) - 样式表文件
+- [script.js](mdc:script.js) - 前端JavaScript代码，负责UI交互和与后端API通信
+
+### 后端
+- [app.py](mdc:app.py) - Flask后端服务器，提供相机控制API
+- 使用Flask和flask_cors实现API服务
+
+### 环境配置
+- [Pipfile](mdc:Pipfile) - pipenv环境配置文件
+- [Pipfile.lock](mdc:Pipfile.lock) - pipenv依赖锁定文件
+
+## 主要功能
+1. 相机连接/断开
+2. 图像采集（连续采集、单张拍照、录制）
+3. 自动对焦功能
+4. ROI区域设置
+5. 相机属性调整
+
+## 运行方式
+1. 安装依赖: `pipenv install` 和 `pipenv install flask-cors`
+2. 启动后端: `pipenv run python app.py` 或 `python app.py`
+3. 后端会自动在浏览器中打开前端页面
+
