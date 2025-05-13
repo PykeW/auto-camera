@@ -44,6 +44,15 @@ camera_state = {
         "Y": {"min": -100.0, "max": 100.0},
         "Z": {"min": 0.0, "max": 50.0},
         "U": {"min": -180.0, "max": 180.0}
+    },
+    # 添加自动对焦参数
+    "focusParams": {
+        "rangeUp": 5.0,
+        "rangeDown": 5.0,
+        "times": 2,
+        "steps": 10,
+        "exposure": 5000,
+        "gain": 1.0
     }
 }
 
@@ -74,6 +83,15 @@ def simulate_focus_process():
         camera_state["isFocusing"] = True
         camera_state["focusStatus"] = "初始化/检查"
         print("后端: 开始自动对焦")
+        
+        # 应用对焦参数
+        focus_params = camera_state["focusParams"]
+        current_z = camera_state["currentZ"]
+        
+        # 计算搜索范围
+        z_min = max(camera_state["zRange"]["min"], current_z - focus_params["rangeDown"])
+        z_max = min(camera_state["zRange"]["max"], current_z + focus_params["rangeUp"])
+        
         time.sleep(0.2) # 模拟初始化
 
         if stop_focus_flag.is_set():
@@ -82,71 +100,61 @@ def simulate_focus_process():
             camera_state["isFocusing"] = False
             return
 
-        # 模拟粗对焦
-        camera_state["focusStatus"] = "粗对焦中"
-        best_z_rough = camera_state["zRange"]["min"]
-        max_clarity_rough = -1
-
-        z = camera_state["zRange"]["min"]
-        while z <= camera_state["zRange"]["max"]:
+        # 多次对焦过程
+        for focus_round in range(focus_params["times"]):
             if stop_focus_flag.is_set():
-                print("后端: 对焦在粗对焦阶段被停止")
-                camera_state["focusStatus"] = "已停止"
-                camera_state["isFocusing"] = False
-                return
-            camera_state["currentZ"] = round(z, 2)
-            camera_state["clarity"] = calculate_clarity(z)
-            print(f"后端: 粗扫 Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
-            if camera_state["clarity"] > max_clarity_rough:
-                max_clarity_rough = camera_state["clarity"]
-                best_z_rough = camera_state["currentZ"]
-            time.sleep(0.1) # 模拟移动和测量时间
-            z += 1.0 # 粗步进
-
-        print(f"后端: 粗对焦峰值 Z ≈ {best_z_rough}")
-
-        # 模拟精细对焦
-        camera_state["focusStatus"] = "精细对焦中"
-        best_z_fine = best_z_rough
-        max_clarity_fine = -1
-        fine_start = max(camera_state["zRange"]["min"], best_z_rough - 1.0)
-        fine_end = min(camera_state["zRange"]["max"], best_z_rough + 1.0)
-        z = fine_start
-        while z <= fine_end:
-            if stop_focus_flag.is_set():
-                print("后端: 对焦在精细对焦阶段被停止")
-                camera_state["focusStatus"] = "已停止"
-                camera_state["isFocusing"] = False
-                return
-            camera_state["currentZ"] = round(z, 2)
-            camera_state["clarity"] = calculate_clarity(z)
-            print(f"后端: 精扫 Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
-            if camera_state["clarity"] > max_clarity_fine:
-                max_clarity_fine = camera_state["clarity"]
-                best_z_fine = camera_state["currentZ"]
-            time.sleep(0.08) # 模拟移动和测量时间
-            z += 0.1 # 精步进
-            z = round(z, 2) # 避免浮点数累积误差
-
-        # 移动到最佳位置
-        camera_state["currentZ"] = best_z_fine
-        camera_state["clarity"] = calculate_clarity(best_z_fine)
-        camera_state["bestZ"] = best_z_fine # 更新实际的最佳Z点
-        camera_state["ZPosition"] = best_z_fine # 同步更新Z轴位置
-        print(f"后端: 精细对焦完成, 最佳 Z = {best_z_fine}")
+                break
+                
+            # 计算当前轮次的步进
+            step_size = (z_max - z_min) / focus_params["steps"]
+            camera_state["focusStatus"] = f"第{focus_round + 1}轮对焦中"
+            
+            best_z = z_min
+            max_clarity = -1
+            
+            # 在当前范围内搜索
+            z = z_min
+            while z <= z_max:
+                if stop_focus_flag.is_set():
+                    break
+                    
+                camera_state["currentZ"] = round(z, 3)
+                camera_state["clarity"] = calculate_clarity(z)
+                print(f"后端: 第{focus_round + 1}轮 Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
+                
+                if camera_state["clarity"] > max_clarity:
+                    max_clarity = camera_state["clarity"]
+                    best_z = camera_state["currentZ"]
+                    
+                time.sleep(0.1) # 模拟移动和测量时间
+                z += step_size
+                z = round(z, 3)
+            
+            # 更新下一轮的搜索范围
+            if focus_round < focus_params["times"] - 1:  # 不是最后一轮
+                range_size = step_size * 2  # 缩小范围
+                z_min = max(camera_state["zRange"]["min"], best_z - range_size)
+                z_max = min(camera_state["zRange"]["max"], best_z + range_size)
         
-        # 移动到最佳位置并完成
-        camera_state["focusStatus"] = "移动到最佳位置"
-        time.sleep(0.1)
-        camera_state["focusStatus"] = "保存参数中"
-        time.sleep(0.1)
-        camera_state["focusStatus"] = "已对焦"
-        print("后端: 自动对焦完成")
-        
-        time.sleep(2) # 短暂停留"已对焦"状态
         if not stop_focus_flag.is_set():
+            # 移动到最佳位置
+            camera_state["currentZ"] = best_z
+            camera_state["clarity"] = calculate_clarity(best_z)
+            camera_state["bestZ"] = best_z
+            camera_state["ZPosition"] = best_z
+            
+            camera_state["focusStatus"] = "移动到最佳位置"
+            time.sleep(0.1)
+            camera_state["focusStatus"] = "保存参数中"
+            time.sleep(0.1)
+            camera_state["focusStatus"] = "已对焦"
+            print(f"后端: 自动对焦完成, 最佳 Z = {best_z}")
+            
+            time.sleep(2)
             camera_state["focusStatus"] = "空闲"
+        
         camera_state["isFocusing"] = False
+        
     except Exception as e:
         print(f"后端: 对焦过程出错: {str(e)}")
         camera_state["focusStatus"] = "错误"
@@ -177,8 +185,8 @@ def connect_camera():
     camera_state["serialNumber"] = request.json.get('serialNumber', f'SN_Backend_{random.randint(100,999)}') # Add randomness for demo
     camera_state["configFile"] = "C:/CameraConfigs/backend_sim.cfg"
     camera_state["savePath"] = "D:/Captures/BackendSim/"
-    camera_state["cameraName"] = f"模拟相机 {camera_state['serialNumber']}"
-    camera_state["cameraModel"] = "FlaskSim v1.0"
+    camera_state["cameraName"] = "工业相机 MV-CH120-10GM"
+    camera_state["cameraModel"] = "MV-CH120-10GM"
     camera_state["properties"] = {
         '曝光时间(us)': {'type': 'number', 'value': random.randint(5000, 20000), 'min': 10, 'max': 1000000, 'step': 10},
         '增益': {'type': 'number', 'value': round(random.uniform(1.0, 3.0), 1), 'min': 0, 'max': 16, 'step': 0.1},
@@ -229,8 +237,8 @@ def disconnect_camera():
         "serialNumber": None,
         "configFile": None,
         "savePath": None,
-        "cameraName": None,
-        "cameraModel": None,
+        "cameraName": "",  # 清空相机名称
+        "cameraModel": "",  # 清空相机型号
         "properties": {},
         "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400},
         "selectedAxisId": None,
@@ -243,6 +251,15 @@ def disconnect_camera():
             "Y": {"min": -100.0, "max": 100.0},
             "Z": {"min": 0.0, "max": 50.0},
             "U": {"min": -180.0, "max": 180.0}
+        },
+        # 添加自动对焦参数
+        "focusParams": {
+            "rangeUp": 5.0,
+            "rangeDown": 5.0,
+            "times": 2,
+            "steps": 10,
+            "exposure": 5000,
+            "gain": 1.0
         }
     }
     print("后端: 相机已断开")
@@ -500,6 +517,120 @@ def save_axis_config():
         "config": config,
         "limits": camera_state["axisLimits"][axis]
     })
+
+# 添加文件选择和路径相关的API端点
+@app.route('/select_config', methods=['POST'])
+def select_config():
+    """模拟选择配置文件"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    # 在实际应用中，这里应该调用系统的文件选择对话框
+    # 这里仅作模拟
+    config_path = "C:/CameraConfigs/camera_settings.cfg"
+    return jsonify({
+        "success": True,
+        "path": config_path
+    })
+
+@app.route('/select_save_path', methods=['POST'])
+def select_save_path():
+    """模拟选择保存路径"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    # 在实际应用中，这里应该调用系统的文件夹选择对话框
+    # 这里仅作模拟
+    save_path = "D:/CameraCaptures/"
+    return jsonify({
+        "success": True,
+        "path": save_path
+    })
+
+@app.route('/update_config', methods=['POST'])
+def update_config():
+    """更新相机配置"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    config_path = request.json.get('configPath')
+    if not config_path:
+        return jsonify({"success": False, "message": "无效的配置文件路径"}), 400
+    
+    # 更新相机配置
+    camera_state["configFile"] = config_path
+    print(f"后端: 已更新相机配置文件路径: {config_path}")
+    
+    # 模拟加载配置文件后的相机参数变化
+    camera_state["properties"].update({
+        '曝光时间(us)': {'type': 'number', 'value': 10000, 'min': 10, 'max': 1000000, 'step': 10},
+        '增益': {'type': 'number', 'value': 1.0, 'min': 0, 'max': 16, 'step': 0.1},
+    })
+    
+    return jsonify(camera_state)
+
+@app.route('/update_save_path', methods=['POST'])
+def update_save_path():
+    """更新保存路径"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    save_path = request.json.get('savePath')
+    if not save_path:
+        return jsonify({"success": False, "message": "无效的保存路径"}), 400
+    
+    # 更新保存路径
+    camera_state["savePath"] = save_path
+    print(f"后端: 已更新图像保存路径: {save_path}")
+    
+    return jsonify(camera_state)
+
+@app.route('/update_focus_params', methods=['POST'])
+def update_focus_params():
+    """更新自动对焦参数"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    if camera_state["isFocusing"]:
+        return jsonify({"success": False, "message": "正在对焦中，无法更改参数"}), 400
+    
+    data = request.json
+    try:
+        # 验证参数
+        range_up = float(data.get('rangeUp', 5.0))
+        range_down = float(data.get('rangeDown', 5.0))
+        times = int(data.get('times', 2))
+        steps = int(data.get('steps', 10))
+        exposure = int(data.get('exposure', 5000))
+        gain = float(data.get('gain', 1.0))
+        
+        # 参数范围检查
+        if range_up <= 0 or range_down <= 0:
+            raise ValueError("寻找范围必须大于0")
+        if times < 1 or times > 5:
+            raise ValueError("调整次数必须在1-5之间")
+        if steps < 5 or steps > 50:
+            raise ValueError("等分数必须在5-50之间")
+        if exposure < 100:
+            raise ValueError("曝光时间必须大于100us")
+        if gain < 1.0 or gain > 16.0:
+            raise ValueError("增益必须在1.0-16.0之间")
+        
+        # 更新参数
+        camera_state["focusParams"].update({
+            "rangeUp": range_up,
+            "rangeDown": range_down,
+            "times": times,
+            "steps": steps,
+            "exposure": exposure,
+            "gain": gain
+        })
+        
+        print(f"后端: 已更新自动对焦参数: {camera_state['focusParams']}")
+        return jsonify({"success": True, "focusParams": camera_state["focusParams"]})
+        
+    except (ValueError, TypeError) as e:
+        return jsonify({"success": False, "message": str(e)}), 400
 
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义

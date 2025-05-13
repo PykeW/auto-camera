@@ -14,6 +14,15 @@ let cameraState = {
         Y: { min: -100.0, max: 100.0 },
         Z: { min: 0.0, max: 50.0 },
         U: { min: -180.0, max: 180.0 }
+    },
+    // 添加自动对焦参数
+    focusParams: {
+        rangeUp: 5.0,
+        rangeDown: 5.0,
+        times: 2,
+        steps: 10,
+        exposure: 5000,
+        gain: 1.0
     }
 };
 
@@ -22,6 +31,9 @@ let connectBtn, serialInput, statusText, focusStatusText, currentZInput, clarity
 let startFocusBtn, stopFocusBtn, axisInputs, jogBtns, stepSelects;
 let axisConfigModal, axisSelect, encoderValue, axisRatio, axisBacklash, axisSpeed;
 let axisAcc, softLimitMin, softLimitMax;
+let configFileInput, savePathInput, selectConfigBtn, selectFolderBtn;
+let drawRoiFocusBtn, focusRoiButtonGroup;
+let focusParamsModal, focusRangeUp, focusRangeDown, focusTimes, focusSteps, focusExposure, focusGain;
 
 // 初始化DOM引用
 function initializeDOMReferences() {
@@ -57,6 +69,52 @@ function initializeDOMReferences() {
     axisAcc = document.getElementById('axis-acc');
     softLimitMin = document.getElementById('soft-limit-min');
     softLimitMax = document.getElementById('soft-limit-max');
+
+    // 配置文件和保存路径控件
+    configFileInput = document.getElementById('config-file');
+    savePathInput = document.getElementById('save-path');
+    selectConfigBtn = document.getElementById('select-config-btn');
+    selectFolderBtn = document.getElementById('select-folder-btn');
+
+    // ROI相关控件
+    drawRoiFocusBtn = document.getElementById('draw-roi-focus-btn');
+    focusRoiButtonGroup = document.getElementById('focus-roi-button-group');
+
+    // 自动对焦参数设置控件
+    focusParamsModal = document.getElementById('focus-params-modal');
+    focusRangeUp = document.getElementById('focus-range-up');
+    focusRangeDown = document.getElementById('focus-range-down');
+    focusTimes = document.getElementById('focus-times');
+    focusSteps = document.getElementById('focus-steps');
+    focusExposure = document.getElementById('focus-exposure');
+    focusGain = document.getElementById('focus-gain');
+
+    // 添加事件监听器
+    if (selectConfigBtn) {
+        selectConfigBtn.addEventListener('click', selectConfigFile);
+    }
+    if (selectFolderBtn) {
+        selectFolderBtn.addEventListener('click', selectSavePath);
+    }
+    if (drawRoiFocusBtn) {
+        drawRoiFocusBtn.addEventListener('click', toggleRoiDrawing);
+    }
+
+    // 自动对焦参数设置相关事件监听
+    document.getElementById('save-focus-params').addEventListener('click', saveFocusParams);
+    document.getElementById('cancel-focus-params').addEventListener('click', hideFocusParamsModal);
+    focusParamsModal.querySelector('.close-button').addEventListener('click', hideFocusParamsModal);
+
+    // 添加参数设置按钮到对焦控制区
+    const focusControls = document.querySelector('.focus-controls');
+    if (focusControls) {
+        const settingsBtn = document.createElement('button');
+        settingsBtn.className = 'primary-button';
+        settingsBtn.innerHTML = '<i class="fas fa-cog"></i> 对焦参数';
+        settingsBtn.addEventListener('click', showFocusParamsModal);
+        settingsBtn.id = 'focus-settings-btn';
+        focusControls.appendChild(settingsBtn);
+    }
 }
 
 // 轴配置相关
@@ -175,6 +233,33 @@ function updateStatus(state) {
     if (clarityInput) {
         clarityInput.value = state.clarity ? state.clarity.toFixed(3) : '--';
     }
+    
+    // 更新配置文件和保存路径显示
+    if (configFileInput && state.configFile) {
+        configFileInput.value = state.configFile;
+    }
+    if (savePathInput && state.savePath) {
+        savePathInput.value = state.savePath;
+    }
+    
+    // 更新按钮状态
+    if (selectConfigBtn) {
+        selectConfigBtn.disabled = !state.isConnected;
+    }
+    if (selectFolderBtn) {
+        selectFolderBtn.disabled = !state.isConnected;
+    }
+
+    // 更新ROI按钮状态
+    if (drawRoiFocusBtn) {
+        drawRoiFocusBtn.disabled = !state.isConnected;
+    }
+    
+    // 更新对焦参数设置按钮状态
+    const focusSettingsBtn = document.getElementById('focus-settings-btn');
+    if (focusSettingsBtn) {
+        focusSettingsBtn.disabled = !state.isConnected || state.isFocusing;
+    }
 }
 
 // 定期更新状态
@@ -253,10 +338,14 @@ async function autoConnect() {
 // 开始自动对焦
 async function startAutoFocus() {
     try {
-        const response = await fetch('/start_focus', { method: 'POST' });
+        const response = await fetch('/start_focus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(cameraState.focusParams)
+        });
         const state = await response.json();
         updateStatus(state);
-        } catch (error) {
+    } catch (error) {
         console.error('开始自动对焦失败:', error);
     }
 }
@@ -340,6 +429,134 @@ function saveAxisConfig() {
       .catch(error => {
           console.error('保存轴配置失败:', error);
       });
+}
+
+// 选择配置文件
+async function selectConfigFile() {
+    try {
+        const response = await fetch('/select_config', {
+            method: 'POST'
+        });
+        const result = await response.json();
+        if (result.success) {
+            configFileInput.value = result.path;
+            // 更新相机配置
+            await updateCameraConfig(result.path);
+        }
+    } catch (error) {
+        console.error('选择配置文件失败:', error);
+    }
+}
+
+// 选择保存路径
+async function selectSavePath() {
+    try {
+        const response = await fetch('/select_save_path', {
+            method: 'POST'
+        });
+        const result = await response.json();
+        if (result.success) {
+            savePathInput.value = result.path;
+            // 更新保存路径
+            await updateSavePath(result.path);
+        }
+    } catch (error) {
+        console.error('选择保存路径失败:', error);
+    }
+}
+
+// 更新相机配置
+async function updateCameraConfig(configPath) {
+    try {
+        const response = await fetch('/update_config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ configPath })
+        });
+        const state = await response.json();
+        updateStatus(state);
+    } catch (error) {
+        console.error('更新相机配置失败:', error);
+    }
+}
+
+// 更新保存路径
+async function updateSavePath(savePath) {
+    try {
+        const response = await fetch('/update_save_path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ savePath })
+        });
+        const state = await response.json();
+        updateStatus(state);
+    } catch (error) {
+        console.error('更新保存路径失败:', error);
+    }
+}
+
+// 显示自动对焦参数设置弹窗
+function showFocusParamsModal() {
+    if (!cameraState.isConnected) return;
+    
+    // 设置当前值
+    focusRangeUp.value = cameraState.focusParams.rangeUp;
+    focusRangeDown.value = cameraState.focusParams.rangeDown;
+    focusTimes.value = cameraState.focusParams.times;
+    focusSteps.value = cameraState.focusParams.steps;
+    focusExposure.value = cameraState.focusParams.exposure;
+    focusGain.value = cameraState.focusParams.gain;
+    
+    focusParamsModal.classList.add('show');
+}
+
+// 隐藏自动对焦参数设置弹窗
+function hideFocusParamsModal() {
+    focusParamsModal.classList.remove('show');
+}
+
+// 保存自动对焦参数
+async function saveFocusParams() {
+    const params = {
+        rangeUp: parseFloat(focusRangeUp.value),
+        rangeDown: parseFloat(focusRangeDown.value),
+        times: parseInt(focusTimes.value),
+        steps: parseInt(focusSteps.value),
+        exposure: parseInt(focusExposure.value),
+        gain: parseFloat(focusGain.value)
+    };
+
+    try {
+        const response = await fetch('/update_focus_params', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        const result = await response.json();
+        if (result.success) {
+            cameraState.focusParams = params;
+            hideFocusParamsModal();
+        }
+    } catch (error) {
+        console.error('保存对焦参数失败:', error);
+    }
+}
+
+// ROI绘制相关
+function toggleRoiDrawing() {
+    if (!cameraState.isConnected) return;
+    
+    const isDrawing = drawRoiFocusBtn.classList.contains('active');
+    if (!isDrawing) {
+        // 开始绘制
+        drawRoiFocusBtn.classList.add('active');
+        focusRoiButtonGroup.style.display = 'flex';
+        // 这里添加ROI绘制的具体实现
+    } else {
+        // 取消绘制
+        drawRoiFocusBtn.classList.remove('active');
+        focusRoiButtonGroup.style.display = 'none';
+    }
 }
 
 // 事件监听器
