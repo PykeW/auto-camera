@@ -3,6 +3,9 @@ from flask_cors import CORS
 import time
 import threading
 import random
+import io
+import base64
+from PIL import Image, ImageDraw
 
 app = Flask(__name__)
 CORS(app)  # 允许所有来源的跨域请求
@@ -53,7 +56,10 @@ camera_state = {
         "steps": 10,
         "exposure": 5000,
         "gain": 1.0
-    }
+    },
+    # 添加校准相关状态
+    "isShowingCalibration": False,
+    "calibrationResult": None
 }
 
 focus_thread = None
@@ -268,7 +274,10 @@ def disconnect_camera():
             "steps": 10,
             "exposure": 5000,
             "gain": 1.0
-        }
+        },
+        # 添加校准相关状态
+        "isShowingCalibration": False,
+        "calibrationResult": None
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -677,6 +686,117 @@ def clear_roi():
     
     print("后端: ROI已清除")
     return jsonify({"success": True})
+
+# --- 校准和当量计算相关 ---
+def generate_calibration_pattern(width=600, height=600, square_size=50):
+    """生成黑白方格校准图案"""
+    # 创建白色背景
+    image = Image.new('RGB', (width, height), color='white')
+    draw = ImageDraw.Draw(image)
+    
+    # 计算行列数
+    rows = height // square_size
+    cols = width // square_size
+    
+    # 绘制方格
+    for i in range(rows + 1):
+        for j in range(cols + 1):
+            if (i + j) % 2 == 0:
+                x1 = j * square_size
+                y1 = i * square_size
+                x2 = x1 + square_size
+                y2 = y1 + square_size
+                draw.rectangle([x1, y1, x2, y2], fill='black')
+    
+    # 绘制交点标记
+    point_radius = 3
+    for i in range(1, rows):
+        for j in range(1, cols):
+            x = j * square_size
+            y = i * square_size
+            # 在交点绘制红色圆点
+            draw.ellipse([x-point_radius, y-point_radius, x+point_radius, y+point_radius], fill='red')
+    
+    # 转换为二进制数据
+    buffer = io.BytesIO()
+    image.save(buffer, format='PNG')
+    buffer.seek(0)
+    
+    # 转换为base64字符串
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+    return f"data:image/png;base64,{img_str}"
+
+@app.route('/generate_calibration_image', methods=['GET'])
+def get_calibration_image():
+    """生成并返回校准图像"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    # 从查询参数获取方格大小或使用默认值
+    square_size = int(request.args.get('square_size', 50))
+    width = 600
+    height = 600
+    
+    # 生成黑白方格图像
+    image_data = generate_calibration_pattern(width, height, square_size)
+    
+    # 记录当前显示校准图像状态
+    camera_state["isShowingCalibration"] = True
+    
+    # 返回图像数据
+    return jsonify({
+        "success": True,
+        "image": image_data,
+        "width": width,
+        "height": height,
+        "squareSize": square_size
+    })
+
+@app.route('/hide_calibration_image', methods=['POST'])
+def hide_calibration_image():
+    """隐藏校准图像，返回相机图像"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    # 更新状态
+    camera_state["isShowingCalibration"] = False
+    
+    return jsonify({
+        "success": True
+    })
+
+@app.route('/calculate_ratio', methods=['POST'])
+def calculate_ratio():
+    """计算像素与物理尺寸的比例（当量）"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "无效的数据"}), 400
+    
+    # 获取方格实际尺寸（毫米）
+    square_size_mm = float(data.get('squareSizeMm', 1.0))
+    
+    # 从校准ROI获取像素尺寸信息
+    # 这里简单模拟一个计算结果
+    pixels_per_square = random.randint(40, 60)  # 模拟每个方格的像素数
+    ratio = pixels_per_square / square_size_mm
+    
+    # 更新当量计算结果
+    camera_state["calibrationResult"] = {
+        "ratio": ratio,
+        "pixelsPerSquare": pixels_per_square,
+        "squareSizeMm": square_size_mm
+    }
+    
+    print(f"后端: 当量计算完成 - {ratio:.2f} 像素/毫米")
+    
+    return jsonify({
+        "success": True,
+        "ratio": ratio,
+        "unit": "像素/毫米"
+    })
 
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义

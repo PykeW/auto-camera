@@ -11,6 +11,8 @@ let cameraState = {
     isZConfigured: false,
     isDrawingROI: false,
     roiEnabled: false,
+    isShowingCalibration: false,
+    calibrationResult: null,
     axisLimits: {
         X: { min: -100.0, max: 100.0 },
         Y: { min: -100.0, max: 100.0 },
@@ -43,6 +45,9 @@ let axisAcc, softLimitMin, softLimitMax;
 let configFileInput, savePathInput, selectConfigBtn, selectFolderBtn;
 let drawRoiFocusBtn, focusRoiButtonGroup;
 let focusParamsModal, focusRangeUp, focusRangeDown, focusTimes, focusSteps, focusExposure, focusGain;
+// 当量计算相关
+let toggleViewBtn, calibrateBtn, calibSquareSize, calibResultValue;
+let simulatedImage, calibrationPattern;
 
 // 初始化DOM引用
 function initializeDOMReferences() {
@@ -108,6 +113,14 @@ function initializeDOMReferences() {
     focusExposure = document.getElementById('focus-exposure');
     focusGain = document.getElementById('focus-gain');
 
+    // 校准和当量计算相关控件
+    toggleViewBtn = document.getElementById('toggle-view-btn');
+    calibrateBtn = document.getElementById('calibrate-btn');
+    calibSquareSize = document.getElementById('calib-square-size');
+    calibResultValue = document.getElementById('calibration-result-value');
+    simulatedImage = document.getElementById('simulated-image');
+    calibrationPattern = document.getElementById('calibration-pattern-display');
+
     // 添加事件监听器
     if (selectConfigBtn) {
         selectConfigBtn.addEventListener('click', selectConfigFile);
@@ -145,6 +158,20 @@ function initializeDOMReferences() {
         settingsBtn.addEventListener('click', showFocusParamsModal);
         settingsBtn.id = 'focus-settings-btn';
         focusControls.appendChild(settingsBtn);
+    }
+
+    // 校准相关的事件监听器
+    if (toggleViewBtn) {
+        toggleViewBtn.addEventListener('click', toggleCalibrationView);
+        console.log('校准图像切换按钮就绪', toggleViewBtn);
+    } else {
+        console.error('未找到校准图像切换按钮(#toggle-view-btn)');
+    }
+    if (calibrateBtn) {
+        calibrateBtn.addEventListener('click', calculateRatio);
+        console.log('当量计算按钮就绪', calibrateBtn);
+    } else {
+        console.error('未找到当量计算按钮(#calibrate-btn)');
     }
 }
 
@@ -298,6 +325,22 @@ function updateStatus(state) {
     const focusSettingsBtn = document.getElementById('focus-settings-btn');
     if (focusSettingsBtn) {
         focusSettingsBtn.disabled = !state.isConnected || state.isFocusing;
+    }
+
+    // 更新校准相关按钮状态
+    if (toggleViewBtn) {
+        toggleViewBtn.disabled = !state.isConnected || state.isFocusing;
+        console.log('toggleViewBtn状态更新:', toggleViewBtn.disabled ? '禁用' : '启用');
+    }
+    if (calibrateBtn) {
+        calibrateBtn.disabled = !state.isConnected || state.isFocusing || !state.isShowingCalibration;
+        console.log('calibrateBtn状态更新:', calibrateBtn.disabled ? '禁用' : '启用', 
+                   '(isConnected:', state.isConnected, 
+                   'isFocusing:', state.isFocusing, 
+                   'isShowingCalibration:', state.isShowingCalibration, ')');
+    }
+    if (calibSquareSize) {
+        calibSquareSize.disabled = !state.isConnected;
     }
 }
 
@@ -749,6 +792,151 @@ function getRoiCoordinates() {
     };
 }
 
+// 当量计算相关功能
+// 切换显示校准图案/相机图像
+async function toggleCalibrationView() {
+    if (!cameraState.isConnected) return;
+
+    try {
+        if (!cameraState.isShowingCalibration) {
+            // 获取当前的方格大小
+            const squareSize = parseInt(calibSquareSize.value || 50);
+            
+            // 获取校准图案
+            const response = await fetch(`/generate_calibration_image?square_size=${squareSize}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                // 更新状态
+                cameraState.isShowingCalibration = true;
+                
+                // 显示校准图案
+                if (simulatedImage) {
+                    simulatedImage.style.display = 'none';
+                }
+                if (calibrationPattern) {
+                    calibrationPattern.style.display = 'block';
+                    calibrationPattern.innerHTML = `<img src="${result.image}" alt="校准图案" style="width:100%;height:100%;">`;
+                }
+                toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示相机图像';
+                
+                // 启用计算按钮
+                if (calibrateBtn) {
+                    calibrateBtn.disabled = false;
+                }
+                
+                console.log('已切换到校准图案视图');
+            }
+        } else {
+            // 隐藏校准图案，显示相机图像
+            const response = await fetch('/hide_calibration_image', { method: 'POST' });
+            const result = await response.json();
+            
+            if (result.success) {
+                // 更新状态
+                cameraState.isShowingCalibration = false;
+                
+                if (simulatedImage) {
+                    simulatedImage.style.display = 'block';
+                }
+                if (calibrationPattern) {
+                    calibrationPattern.style.display = 'none';
+                    calibrationPattern.innerHTML = '';
+                }
+                toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示标定板';
+                
+                // 禁用计算按钮
+                if (calibrateBtn) {
+                    calibrateBtn.disabled = true;
+                }
+                
+                console.log('已切换到相机图像视图');
+            }
+        }
+    } catch (error) {
+        console.error('切换视图失败:', error);
+    }
+}
+
+// 计算当量
+async function calculateRatio() {
+    if (!cameraState.isConnected) {
+        alert('请先连接相机');
+        return;
+    }
+    
+    try {
+        // 获取方格实际尺寸
+        const squareSizeMm = parseFloat(calibSquareSize.value || 1.0);
+        console.log(`当量计算: 使用方格尺寸 ${squareSizeMm}mm`);
+        
+        // 获取校准图案
+        const response1 = await fetch(`/generate_calibration_image?square_size=50`);
+        const result1 = await response1.json();
+        
+        if (result1.success) {
+            // 更新状态
+            cameraState.isShowingCalibration = true;
+            
+            // 显示校准图案
+            if (simulatedImage) {
+                simulatedImage.style.display = 'none';
+            }
+            if (calibrationPattern) {
+                calibrationPattern.style.display = 'block';
+                calibrationPattern.innerHTML = `<img src="${result1.image}" alt="校准图案" style="width:100%;height:100%;">`;
+            }
+            
+            // 给服务器一点时间处理
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // 发送计算请求
+            const response2 = await fetch('/calculate_ratio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ squareSizeMm })
+            });
+            const result2 = await response2.json();
+            
+            if (result2.success) {
+                // 更新显示结果
+                const ratio = result2.ratio.toFixed(2);
+                console.log(`当量计算结果: ${ratio} ${result2.unit}`);
+                if (calibResultValue) {
+                    calibResultValue.textContent = `${ratio} ${result2.unit}`;
+                }
+                
+                // 可以添加视觉反馈
+                calibrateBtn.classList.add('success');
+                setTimeout(() => {
+                    calibrateBtn.classList.remove('success');
+                }, 1000);
+                
+                // 自动切换回相机视图
+                setTimeout(async () => {
+                    if (simulatedImage) {
+                        simulatedImage.style.display = 'block';
+                    }
+                    if (calibrationPattern) {
+                        calibrationPattern.style.display = 'none';
+                        calibrationPattern.innerHTML = '';
+                    }
+                    cameraState.isShowingCalibration = false;
+                }, 2000);
+            } else {
+                console.error('当量计算失败:', result2.message);
+                alert('当量计算失败: ' + (result2.message || '未知错误'));
+            }
+        } else {
+            console.error('获取校准图像失败:', result1.message);
+            alert('获取校准图像失败: ' + (result1.message || '未知错误'));
+        }
+    } catch (error) {
+        console.error('计算当量失败:', error);
+        alert('当量计算发生错误，请查看控制台日志');
+    }
+}
+
 // 事件监听器
 document.addEventListener('DOMContentLoaded', () => {
     // 初始化所有DOM引用
@@ -771,6 +959,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (stopFocusBtn) {
         stopFocusBtn.addEventListener('click', stopAutoFocus);
+    }
+    
+    // 添加当量校准按钮事件监听
+    const debugCalibBtn = document.getElementById('debug-calib-btn');
+    if (debugCalibBtn) {
+        debugCalibBtn.addEventListener('click', calibrateRatio);
     }
 
     // 点动按钮点击事件
@@ -853,3 +1047,72 @@ document.addEventListener('DOMContentLoaded', () => {
     // 自动连接
     setTimeout(autoConnect, 500); // 延迟500ms后自动连接
 });
+
+// 当量校准功能
+async function calibrateRatio() {
+    if (!cameraState.isConnected) {
+        alert('请先连接相机');
+        return;
+    }
+    
+    try {
+        console.log('当量校准: 当前状态', cameraState);
+        
+        // 1. 获取校准图像
+        console.log('当量校准: 发送获取校准图像请求...');
+        const response1 = await fetch('/generate_calibration_image?square_size=50');
+        const result1 = await response1.json();
+        console.log('当量校准: 校准图像响应', result1);
+        
+        if (result1.success) {
+            // 显示校准图案
+            console.log('当量校准: 更新状态和显示');
+            cameraState.isShowingCalibration = true;
+            
+            if (simulatedImage) {
+                simulatedImage.style.display = 'none';
+            }
+            if (calibrationPattern) {
+                calibrationPattern.style.display = 'block';
+                calibrationPattern.innerHTML = `<img src="${result1.image}" alt="校准图案" style="width:100%;height:100%;">`;
+            }
+            
+            // 2. 计算当量
+            console.log('当量校准: 发送计算当量请求...');
+            const squareSizeMm = parseFloat(calibSquareSize.value || 1.0);
+            const response2 = await fetch('/calculate_ratio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ squareSizeMm })
+            });
+            const result2 = await response2.json();
+            console.log('当量校准: 当量计算响应', result2);
+            
+            if (result2.success) {
+                const ratio = result2.ratio.toFixed(2);
+                if (calibResultValue) {
+                    calibResultValue.textContent = `${ratio} ${result2.unit}`;
+                }
+                
+                // 自动切换回相机视图
+                setTimeout(async () => {
+                    if (simulatedImage) {
+                        simulatedImage.style.display = 'block';
+                    }
+                    if (calibrationPattern) {
+                        calibrationPattern.style.display = 'none';
+                        calibrationPattern.innerHTML = '';
+                    }
+                    cameraState.isShowingCalibration = false;
+                }, 2000);
+            } else {
+                alert('当量计算失败: ' + (result2.message || '未知错误'));
+            }
+        } else {
+            alert('获取校准图像失败: ' + (result1.message || '未知错误'));
+        }
+    } catch (error) {
+        console.error('当量校准失败:', error);
+        alert('当量校准过程发生错误，请查看控制台日志');
+    }
+}
