@@ -7,6 +7,7 @@
     <!-- Font Awesome 6.0.0 - Ensure integrity and crossorigin attributes are present -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body>
     <div class="app-container">
@@ -24,6 +25,72 @@
 
         <main class="main-content">
             <section class="camera-view">
+                <!-- Axis Configuration Panel -->
+                <div class="axis-config-panel">
+                    <div class="axis-group">
+                        <div class="axis-item">
+                            <label>X:</label>
+                            <input type="number" id="x-axis" disabled>
+                            <div class="axis-controls">
+                                <button class="jog-btn minus" data-axis="X">-</button>
+                                <select class="step-select" data-axis="X">
+                                    <option value="0.001">0.001</option>
+                                    <option value="0.01">0.01</option>
+                                    <option value="0.1" selected>0.1</option>
+                                    <option value="1.0">1.0</option>
+                                    <option value="10.0">10.0</option>
+                                </select>
+                                <button class="jog-btn plus" data-axis="X">+</button>
+                            </div>
+                        </div>
+                        <div class="axis-item">
+                            <label>Y:</label>
+                            <input type="number" id="y-axis" disabled>
+                            <div class="axis-controls">
+                                <button class="jog-btn minus" data-axis="Y">-</button>
+                                <select class="step-select" data-axis="Y">
+                                    <option value="0.001">0.001</option>
+                                    <option value="0.01">0.01</option>
+                                    <option value="0.1" selected>0.1</option>
+                                    <option value="1.0">1.0</option>
+                                    <option value="10.0">10.0</option>
+                                </select>
+                                <button class="jog-btn plus" data-axis="Y">+</button>
+                            </div>
+                        </div>
+                        <div class="axis-item">
+                            <label>Z:</label>
+                            <input type="number" id="z-axis" disabled>
+                            <div class="axis-controls">
+                                <button class="jog-btn minus" data-axis="Z">-</button>
+                                <select class="step-select" data-axis="Z">
+                                    <option value="0.001">0.001</option>
+                                    <option value="0.01">0.01</option>
+                                    <option value="0.1" selected>0.1</option>
+                                    <option value="1.0">1.0</option>
+                                    <option value="5.0">5.0</option>
+                                </select>
+                                <button class="jog-btn plus" data-axis="Z">+</button>
+                            </div>
+                        </div>
+                        <div class="axis-item">
+                            <label>U:</label>
+                            <input type="number" id="u-axis" disabled>
+                            <div class="axis-controls">
+                                <button class="jog-btn minus" data-axis="U">-</button>
+                                <select class="step-select" data-axis="U">
+                                    <option value="0.1">0.1</option>
+                                    <option value="1.0" selected>1.0</option>
+                                    <option value="5.0">5.0</option>
+                                    <option value="15.0">15.0</option>
+                                    <option value="45.0">45.0</option>
+                                </select>
+                                <button class="jog-btn plus" data-axis="U">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Moved Toggle Button Here -->
                 <button id="toggle-view-btn" class="select-button" disabled="" style="position: absolute; z-index: 10;"><i class="fas fa-sync-alt"></i> 显示标定板</button>
 
@@ -44,24 +111,9 @@
                 <!-- Camera Connection & Axis -->
                 <div class="panel-section requires-connection">
                     <label for="serial-number">相机序列号：</label>
-                     <div class="input-group axis-config-group">
-                         <div class="axis-config-row">
-                             <select id="serial-number" disabled><option>加载相机...</option></select>
-                             <button id="connect-btn" class="connect-button" disabled>连接</button>
-                         </div>
-                         <div class="axis-config-row button-row">
-                             <button id="config-axis-btn" class="select-button" title="配置相机Z轴" disabled>配置轴</button>
-                             <button id="clear-axis-btn" class="select-button danger-button" title="清空已选Z轴" disabled>清除</button>
-                         </div>
-                    </div>
-                    <div id="axis-config-dropdown" class="axis-dropdown" >
-                         <div class="axis-dropdown-header">选择 Z 轴 (模拟PLC数据)</div>
-                         <ul id="axis-list" class="axis-list">
-                             <li class="axis-list-loading">加载中...</li>
-                         </ul>
-                         <div class="axis-dropdown-footer">
-                             <span id="dropdown-camera-sn"></span>
-                         </div>
+                    <div class="input-group">
+                        <input type="text" id="serial-number" value="SN_Sim_1" readonly>
+                        <button id="connect-btn" class="connect-button">连接</button>
                     </div>
                 </div>
 
