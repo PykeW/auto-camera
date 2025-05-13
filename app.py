@@ -59,8 +59,34 @@ camera_state = {
     },
     # 添加校准相关状态
     "isShowingCalibration": False,
-    "calibrationResult": None
+    "calibrationResult": None,
+    # 添加标定相关状态
+    "isCalibrating": False,
+    "markDetected": False,
+    "markCentered": False,
+    "markPoints": []
 }
+
+# --- 标定相关变量 ---
+calibration_state = {
+    "isCalibrating": False,
+    "markDetected": False,
+    "markCentered": False,
+    "currentPoint": None,
+    "totalPoints": 0,
+    "completedPoints": 0,
+    "markPoints": [],
+    "calibrationMatrix": [],
+    "failedPoints": [],
+    "imageWidth": 640,
+    "imageHeight": 480,
+    "centerX": 320,
+    "centerY": 240
+}
+
+# 新增标定用的线程
+calibration_thread = None
+stop_calibration_flag = threading.Event()
 
 focus_thread = None
 stop_focus_flag = threading.Event()
@@ -174,6 +200,83 @@ def simulate_focus_process():
         camera_state["focusStatus"] = "错误"
         camera_state["isFocusing"] = False
 
+def simulate_calibration_process():
+    """模拟标定过程"""
+    global calibration_state, stop_calibration_flag
+    
+    try:
+        stop_calibration_flag.clear()
+        calibration_state["isCalibrating"] = True
+        
+        # 执行标定过程
+        for i in range(calibration_state["totalPoints"]):
+            if stop_calibration_flag.is_set():
+                print("后端: 标定被中断")
+                break
+            
+            # 获取当前点位
+            point = calibration_state["calibrationMatrix"][i]
+            calibration_state["currentPoint"] = point
+            
+            print(f"后端: 标定点位 {i+1}/{calibration_state['totalPoints']} - 坐标: ({point['x']}, {point['y']})")
+            
+            # 模拟移动到点位
+            time.sleep(0.5)
+            
+            # 模拟拍照和检测过程
+            time.sleep(0.2)
+            
+            # 有95%的成功率
+            if random.random() < 0.95:
+                calibration_state["completedPoints"] += 1
+            else:
+                calibration_state["failedPoints"].append(i)
+                print(f"后端: 点位 {i+1} 检测失败")
+            
+            # 更新进度
+            print(f"后端: 标定进度 {calibration_state['completedPoints']}/{calibration_state['totalPoints']}")
+        
+        # 如果未被中断，生成标定结果
+        if not stop_calibration_flag.is_set():
+            # 模拟计算结果
+            time.sleep(1.0)
+            
+            # 生成随机标定矩阵
+            fx = 1200 + random.random() * 100
+            fy = 1200 + random.random() * 100
+            cx = calibration_state["centerX"] + random.random() * 10 - 5
+            cy = calibration_state["centerY"] + random.random() * 10 - 5
+            
+            k1 = random.random() * 0.1 - 0.05
+            k2 = random.random() * 0.05 - 0.025
+            p1 = random.random() * 0.01 - 0.005
+            p2 = random.random() * 0.01 - 0.005
+            k3 = random.random() * 0.01 - 0.005
+            
+            # 生成标定结果
+            calibration_state["calibrationResults"] = {
+                "intrinsic": [
+                    [fx, 0, cx],
+                    [0, fy, cy],
+                    [0, 0, 1]
+                ],
+                "distortion": [k1, k2, p1, p2, k3],
+                "reprojectionError": random.random() * 0.5,
+                "completedPoints": calibration_state["completedPoints"],
+                "totalPoints": calibration_state["totalPoints"],
+                "resolution": [calibration_state["imageWidth"], calibration_state["imageHeight"]],
+                "timestamp": time.time()
+            }
+            
+            print("后端: 标定完成，生成结果")
+        
+        # 结束标定
+        calibration_state["isCalibrating"] = False
+        
+    except Exception as e:
+        print(f"后端: 标定过程出错: {str(e)}")
+        calibration_state["isCalibrating"] = False
+
 # --- API Endpoints ---
 @app.route('/connect', methods=['POST'])
 def connect_camera():
@@ -277,7 +380,12 @@ def disconnect_camera():
         },
         # 添加校准相关状态
         "isShowingCalibration": False,
-        "calibrationResult": None
+        "calibrationResult": None,
+        # 添加标定相关状态
+        "isCalibrating": False,
+        "markDetected": False,
+        "markCentered": False,
+        "markPoints": []
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -796,6 +904,232 @@ def calculate_ratio():
         "success": True,
         "ratio": ratio,
         "unit": "像素/毫米"
+    })
+
+# --- 标定相关API ---
+@app.route('/detect_mark', methods=['POST'])
+def detect_mark():
+    """模拟检测Mark点"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    print("后端: 收到检测Mark点请求")
+    
+    # 生成随机Mark点位置
+    offsetX = random.randint(-100, 100)
+    offsetY = random.randint(-100, 100)
+    markX = calibration_state["centerX"] + offsetX
+    markY = calibration_state["centerY"] + offsetY
+    confidence = 0.85 + random.random() * 0.14
+    
+    # 更新标定状态
+    calibration_state["markDetected"] = True
+    calibration_state["markPoints"] = [{
+        "x": markX,
+        "y": markY,
+        "confidence": confidence
+    }]
+    calibration_state["markPosition"] = {"x": markX, "y": markY}
+    
+    print(f"后端: 检测到Mark点 - 位置: ({markX}, {markY}), 置信度: {confidence:.2f}")
+    
+    return jsonify({
+        "success": True,
+        "markPoints": calibration_state["markPoints"],
+        "message": f"检测成功 (置信度: {confidence:.2f})"
+    })
+
+@app.route('/center_mark', methods=['POST'])
+def center_mark():
+    """模拟居中Mark点"""
+    if not camera_state["isConnected"] or not calibration_state["markDetected"]:
+        return jsonify({"success": False, "message": "相机未连接或未检测Mark点"}), 400
+    
+    print("后端: 收到居中Mark点请求")
+    
+    # 获取当前Mark点
+    mark_point = calibration_state["markPoints"][0]
+    
+    # 计算偏移量
+    offsetX = mark_point["x"] - calibration_state["centerX"]
+    offsetY = mark_point["y"] - calibration_state["centerY"]
+    
+    # 模拟移动延迟
+    time.sleep(0.5)
+    
+    # 添加小偏移量模拟实际情况
+    smallOffsetX = random.uniform(-5, 5)
+    smallOffsetY = random.uniform(-5, 5)
+    
+    # 更新Mark点位置
+    calibration_state["markPosition"] = {
+        "x": calibration_state["centerX"] + smallOffsetX,
+        "y": calibration_state["centerY"] + smallOffsetY
+    }
+    calibration_state["markCentered"] = True
+    
+    print(f"后端: Mark点已居中 - 新位置: ({calibration_state['markPosition']['x']}, {calibration_state['markPosition']['y']})")
+    
+    return jsonify({
+        "success": True,
+        "position": calibration_state["markPosition"],
+        "message": "居中完成(有小偏移)"
+    })
+
+@app.route('/start_calibration', methods=['POST'])
+def start_calibration():
+    """开始标定"""
+    global calibration_state, calibration_thread, stop_calibration_flag
+    
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    if not calibration_state["markCentered"]:
+        return jsonify({"success": False, "message": "请先检测并居中Mark点"}), 400
+    
+    if calibration_state["isCalibrating"]:
+        return jsonify({"success": False, "message": "标定已在进行中"}), 400
+    
+    # 获取标定参数
+    data = request.json
+    size = int(data.get('size', 3))
+    offset = float(data.get('offset', 10.0))
+    
+    print(f"后端: 收到开始标定请求 - 矩阵大小: {size}×{size}, 偏移: {offset}mm")
+    
+    # 生成标定矩阵
+    calibration_state["calibrationMatrix"] = []
+    center = size // 2
+    
+    for y in range(size):
+        for x in range(size):
+            xPos = (x - center) * offset
+            yPos = (y - center) * offset
+            pointIndex = y * size + x
+            
+            calibration_state["calibrationMatrix"].append({
+                "x": xPos,
+                "y": yPos,
+                "index": pointIndex,
+                "row": y,
+                "col": x
+            })
+    
+    calibration_state["totalPoints"] = size * size
+    calibration_state["completedPoints"] = 0
+    calibration_state["failedPoints"] = []
+    calibration_state["currentPoint"] = None
+    calibration_state["calibrationResults"] = None
+    
+    # 启动标定线程
+    stop_calibration_flag.clear()
+    calibration_thread = threading.Thread(target=simulate_calibration_process, daemon=True)
+    calibration_thread.start()
+    
+    return jsonify({
+        "success": True,
+        "message": "标定已开始",
+        "totalPoints": calibration_state["totalPoints"]
+    })
+
+@app.route('/stop_calibration', methods=['POST'])
+def stop_calibration():
+    """停止标定"""
+    global calibration_state, stop_calibration_flag
+    
+    if not calibration_state["isCalibrating"]:
+        return jsonify({"success": False, "message": "没有正在进行的标定"}), 400
+    
+    print("后端: 收到停止标定请求")
+    
+    # 发送停止信号
+    stop_calibration_flag.set()
+    
+    # 等待线程结束
+    if calibration_thread and calibration_thread.is_alive():
+        calibration_thread.join(timeout=1.0)
+    
+    # 强制更新状态
+    calibration_state["isCalibrating"] = False
+    
+    return jsonify({
+        "success": True,
+        "message": "标定已停止",
+        "completedPoints": calibration_state["completedPoints"],
+        "totalPoints": calibration_state["totalPoints"]
+    })
+
+@app.route('/calibration_status', methods=['GET'])
+def get_calibration_status():
+    """获取标定状态"""
+    return jsonify({
+        "isCalibrating": calibration_state["isCalibrating"],
+        "markDetected": calibration_state["markDetected"],
+        "markCentered": calibration_state["markCentered"],
+        "currentPoint": calibration_state["currentPoint"],
+        "completedPoints": calibration_state["completedPoints"],
+        "totalPoints": calibration_state["totalPoints"],
+        "failedPoints": calibration_state["failedPoints"],
+        "calibrationResults": calibration_state["calibrationResults"]
+    })
+
+@app.route('/generate_mark_image', methods=['GET'])
+def generate_mark_image():
+    """生成带Mark点的图像"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    # 获取Mark点位置
+    markX = request.args.get('markX', type=float)
+    markY = request.args.get('markY', type=float)
+    markSize = request.args.get('markSize', 8, type=int)
+    
+    if markX is None or markY is None:
+        # 如果未指定位置，使用当前标定位置或中心点
+        if calibration_state["markPosition"]:
+            markX = calibration_state["markPosition"]["x"]
+            markY = calibration_state["markPosition"]["y"]
+        else:
+            markX = calibration_state["centerX"]
+            markY = calibration_state["centerY"]
+    
+    # 创建图像
+    image = Image.new('RGB', (calibration_state["imageWidth"], calibration_state["imageHeight"]), color='white')
+    draw = ImageDraw.Draw(image)
+    
+    # 添加网格线
+    for y in range(0, calibration_state["imageHeight"], 50):
+        draw.line([(0, y), (calibration_state["imageWidth"], y)], fill='#DDDDDD')
+    
+    for x in range(0, calibration_state["imageWidth"], 50):
+        draw.line([(x, 0), (x, calibration_state["imageHeight"])], fill='#DDDDDD')
+    
+    # 添加中心十字线
+    draw.line([(0, calibration_state["centerY"]), (calibration_state["imageWidth"], calibration_state["centerY"])], fill='#FFAAAA', width=1)
+    draw.line([(calibration_state["centerX"], 0), (calibration_state["centerX"], calibration_state["imageHeight"])], fill='#FFAAAA', width=1)
+    
+    # 绘制Mark点
+    draw.ellipse([markX-markSize, markY-markSize, markX+markSize, markY+markSize], fill='black')
+    
+    # 在Mark点处添加十字线
+    draw.line([(0, markY), (calibration_state["imageWidth"], markY)], fill='#AAAAAA', width=1)
+    draw.line([(markX, 0), (markX, calibration_state["imageHeight"])], fill='#AAAAAA', width=1)
+    
+    # 转换为二进制数据
+    buffer = io.BytesIO()
+    image.save(buffer, format='PNG')
+    buffer.seek(0)
+    
+    # 转换为base64字符串
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+    
+    return jsonify({
+        "success": True,
+        "image": f"data:image/png;base64,{img_str}",
+        "markPosition": {
+            "x": markX,
+            "y": markY
+        }
     })
 
 if __name__ == '__main__':

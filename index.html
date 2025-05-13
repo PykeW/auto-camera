@@ -108,6 +108,11 @@
                     <div class="focus-overlay" id="focus-roi-overlay" style="display: none;"></div>
                     <!-- Calibration ROI Overlay (New) -->
                     <div class="focus-overlay calibration-roi-overlay" id="calibration-roi-overlay" style="display: none;"></div>
+                    
+                    <!-- 标定点位阵显示 -->
+                    <div id="calibration-matrix-display" class="calibration-matrix-display">
+                        <div id="matrix-grid" class="matrix-grid"></div>
+                    </div>
                 </div>
             </section>
 
@@ -274,6 +279,67 @@
                     <hr class="separator">
 
                     <!-- Calibration Controls -->
+                    <h4>相机标定</h4>
+                    <!-- 标定矩阵设置 -->
+                    <div class="control-item side-by-side">
+                        <label for="matrix-size">矩阵大小:</label>
+                        <select id="matrix-size" class="compact-select">
+                            <option value="3" selected>3×3</option>
+                            <option value="5" >5×5</option>
+                            <option value="7">7×7</option>
+                            <option value="9">9×9</option>
+                        </select>
+                    </div>
+                    <div class="control-item side-by-side">
+                        <label for="point-offset">点位偏移(mm):</label>
+                        <input type="number" id="point-offset" value="10.0" step="0.1" min="0.1">
+                    </div>
+                    <div class="control-item side-by-side">
+                        <label for="mark-size">Mark点尺寸(mm):</label>
+                        <input type="number" id="mark-size" value="2.0" step="0.1" min="0.1">
+                    </div>
+                    <!-- 标定控制按钮 -->
+                    <div class="control-item calibration-controls">
+                        <button id="detect-mark-btn" class="primary-button">
+                            <i class="fas fa-crosshairs"></i> 检测Mark点
+                        </button>
+                        <button id="center-mark-btn" class="primary-button" disabled>
+                            <i class="fas fa-compress-arrows-alt"></i> 居中Mark点
+                        </button>
+                        <button id="start-calib-btn" class="primary-button" disabled>
+                            <i class="fas fa-play-circle"></i> 开始标定
+                        </button>
+                        <button id="stop-calib-btn" class="danger-button" disabled>
+                            <i class="fas fa-stop-circle"></i> 停止标定
+                        </button>
+                    </div>
+                    <!-- 标定状态显示 -->
+                    <div class="calibration-status">
+                        <div class="control-item side-by-side">
+                            <label>标定状态:</label>
+                            <span id="calibration-status" class="status-text">未开始</span>
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label>当前点位:</label>
+                            <span id="current-point" class="status-text">--</span>
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label>进度:</label>
+                            <div class="progress-bar">
+                                <div id="calibration-progress" class="progress" style="width: 0%">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 标定结果显示 -->
+                    <div id="calibration-results" class="calibration-results">
+                        <h5>标定结果</h5>
+                        <pre id="calibration-results-content"></pre>
+                    </div>
+
+                    <hr class="separator">
+
+                    <!-- 当量计算 -->
                     <h4>当量计算</h4>
                      <!-- Apply side-by-side layout -->
                      <div class="control-item side-by-side">
