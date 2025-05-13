@@ -133,6 +133,7 @@ body {
     border-left: 1px solid var(--border-dark);
     scrollbar-width: none;
     -ms-overflow-style: none;
+    max-width: 100%;
 }
 .control-panel::-webkit-scrollbar {
     display: none;
@@ -467,17 +468,13 @@ input[type=range]::-moz-range-thumb {
     gap: var(--spacing-small);
 }
 
-.property-grid .control-item {
-    gap: var(--spacing-medium);
-    width: 100%;
-    margin-bottom: var(--spacing-small);
-}
-
 .property-grid .control-item,
 .control-item.side-by-side {
     display: flex;
     align-items: center;
     gap: var(--spacing-medium);
+    flex-wrap: nowrap;
+    width: 100%;
 }
 
 .property-grid .control-item label,
@@ -487,15 +484,18 @@ input[type=range]::-moz-range-thumb {
     min-width: 80px;
     text-align: left;
     margin-bottom: 0;
+    white-space: nowrap;
 }
 
 .property-grid .control-item select,
 .property-grid .control-item input[type="number"],
 .property-grid .control-item input[type="text"],
 .control-item.side-by-side input,
-.control-item.side-by-side span {
+.control-item.side-by-side span,
+.control-item.side-by-side .axis-position-control {
     flex-grow: 1;
     width: auto;
+    min-width: 0;
 }
 
 .control-item.side-by-side input,
@@ -627,12 +627,47 @@ input:checked + .slider:before {
 /* 对焦控件 */
 .focus-overlay {
     position: absolute;
-    border: 2px dashed var(--accent-yellow);
-    pointer-events: none;
-    background-color: rgba(255, 255, 0, 0.08);
-    opacity: 0;
-    transition: opacity 0.15s linear;
-    box-shadow: 0 0 10px rgba(255, 255, 0, 0.2);
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* 默认不拦截鼠标事件 */
+    z-index: 5;
+}
+
+/* 启用ROI绘制时才拦截鼠标事件 */
+.focus-overlay.drawing {
+    pointer-events: all;
+    cursor: crosshair;
+}
+
+/* ROI矩形样式 */
+.roi-rect {
+    position: absolute;
+    border: 2px solid #FF5722;
+    background-color: rgba(255, 87, 34, 0.2);
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    pointer-events: none; /* 不拦截鼠标事件 */
+}
+
+/* ROI临时绘制中样式 */
+.roi-rect.drawing {
+    border: 2px dashed #FF5722;
+    background-color: rgba(255, 87, 34, 0.15);
+    box-shadow: none;
+}
+
+/* ROI坐标信息显示 */
+.roi-info {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    z-index: 6;
 }
 
 .focus-controls {
@@ -952,6 +987,30 @@ input:checked + .slider:before {
 
     .main-content {
         flex-direction: column;
+    }
+    
+    /* 确保在移动设备上轴控制正确显示 */
+    .control-item.side-by-side {
+        flex-wrap: wrap;
+    }
+    
+    .control-item.side-by-side label {
+        width: 100%;
+        margin-bottom: var(--spacing-small);
+    }
+    
+    .control-item.side-by-side .axis-position-control {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --panel-width: 100%;
+    }
+    
+    .axis-position-control input {
+        min-width: 0;
     }
 }
 
@@ -1500,4 +1559,84 @@ input:checked + .slider:before {
 
 .mark-point.moving {
     animation: pulse 0.8s infinite;
+}
+
+/* 轴位置控制样式 */
+.axis-position-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+}
+
+.axis-position-control input {
+    flex: 1;
+    min-width: 60px;
+    text-align: center;
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    padding: 4px 8px;
+    color: var(--text-light);
+}
+
+.axis-position-control .jog-btn {
+    min-width: 30px;
+    width: 30px;
+    flex: 0 0 30px;
+    height: 30px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: var(--bg-medium);
+    color: var(--accent-blue);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.axis-position-control .jog-btn.minus {
+    font-size: 22px;
+}
+
+.axis-position-control .jog-btn.plus {
+    font-size: 22px;
+}
+
+.axis-position-control .jog-btn:hover:not(:disabled) {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: white;
+}
+
+.axis-position-control .jog-btn:active:not(:disabled) {
+    transform: scale(0.95);
+    background-color: #157acf;
+}
+
+.axis-position-control .jog-btn:disabled {
+    background-color: #4a4a4a;
+    color: var(--text-medium);
+    cursor: not-allowed;
+    border-color: var(--border-dark);
+    opacity: 0.7;
+}
+
+.fixed-step-value {
+    background-color: var(--bg-medium);
+    padding: 4px 8px;
+    border-radius: var(--border-radius);
+    display: inline-block;
+    color: var(--accent-blue);
+    font-weight: bold;
+    min-width: 70px;
+    text-align: center !important;
+    border: 1px solid var(--border-dark);
 } 

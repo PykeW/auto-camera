@@ -38,6 +38,32 @@ alwaysApply: true
    - 视频录制
    - 软件触发
 
+5. 相机标定功能
+   - Mark点检测与定位
+     * 模拟检测延时：100-300ms
+     * 检测置信度：0.85-0.99
+     * 点位随机偏移：±2像素
+   
+   - 标定矩阵生成
+     * 支持尺寸：3×3、5×5、9×9
+     * 偏移量范围：1.0-50.0mm
+     * 基准点：图像中心点
+   
+   - 运动控制
+     * 移动延时：500ms/点
+     * 位置精度：±0.001mm
+     * 运动范围检查
+   
+   - 图像采集
+     * 拍照延时：200ms
+     * 图像分辨率：1920×1080
+     * 自动曝光调整
+   
+   - 数据处理
+     * 计算延时：1-2秒
+     * 标定精度：≤0.01mm
+     * 结果验证：重投影误差
+
 ## 模拟实现
 1. 相机状态模拟
    - 连接延时：0.5秒
@@ -48,6 +74,27 @@ alwaysApply: true
    - 粗对焦步进：1.0mm
    - 精对焦步进：0.1mm
    - 清晰度计算：基于高斯分布
+
+3. 标定过程模拟
+   - Mark点检测
+     * 随机生成点位：中心±100像素
+     * 检测概率：95%成功率
+     * 失败重试：最多3次
+   
+   - 相机移动
+     * 分步移动：每步≤10mm
+     * 到位延时：500ms
+     * 位置抖动：±0.001mm
+   
+   - 图像生成
+     * 基于实际位置生成Mark点
+     * 添加随机噪声
+     * 模拟光照变化
+   
+   - 数据存储
+     * 自动创建目录结构
+     * 图片命名规范化
+     * 结果数据JSON格式
 
 ## API接口规范
 1. 基础接口
@@ -63,6 +110,23 @@ alwaysApply: true
    - `/stop_capture`: POST，停止采集
    - `/single_shot`: POST，单张拍照
    - `/start_recording`: POST，开始录制
+
+3. 标定接口
+   - `/api/calibration/detect_mark`: POST
+     * 请求：`{ exposure: number, gain: number }`
+     * 响应：`{ x: number, y: number, confidence: number }`
+   
+   - `/api/calibration/move_to`: POST
+     * 请求：`{ x: number, y: number }`
+     * 响应：`{ success: boolean, position: { x, y } }`
+   
+   - `/api/calibration/capture`: POST
+     * 请求：`{ point_index: number }`
+     * 响应：`{ image_path: string, timestamp: string }`
+   
+   - `/api/calibration/calculate`: POST
+     * 请求：`{ matrix_size: string, points: Array }`
+     * 响应：`{ matrix: Array, accuracy: Object }`
 
 ## 开发注意事项
 1. 前端更新
@@ -95,5 +159,21 @@ alwaysApply: true
    - 检查CPU使用率
    - 监控内存占用
    - 验证响应时间
+
+3. 标定测试
+   - 检测准确性测试
+     * Mark点检测率
+     * 位置精度验证
+     * 重复性测试
+   
+   - 运动控制测试
+     * 定位精度
+     * 运动平稳性
+     * 超限保护
+   
+   - 数据处理测试
+     * 计算性能
+     * 内存占用
+     * 存储效率
 
 

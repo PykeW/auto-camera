@@ -6,6 +6,7 @@ import random
 import io
 import base64
 from PIL import Image, ImageDraw
+from math import ceil
 
 app = Flask(__name__)
 CORS(app)  # 允许所有来源的跨域请求
@@ -50,12 +51,13 @@ camera_state = {
     },
     # 添加自动对焦参数
     "focusParams": {
-        "rangeUp": 5.0,
-        "rangeDown": 5.0,
-        "times": 2,
+        "start": 5.0,
+        "end": 15.0,
+        "step": 0.5,
         "steps": 10,
         "exposure": 5000,
-        "gain": 1.0
+        "gain": 1.0,
+        "times": 1
     },
     # 添加校准相关状态
     "isShowingCalibration": False,
@@ -126,11 +128,11 @@ def simulate_focus_process():
         
         # 应用对焦参数
         focus_params = camera_state["focusParams"]
-        current_z = camera_state["currentZ"]
         
-        # 计算搜索范围
-        z_min = max(camera_state["zRange"]["min"], current_z - focus_params["rangeDown"])
-        z_max = min(camera_state["zRange"]["max"], current_z + focus_params["rangeUp"])
+        # 直接使用参数中的起点、终点和步进
+        start_z = focus_params["start"]
+        end_z = focus_params["end"]
+        step_size = focus_params["step"]
         
         time.sleep(0.2) # 模拟初始化
 
@@ -140,41 +142,29 @@ def simulate_focus_process():
             camera_state["isFocusing"] = False
             return
 
-        # 多次对焦过程
-        for focus_round in range(focus_params["times"]):
+        # 单轮对焦过程
+        camera_state["focusStatus"] = "粗对焦中"
+        
+        best_z = start_z
+        max_clarity = -1
+            
+        # 从起点到终点进行线性扫描
+        z = start_z
+        while z <= end_z:
             if stop_focus_flag.is_set():
                 break
                 
-            # 计算当前轮次的步进
-            step_size = (z_max - z_min) / focus_params["steps"]
-            camera_state["focusStatus"] = f"第{focus_round + 1}轮对焦中"
+            camera_state["currentZ"] = round(z, 3)
+            camera_state["clarity"] = calculate_clarity(z)
+            print(f"后端: 对焦 Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
             
-            best_z = z_min
-            max_clarity = -1
-            
-            # 在当前范围内搜索
-            z = z_min
-            while z <= z_max:
-                if stop_focus_flag.is_set():
-                    break
-                    
-                camera_state["currentZ"] = round(z, 3)
-                camera_state["clarity"] = calculate_clarity(z)
-                print(f"后端: 第{focus_round + 1}轮 Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
+            if camera_state["clarity"] > max_clarity:
+                max_clarity = camera_state["clarity"]
+                best_z = camera_state["currentZ"]
                 
-                if camera_state["clarity"] > max_clarity:
-                    max_clarity = camera_state["clarity"]
-                    best_z = camera_state["currentZ"]
-                    
-                time.sleep(0.1) # 模拟移动和测量时间
-                z += step_size
-                z = round(z, 3)
-            
-            # 更新下一轮的搜索范围
-            if focus_round < focus_params["times"] - 1:  # 不是最后一轮
-                range_size = step_size * 2  # 缩小范围
-                z_min = max(camera_state["zRange"]["min"], best_z - range_size)
-                z_max = min(camera_state["zRange"]["max"], best_z + range_size)
+            time.sleep(0.1) # 模拟移动和测量时间
+            z += step_size
+            z = round(z, 3)
         
         if not stop_focus_flag.is_set():
             # 移动到最佳位置
@@ -207,6 +197,7 @@ def simulate_calibration_process():
     try:
         stop_calibration_flag.clear()
         calibration_state["isCalibrating"] = True
+        print("后端: 开始标定过程，初始化完成")
         
         # 执行标定过程
         for i in range(calibration_state["totalPoints"]):
@@ -236,9 +227,12 @@ def simulate_calibration_process():
             # 更新进度
             print(f"后端: 标定进度 {calibration_state['completedPoints']}/{calibration_state['totalPoints']}")
         
+        print(f"后端: 标定点位循环完成，总点数: {calibration_state['totalPoints']}，完成点数: {calibration_state['completedPoints']}")
+        
         # 如果未被中断，生成标定结果
         if not stop_calibration_flag.is_set():
             # 模拟计算结果
+            print("后端: 开始计算标定结果...")
             time.sleep(1.0)
             
             # 生成随机标定矩阵
@@ -268,14 +262,19 @@ def simulate_calibration_process():
                 "timestamp": time.time()
             }
             
-            print("后端: 标定完成，生成结果")
+            print("后端: 标定完成，结果生成成功")
+        else:
+            print("后端: 标定被中断，不生成结果")
         
-        # 结束标定
+        # 确保标定状态正确更新
         calibration_state["isCalibrating"] = False
+        print("后端: 标定过程结束，isCalibrating设置为False")
         
     except Exception as e:
         print(f"后端: 标定过程出错: {str(e)}")
+        # 确保出错时也更新状态
         calibration_state["isCalibrating"] = False
+        print("后端: 标定出错，isCalibrating设置为False")
 
 # --- API Endpoints ---
 @app.route('/connect', methods=['POST'])
@@ -323,6 +322,17 @@ def connect_camera():
     camera_state["YPosition"] = round(random.uniform(-100.0, 100.0), 3)
     camera_state["ZPosition"] = round(random.uniform(0.0, 50.0), 3)
     camera_state["UPosition"] = round(random.uniform(-180.0, 180.0), 3)
+    
+    # 显式初始化对焦参数
+    camera_state["focusParams"] = {
+        "start": 5.0,
+        "end": 15.0,
+        "step": 0.5,
+        "steps": 10,
+        "exposure": 5000,
+        "gain": 1.0,
+        "times": 1
+    }
     # --------------------------------------------------------
 
     print(f"后端: 相机 {camera_state['serialNumber']} 已连接 (状态已刷新)")
@@ -371,12 +381,13 @@ def disconnect_camera():
         },
         # 添加自动对焦参数
         "focusParams": {
-            "rangeUp": 5.0,
-            "rangeDown": 5.0,
-            "times": 2,
+            "start": 5.0,
+            "end": 15.0,
+            "step": 0.5,
             "steps": 10,
             "exposure": 5000,
-            "gain": 1.0
+            "gain": 1.0,
+            "times": 1
         },
         # 添加校准相关状态
         "isShowingCalibration": False,
@@ -499,6 +510,43 @@ def toggle_roi():
     # if data and 'roiCoords' in data:
     #     camera_state['roiCoords'] = data['roiCoords']
     return jsonify({"status": "ok", "roiEnabled": camera_state["roiEnabled"]})
+
+@app.route('/update_roi', methods=['POST'])
+def update_roi():
+    """更新ROI设置"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "无效的ROI数据"}), 400
+    
+    # 直接接收ROI坐标(l, t, r, b格式)
+    if isinstance(data, dict) and all(k in data for k in ['l', 't', 'r', 'b']):
+        camera_state["roiCoords"] = data
+        camera_state["roiEnabled"] = True
+        print(f"后端: ROI已更新 - 坐标: {camera_state['roiCoords']}")
+        return jsonify({"success": True})
+    else:
+        # 向后兼容的处理方式
+        camera_state["roiEnabled"] = data.get('enabled', False)
+        if 'coords' in data and data['coords']:
+            camera_state["roiCoords"] = data['coords']
+        
+        print(f"后端: ROI已更新(兼容模式) - 启用状态: {camera_state['roiEnabled']}, 坐标: {camera_state['roiCoords']}")
+        return jsonify({"success": True})
+
+@app.route('/clear_roi', methods=['POST'])
+def clear_roi():
+    """清除ROI设置"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    camera_state["roiEnabled"] = False
+    camera_state["roiCoords"] = {"l": 150, "t": 100, "r": 450, "b": 400}  # 重置为默认值
+    
+    print("后端: ROI已清除")
+    return jsonify({"success": True})
 
 # --- 属性更改模拟 ---
 @app.route('/set_property', methods=['POST'])
@@ -730,20 +778,22 @@ def update_focus_params():
     data = request.json
     try:
         # 验证参数
-        range_up = float(data.get('rangeUp', 5.0))
-        range_down = float(data.get('rangeDown', 5.0))
-        times = int(data.get('times', 2))
-        steps = int(data.get('steps', 10))
+        start = float(data.get('start', 5.0))  # 起点
+        end = float(data.get('end', 15.0))    # 终点
+        step = float(data.get('step', 0.5))   # 步进
+        
+        # 从data获取以下参数，如果没有则使用默认值
+        steps = int(data.get('steps', ceil((end - start) / step)))
         exposure = int(data.get('exposure', 5000))
         gain = float(data.get('gain', 1.0))
         
         # 参数范围检查
-        if range_up <= 0 or range_down <= 0:
-            raise ValueError("寻找范围必须大于0")
-        if times < 1 or times > 5:
-            raise ValueError("调整次数必须在1-5之间")
-        if steps < 5 or steps > 50:
-            raise ValueError("等分数必须在5-50之间")
+        if start >= end:
+            raise ValueError("起点必须小于终点")
+        if step <= 0:
+            raise ValueError("步进必须大于0")
+        if steps < 2:
+            raise ValueError("需要至少两个步进点")
         if exposure < 100:
             raise ValueError("曝光时间必须大于100us")
         if gain < 1.0 or gain > 16.0:
@@ -751,49 +801,20 @@ def update_focus_params():
         
         # 更新参数
         camera_state["focusParams"].update({
-            "rangeUp": range_up,
-            "rangeDown": range_down,
-            "times": times,
+            "start": start,
+            "end": end,
+            "step": step,
             "steps": steps,
             "exposure": exposure,
-            "gain": gain
+            "gain": gain,
+            "times": 1  # 固定为1轮
         })
         
-        print(f"后端: 已更新自动对焦参数: {camera_state['focusParams']}")
-        return jsonify({"success": True, "focusParams": camera_state["focusParams"]})
-        
-    except (ValueError, TypeError) as e:
+        return jsonify({"success": True})
+    except ValueError as e:
         return jsonify({"success": False, "message": str(e)}), 400
-
-# --- ROI相关API端点 ---
-@app.route('/update_roi', methods=['POST'])
-def update_roi():
-    """更新ROI设置"""
-    if not camera_state["isConnected"]:
-        return jsonify({"success": False, "message": "相机未连接"}), 400
-    
-    data = request.json
-    if not data:
-        return jsonify({"success": False, "message": "无效的ROI数据"}), 400
-    
-    camera_state["roiEnabled"] = data.get('enabled', False)
-    if 'coords' in data and data['coords']:
-        camera_state["roiCoords"] = data['coords']
-    
-    print(f"后端: ROI已更新 - 启用状态: {camera_state['roiEnabled']}, 坐标: {camera_state['roiCoords']}")
-    return jsonify({"success": True})
-
-@app.route('/clear_roi', methods=['POST'])
-def clear_roi():
-    """清除ROI设置"""
-    if not camera_state["isConnected"]:
-        return jsonify({"success": False, "message": "相机未连接"}), 400
-    
-    camera_state["roiEnabled"] = False
-    camera_state["roiCoords"] = {"l": 150, "t": 100, "r": 450, "b": 400}  # 重置为默认值
-    
-    print("后端: ROI已清除")
-    return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"参数更新失败: {str(e)}"}), 500
 
 # --- 校准和当量计算相关 ---
 def generate_calibration_pattern(width=600, height=600, square_size=50):

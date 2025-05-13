@@ -234,11 +234,23 @@
 
                     <!-- Z Axis / Focus -->
                     <h4>Z轴控制 / 对焦</h4>
-                    <!-- Apply side-by-side layout -->
+                    <!-- 添加轴选择下拉列表 -->
                     <div class="control-item side-by-side">
-                        <label for="current-z">当前 Z (mm):</label>
-                        <input type="text" id="current-z" value="--" readonly disabled="">
+                        <label for="focus-axis-select">选择轴:</label>
+                        <select id="focus-axis-select" class="compact-select"></select>
                     </div>
+                    
+                    <!-- 当前轴位置显示和点动控制 -->
+                    <div class="control-item side-by-side">
+                        <label for="focus-axis-position">轴位置控制(mm):</label>
+                        <div class="axis-position-control">
+                            <button class="jog-btn minus" id="focus-jog-minus">-</button>
+                            <input type="text" id="focus-axis-position" value="0.000" readonly>
+                            <button class="jog-btn plus" id="focus-jog-plus">+</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 对焦相关数据显示 -->
                      <!-- Apply side-by-side layout -->
                      <div class="control-item side-by-side">
                         <label for="clarity-value">当前清晰度:</label>
@@ -248,6 +260,20 @@
                      <div class="control-item focus-status side-by-side">
                         <label>对焦状态:</label>
                         <span id="focus-status-text" class="status-未连接">未连接</span>
+                    </div>
+                    
+                    <!-- 对焦参数设置 - 直接在界面上显示 -->
+                    <div class="control-item side-by-side">
+                        <label for="focus-start">起点(mm):</label>
+                        <input type="number" id="focus-start" value="5.0" step="0.1" min="0.0" class="compact-input">
+                    </div>
+                    <div class="control-item side-by-side">
+                        <label for="focus-end">终点(mm):</label>
+                        <input type="number" id="focus-end" value="15.0" step="0.1" min="0.0" class="compact-input">
+                    </div>
+                    <div class="control-item side-by-side">
+                        <label for="focus-step">步进(mm):</label>
+                        <input type="number" id="focus-step" value="0.5" step="0.1" min="0.1" class="compact-input">
                     </div>
 
                     <!-- Focus ROI Controls (Moved Here) -->
@@ -420,48 +446,6 @@
             <div class="modal-footer">
                 <button id="save-axis-config" class="primary-button">保存配置</button>
                 <button id="cancel-axis-config" class="danger-button">取消</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 自动对焦参数设置弹窗 -->
-    <div id="focus-params-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>自动对焦参数设置</h3>
-                <button class="close-button">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="config-section">
-                    <div class="control-item">
-                        <label for="focus-range-up">向上寻找范围(mm)：</label>
-                        <input type="number" id="focus-range-up" value="5.0" step="0.1" min="0.1">
-                    </div>
-                    <div class="control-item">
-                        <label for="focus-range-down">向下寻找范围(mm)：</label>
-                        <input type="number" id="focus-range-down" value="5.0" step="0.1" min="0.1">
-                    </div>
-                    <div class="control-item">
-                        <label for="focus-times">调整次数：</label>
-                        <input type="number" id="focus-times" value="2" min="1" max="5">
-                    </div>
-                    <div class="control-item">
-                        <label for="focus-steps">每次调整等分数：</label>
-                        <input type="number" id="focus-steps" value="10" min="5" max="50">
-                    </div>
-                    <div class="control-item">
-                        <label for="focus-exposure">对焦曝光时间(us)：</label>
-                        <input type="number" id="focus-exposure" value="5000" step="100" min="100">
-                    </div>
-                    <div class="control-item">
-                        <label for="focus-gain">对焦增益：</label>
-                        <input type="number" id="focus-gain" value="1.0" step="0.1" min="1.0" max="16.0">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="save-focus-params" class="primary-button">保存设置</button>
-                <button id="cancel-focus-params" class="danger-button">取消</button>
             </div>
         </div>
     </div>
