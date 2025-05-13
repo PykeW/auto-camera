@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import time
 import threading
@@ -6,6 +6,14 @@ import random
 
 app = Flask(__name__)
 CORS(app)  # 允许所有来源的跨域请求
+
+@app.route('/')
+def index():
+    return send_file('index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_file(path)
 
 # --- 模拟状态 ---
 camera_state = {
