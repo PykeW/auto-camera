@@ -21,6 +21,57 @@ class CameraController {
         this.cameraModelInput = document.getElementById('camera-model');
         this.propertyTableBody = document.querySelector('#property-table tbody');
 
+        // Z轴相关控件引用
+        this.axisSelectDropdown = document.getElementById('axis-select');
+        this.axisMinInput = document.getElementById('axis-min');
+        this.axisMaxInput = document.getElementById('axis-max');
+        this.jogDownBtn = document.getElementById('jog-down');
+        this.jogUpBtn = document.getElementById('jog-up');
+        this.jogStepInput = document.getElementById('jog-step');
+        
+        // 轴配置面板相关引用
+        this.axisList = document.getElementById('axis-list');
+        this.addAxisBtn = document.getElementById('add-axis-btn');
+        this.axisModeSelect = document.getElementById('axis-mode-select');
+        this.xyzControlsPanel = document.getElementById('xyz-controls');
+        
+        // XYZ模式下的轴控制引用
+        this.xAxisSelect = document.getElementById('x-axis-select');
+        this.yAxisSelect = document.getElementById('y-axis-select');
+        this.zAxisSelect = document.getElementById('z-axis-select');
+        this.xAxisPosition = document.getElementById('x-axis-position');
+        this.yAxisPosition = document.getElementById('y-axis-position');
+        this.zAxisPosition = document.getElementById('z-axis-position');
+        this.xyzJogStep = document.getElementById('xyz-jog-step');
+        
+        // 当前选中的轴（按类型）
+        this.selectedAxesByType = {
+            X: null,
+            Y: null,
+            Z: null,
+            U: null,
+            R: null
+        };
+        
+        // 添加轴弹窗相关引用
+        this.addAxisModal = document.getElementById('add-axis-modal');
+        this.newAxisNameInput = document.getElementById('new-axis-name');
+        this.newAxisTypeInput = document.getElementById('new-axis-type');
+        this.newAxisModeInput = document.getElementById('new-axis-mode');
+        this.newAxisMinInput = document.getElementById('new-axis-min');
+        this.newAxisMaxInput = document.getElementById('new-axis-max');
+        this.newAxisCurrentInput = document.getElementById('new-axis-current');
+        this.addAxisSaveBtn = document.getElementById('add-axis-save-btn');
+        this.addAxisCancelBtn = document.getElementById('add-axis-cancel-btn');
+        
+        // 自动对焦参数控件引用
+        this.toggleFocusParamsBtn = document.getElementById('toggle-focus-params');
+        this.focusParamsContainer = document.getElementById('focus-params-container');
+        this.focusScanMinInput = document.getElementById('focus-scan-min');
+        this.focusScanMaxInput = document.getElementById('focus-scan-max');
+        this.focusStepRoughInput = document.getElementById('focus-step-rough');
+        this.focusStepFineInput = document.getElementById('focus-step-fine');
+
         // --- Find ROI elements using standard JS ---
         const allPanelSections = document.querySelectorAll('.panel-section');
         let roiSectionElement = null;
@@ -58,7 +109,6 @@ class CameraController {
         // --- End of ROI element finding ---
 
         this.connectBtn = document.getElementById('connect-btn');
-        this.configAxisBtn = document.getElementById('config-axis-btn');
         this.headerButtons = document.querySelectorAll('.header-controls .header-button:not(#btn-settings)'); // Exclude settings button
         this.panelControls = document.querySelectorAll('.requires-connection input, .requires-connection select, .requires-connection button, .requires-connection table input, .requires-connection table select');
         this.calibrateBtn = document.getElementById('calibrate-btn');
@@ -73,14 +123,6 @@ class CameraController {
         this.enableRoiBtn = document.getElementById('enable-roi-btn');
         this.roiOverlay = document.getElementById('focus-roi-overlay'); // Get ROI overlay element
 
-        // Modal elements
-        this.axisConfigModal = document.getElementById('axis-config-modal');
-        this.modalOverlay = this.axisConfigModal.querySelector('.modal-overlay');
-        this.modalCameraSNInput = document.getElementById('modal-camera-sn');
-        this.axisSelectDropdown = document.getElementById('axis-select');
-        this.modalSaveAxisBtn = document.getElementById('modal-save-axis-btn');
-        this.modalCancelAxisBtn = document.getElementById('modal-cancel-axis-btn');
-
         // --- Simulation Parameters ---
         this.SIMULATED_BEST_Z = 15.5; // mm
         this.Z_RANGE = { min: 5, max: 25 }; // mm
@@ -94,11 +136,14 @@ class CameraController {
         this.CONNECT_DELAY = 500; // ms
         this.MAX_BLUR = 5; // px
         this.CALIBRATION_DELAY = 300; // ms for simulated calibration
+        this.JOG_STEP = 0.1; // 默认点动步长
         // ---------------------------
 
         // --- Simulated PLC Data ---
-        this.simulatedAxes = ["主Z轴", "副Z轴-A", "龙门Z轴"];
+        this.simulatedAxes = []; // 改为空数组，由后端提供
+        this.axesInfo = {}; // 改为空对象，由后端提供
         this.selectedAxis = null; // Store the selected axis for the "connected" camera
+        this.currentModeFilter = ""; // 当前选择的模式过滤器
         // ---------------------------
 
         this.currentZ = 10.0;
@@ -114,13 +159,17 @@ class CameraController {
 
         this.initializeEventListeners();
         this.initUI();
+        
+        // 初始化时不调用renderAxisList，因为此时还没有轴数据
+        // 在连接成功后会调用
     }
 
     // --- Utility Functions ---
     calculateClarity(z) {
+        // 使用固定的清晰度权重因子
+        const sharpnessValue = 2.0;
         const diff = z - this.SIMULATED_BEST_Z;
-        const focusSharpness = 2.0;
-        const clarity = Math.exp(-(diff * diff) / (2 * focusSharpness * focusSharpness));
+        const clarity = Math.exp(-(diff * diff) / (2 * sharpnessValue * sharpnessValue));
         return clarity;
     }
 
@@ -130,15 +179,31 @@ class CameraController {
     }
 
     updateUI() {
-        this.currentZInput.value = this.isConnected ? this.currentZ.toFixed(2) : '--';
-        this.footerZPos.textContent = this.isConnected ? this.currentZ.toFixed(2) : '--';
-        if (this.isConnected) {
-            this.currentClarity = this.calculateClarity(this.currentZ);
+        // 检查是否有选中的轴
+        const hasSelectedAxis = this.selectedAxis && this.axesInfo[this.selectedAxis];
+        
+        // 更新当前轴位置显示
+        this.currentZInput.value = (this.isConnected && hasSelectedAxis) ? 
+            this.axesInfo[this.selectedAxis].current.toFixed(2) : '--';
+        
+        // 更新状态栏显示
+        if (hasSelectedAxis && this.axesInfo[this.selectedAxis].type === 'Z') {
+            this.footerZPos.textContent = this.isConnected ? 
+                this.axesInfo[this.selectedAxis].current.toFixed(2) : '--';
+        } else {
+            this.footerZPos.textContent = '--';
+        }
+        
+        // 只有Z轴才有清晰度计算
+        if (this.isConnected && hasSelectedAxis && this.axesInfo[this.selectedAxis].type === 'Z') {
+            const currentZ = this.axesInfo[this.selectedAxis].current;
+            this.currentZ = currentZ; // 保存当前Z位置用于对焦
+            this.currentClarity = this.calculateClarity(currentZ);
             this.clarityValueInput.value = this.currentClarity.toFixed(3);
             this.applyBlur(this.currentClarity);
         } else {
             this.clarityValueInput.value = '--';
-            this.simulatedImage.style.filter = 'none'; // Remove blur when disconnected
+            this.simulatedImage.style.filter = 'none';
         }
     }
 
@@ -199,6 +264,9 @@ class CameraController {
             this.connectBtn.textContent = "断开连接";
             this.selectedAxis = null; // Reset axis selection on new connection
             
+            // 获取轴数据
+            await this.fetchAxesData();
+            
             // Populate data and enable controls *after* connection
             this.populateSimulatedData();
             this.updateControlStates(true); 
@@ -239,6 +307,15 @@ class CameraController {
     updateControlStates(connected) {
         const isIdle = connected && !this.isFocusing && !this.isCapturing && !this.isRecording;
         const canStartActivity = connected && !this.isFocusing; // Can start capture/record if connected and not focusing
+        
+        // 检查是否有选中的轴
+        const hasSelectedAxis = this.selectedAxis && this.axesInfo[this.selectedAxis];
+        
+        // 检查是否有选中的Z轴
+        const hasSelectedZAxis = hasSelectedAxis && this.axesInfo[this.selectedAxis].type === "Z";
+        
+        // 检查选中的轴类型
+        const selectedAxisType = hasSelectedAxis ? this.axesInfo[this.selectedAxis].type : null;
 
         // Connect Button
         if(this.connectBtn) this.connectBtn.disabled = this.isFocusing || this.isCapturing || this.isRecording; // Cannot disconnect while busy
@@ -263,8 +340,8 @@ class CameraController {
         if(this.selectConfigBtn) this.selectConfigBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
         if(this.selectFolderBtn) this.selectFolderBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
 
-        // Focus buttons
-        this.startFocusBtn.disabled = !isIdle;
+        // Focus buttons - 只有选择了Z轴才启用
+        this.startFocusBtn.disabled = !isIdle || !hasSelectedZAxis;
         this.stopFocusBtn.disabled = !this.isFocusing;
 
         // Calibration button
@@ -280,8 +357,44 @@ class CameraController {
              ctrl.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
          });
 
-        // Config Axis Button
-        if (this.configAxisBtn) this.configAxisBtn.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
+        // Axis Select Dropdown
+        if(this.axisSelectDropdown) this.axisSelectDropdown.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording;
+        
+        // 轴信息区域 - 选中任何轴时都显示
+        if(this.axisMinInput) this.axisMinInput.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || !hasSelectedAxis;
+        if(this.axisMaxInput) this.axisMaxInput.disabled = !connected || this.isFocusing || this.isCapturing || this.isRecording || !hasSelectedAxis;
+        
+        // Z轴控制/对焦相关控件只有在选择了Z轴时才启用
+        if(this.jogDownBtn) this.jogDownBtn.disabled = !isIdle || !hasSelectedAxis;
+        if(this.jogUpBtn) this.jogUpBtn.disabled = !isIdle || !hasSelectedAxis;
+        if(this.jogStepInput) this.jogStepInput.disabled = !isIdle || !hasSelectedAxis;
+        
+        // 自动对焦参数控件 - 只有选择了Z轴才启用
+        if(this.toggleFocusParamsBtn) this.toggleFocusParamsBtn.disabled = !connected || !hasSelectedZAxis;
+        if(this.focusScanMinInput) this.focusScanMinInput.disabled = !isIdle || !hasSelectedZAxis;
+        if(this.focusScanMaxInput) this.focusScanMaxInput.disabled = !isIdle || !hasSelectedZAxis;
+        if(this.focusStepRoughInput) this.focusStepRoughInput.disabled = !isIdle || !hasSelectedZAxis;
+        if(this.focusStepFineInput) this.focusStepFineInput.disabled = !isIdle || !hasSelectedZAxis;
+        
+        // 根据轴类型更新显示和控件标签
+        if (hasSelectedAxis) {
+            // 更新当前轴位置标签
+            const currentZLabel = document.querySelector('label[for="current-z"]');
+            if (currentZLabel) {
+                currentZLabel.textContent = `当前 ${selectedAxisType} 位置 (mm):`;
+            }
+            
+            // 如果是Z轴，显示清晰度和对焦控件
+            document.querySelectorAll('.focus-controls, .focus-status').forEach(el => {
+                el.style.display = hasSelectedZAxis ? '' : 'none';
+            });
+            
+            // 手动调整轴标签
+            const jogControlsLabel = document.querySelector('.jog-controls').previousElementSibling;
+            if (jogControlsLabel) {
+                jogControlsLabel.textContent = `手动调整 ${selectedAxisType} 轴:`;
+            }
+        }
     }
 
     // Clears data when disconnected
@@ -302,6 +415,20 @@ class CameraController {
              } catch(e) { /* ignore */ }
         }
         this.applyBlur(1); // Apply max blur
+        
+        // 重置Z轴相关控件
+        this.axisSelectDropdown.innerHTML = '<option value="">--请选择--</option>';
+        this.axisMinInput.value = "0";
+        this.axisMaxInput.value = "100";
+        this.jogStepInput.value = "0.1";
+        
+        // 重置自动对焦参数控件
+        this.focusScanMinInput.value = "5";
+        this.focusScanMaxInput.value = "25";
+        this.focusStepRoughInput.value = "1.0";
+        this.focusStepFineInput.value = "0.1";
+        this.focusParamsContainer.classList.remove('show');
+        this.toggleFocusParamsBtn.textContent = "显示参数";
     }
 
     // Populates controls with simulated data (called after connection)
@@ -315,6 +442,22 @@ class CameraController {
         this.cameraNameInput.value = "前置定焦相机";
         this.cameraModelInput.value = "模拟相机 (XYZ-100)";
 
+        // 填充Z轴选择下拉列表
+        this.populateAxisSelect();
+        
+        // 设置当前选择的轴（如果有）
+        if (this.selectedAxis && this.simulatedAxes.includes(this.selectedAxis)) {
+            this.axisSelectDropdown.value = this.selectedAxis;
+            // 显示选中轴的信息
+            this.updateAxisInfo(this.selectedAxis);
+        }
+        
+        // 设置自动对焦参数
+        this.focusScanMinInput.value = this.Z_RANGE.min;
+        this.focusScanMaxInput.value = this.Z_RANGE.max;
+        this.focusStepRoughInput.value = this.Z_STEP_ROUGH;
+        this.focusStepFineInput.value = this.Z_STEP_FINE;
+        
         // Camera Properties Table
         const properties = [
              { name: 'Y反转', type: 'select', options: ['否', '是'], value: '否' },
@@ -387,10 +530,36 @@ class CameraController {
         console.log("模拟数据填充完成。");
     }
 
+    // 更新Z轴信息显示
+    updateAxisInfo(axisName) {
+        if (!axisName || !this.axesInfo[axisName]) return;
+        
+        const axisInfo = this.axesInfo[axisName];
+        this.axisMinInput.value = axisInfo.min;
+        this.axisMaxInput.value = axisInfo.max;
+        
+        // 更新当前Z位置为选中轴的当前位置
+        this.currentZ = axisInfo.current;
+        this.updateUI();
+        
+        console.log(`已更新轴信息: ${axisName}, 范围: ${axisInfo.min}-${axisInfo.max}mm, 当前位置: ${axisInfo.current}mm`);
+    }
+    
+    // 手动调整Z轴位置（点动/寸动）
+    jogAxis(direction) {
+        if (!this.isConnected || this.isFocusing || this.isCapturing || this.isRecording || !this.selectedAxis) return;
+        
+        const step = parseFloat(this.jogStepInput.value) || this.JOG_STEP;
+        const delta = direction === 'up' ? step : -step;
+        
+        // 发送移动请求到后端
+        this.moveAxisOnServer(this.selectedAxis, delta, true);
+    }
+
     // --- Autofocus Simulation Logic --- (Refined)
     async startAutofocus() {
-        if (this.isFocusing || !this.isConnected) {
-            console.warn("无法开始对焦: 未连接或已在对焦中");
+        if (this.isFocusing || !this.isConnected || !this.selectedAxis) {
+            console.warn("无法开始对焦: 未连接、未选择轴或已在对焦中");
             return;
         }
         console.log("--------- 开始自动对焦流程 ---------");
@@ -412,11 +581,30 @@ class CameraController {
             await this.wait(this.CONTROL_REQUEST_DELAY);
             console.log("模拟: [通信层->控制器] Z 轴控制权已获取");
 
+            // 获取当前设置的扫描参数
+            const scanMin = parseFloat(this.focusScanMinInput.value) || this.Z_RANGE.min;
+            const scanMax = parseFloat(this.focusScanMaxInput.value) || this.Z_RANGE.max;
+            const stepRough = parseFloat(this.focusStepRoughInput.value) || this.Z_STEP_ROUGH;
+            const stepFine = parseFloat(this.focusStepFineInput.value) || this.Z_STEP_FINE;
+            
+            // 检查Z轴范围
+            const axisInfo = this.axesInfo[this.selectedAxis];
+            if (scanMin < axisInfo.min) {
+                console.warn(`警告: 扫描起点 ${scanMin}mm 小于轴最小范围 ${axisInfo.min}mm，已调整`);
+                this.focusScanMinInput.value = axisInfo.min;
+            }
+            if (scanMax > axisInfo.max) {
+                console.warn(`警告: 扫描终点 ${scanMax}mm 大于轴最大范围 ${axisInfo.max}mm，已调整`);
+                this.focusScanMaxInput.value = axisInfo.max;
+            }
+
             // 2. Rough Focusing
             currentStage = "粗对焦";
             this.updateFocusStatus('粗对焦中');
-            let z_rough = this.Z_RANGE.min;
-            while (z_rough <= this.Z_RANGE.max) {
+            let z_rough = Math.max(axisInfo.min, scanMin);
+            const z_rough_max = Math.min(axisInfo.max, scanMax);
+            
+            while (z_rough <= z_rough_max) {
                  console.log(`模拟: [控制器->通信层] 移动 Z 轴到 ${z_rough.toFixed(2)}`);
                  await this.simulateZMovement(z_rough);
                  console.log(`模拟: [控制器->图像处理] 获取当前位置清晰度`);
@@ -426,7 +614,7 @@ class CameraController {
                      this.bestZFound = z_rough;
                  }
                  await this.wait(this.SCAN_DELAY_ROUGH);
-                 z_rough += this.Z_STEP_ROUGH;
+                 z_rough += stepRough;
              }
              if (this.bestZFound === null) throw new Error("粗对焦未能确定峰值区域");
              console.log(`粗对焦峰值 Z ≈ ${this.bestZFound.toFixed(2)}`);
@@ -435,8 +623,8 @@ class CameraController {
             currentStage = "精细对焦";
             this.updateFocusStatus('精细对焦中');
              maxClarityFound = -1;
-             let fineStart = Math.max(this.Z_RANGE.min, this.bestZFound - this.Z_STEP_ROUGH);
-             let fineEnd = Math.min(this.Z_RANGE.max, this.bestZFound + this.Z_STEP_ROUGH);
+             let fineStart = Math.max(axisInfo.min, this.bestZFound - stepRough);
+             let fineEnd = Math.min(axisInfo.max, this.bestZFound + stepRough);
              let z_fine = fineStart;
              let finalBestZ = this.bestZFound;
              while (z_fine <= fineEnd) {
@@ -449,7 +637,7 @@ class CameraController {
                      finalBestZ = z_fine;
                  }
                  await this.wait(this.SCAN_DELAY_FINE);
-                 z_fine = parseFloat((z_fine + this.Z_STEP_FINE).toFixed(2));
+                 z_fine = parseFloat((z_fine + stepFine).toFixed(2));
              }
              console.log(`精细对焦完成, 判定最佳 Z = ${finalBestZ.toFixed(2)}`);
              this.bestZFound = finalBestZ;
@@ -485,6 +673,11 @@ class CameraController {
              currentStage = "完成";
              this.updateFocusStatus('已对焦'); // Final success state
              console.log("--------- 自动对焦流程完成 --------- ");
+
+            // 更新轴的当前位置信息
+            if (this.selectedAxis && this.bestZFound) {
+                this.axesInfo[this.selectedAxis].current = this.bestZFound;
+            }
 
         } catch (error) {
             if (error.message.startsWith("Stopped")) {
@@ -616,49 +809,6 @@ class CameraController {
         this.updateControlStates(true);
     }
 
-    // --- Axis Configuration Modal Logic ---
-    openAxisConfigModal() {
-        if (!this.isConnected || !this.axisConfigModal) return;
-
-        console.log("打开轴配置弹窗...");
-        // Populate dropdown
-        this.axisSelectDropdown.innerHTML = '<option value="">--请选择--</option>'; // Clear existing
-        this.simulatedAxes.forEach(axis => {
-            const option = document.createElement('option');
-            option.value = axis;
-            option.textContent = axis;
-            this.axisSelectDropdown.appendChild(option);
-        });
-
-        // Set current selection if available
-        this.axisSelectDropdown.value = this.selectedAxis || "";
-        this.modalCameraSNInput.value = this.serialNumberSelect.value || "N/A"; // Show current camera SN
-
-        // Use classList to show modal with transition
-        this.axisConfigModal.classList.add('show');
-    }
-
-    closeAxisConfigModal() {
-         if (!this.axisConfigModal) return;
-         // Use classList to hide modal with transition
-         this.axisConfigModal.classList.remove('show');
-         console.log("关闭轴配置弹窗");
-    }
-
-    saveAxisConfiguration() {
-        if (!this.axisConfigModal) return;
-        const newlySelectedAxis = this.axisSelectDropdown.value;
-        if (!newlySelectedAxis) {
-            alert("请选择一个有效的Z轴！");
-            return;
-        }
-        this.selectedAxis = newlySelectedAxis;
-        console.log(`模拟: 保存相机 ${this.modalCameraSNInput.value} 的 Z 轴配置为: ${this.selectedAxis}`);
-        alert(`模拟：配置已保存: ${this.selectedAxis}`); // Give user feedback
-        this.closeAxisConfigModal();
-        // In a real app, you might trigger other actions here
-    }
-
     // --- Event Listeners ---
     initializeEventListeners() {
         this.connectBtn.addEventListener('click', () => {
@@ -668,7 +818,60 @@ class CameraController {
                 this.connectCamera();
             }
         });
-        this.configAxisBtn.addEventListener('click', () => this.openAxisConfigModal());
+        
+        // 添加Z轴选择下拉列表的change事件监听
+        this.axisSelectDropdown.addEventListener('change', async () => {
+            if (this.isConnected && this.axisSelectDropdown.value) {
+                const selectedAxis = this.axisSelectDropdown.value;
+                // 发送选择轴请求到后端
+                const success = await this.selectAxisOnServer(selectedAxis);
+                
+                if (success) {
+                    this.selectedAxis = selectedAxis;
+                    console.log(`选择了轴: ${this.selectedAxis}`);
+                    this.updateAxisInfo(this.selectedAxis);
+                    this.renderAxisList(); // 更新轴列表的选中状态
+                }
+            }
+        });
+        
+        // 添加轴信息编辑事件监听
+        this.axisMinInput.addEventListener('change', () => {
+            if (this.isConnected && this.selectedAxis) {
+                const newMin = parseFloat(this.axisMinInput.value);
+                if (!isNaN(newMin)) {
+                    this.axesInfo[this.selectedAxis].min = newMin;
+                    console.log(`已更新 ${this.selectedAxis} 最小范围: ${newMin}mm`);
+                }
+            }
+        });
+        
+        this.axisMaxInput.addEventListener('change', () => {
+            if (this.isConnected && this.selectedAxis) {
+                const newMax = parseFloat(this.axisMaxInput.value);
+                if (!isNaN(newMax)) {
+                    this.axesInfo[this.selectedAxis].max = newMax;
+                    console.log(`已更新 ${this.selectedAxis} 最大范围: ${newMax}mm`);
+                }
+            }
+        });
+        
+        // 添加点动/寸动按钮事件监听
+        this.jogDownBtn.addEventListener('click', () => this.jogAxis('down'));
+        this.jogUpBtn.addEventListener('click', () => this.jogAxis('up'));
+        
+        // 添加自动对焦参数开关监听
+        this.toggleFocusParamsBtn.addEventListener('click', () => {
+            const isHidden = !this.focusParamsContainer.classList.contains('show');
+            if (isHidden) {
+                this.focusParamsContainer.classList.add('show');
+                this.toggleFocusParamsBtn.textContent = "隐藏参数";
+            } else {
+                this.focusParamsContainer.classList.remove('show');
+                this.toggleFocusParamsBtn.textContent = "显示参数";
+            }
+        });
+        
         this.startFocusBtn.addEventListener('click', () => this.startAutofocus());
         this.stopFocusBtn.addEventListener('click', () => this.stopAutofocus());
 
@@ -693,11 +896,6 @@ class CameraController {
          });
         this.enableRoiBtn?.addEventListener('click', () => this.toggleROI());
 
-        // Modal listeners
-        this.modalSaveAxisBtn.addEventListener('click', () => this.saveAxisConfiguration());
-        this.modalCancelAxisBtn.addEventListener('click', () => this.closeAxisConfigModal());
-        this.modalOverlay.addEventListener('click', () => this.closeAxisConfigModal()); // Close on overlay click
-
         this.simulatedImage.addEventListener('mousemove', (e) => {
             const rect = this.simulatedImage.getBoundingClientRect();
             // Adjust coordinates based on image's natural size vs displayed size if needed
@@ -713,6 +911,435 @@ class CameraController {
         this.simulatedImage.addEventListener('mouseleave', () => {
              this.statusBarMouse.textContent = `---, ---`;
         });
+
+        // 添加轴模式选择事件
+        this.axisModeSelect.addEventListener('change', () => {
+            const selectedMode = this.axisModeSelect.value;
+            
+            // 显示/隐藏XYZ控制面板
+            if (selectedMode === 'XYZ') {
+                this.xyzControlsPanel.style.display = 'block';
+                this.updateXYZControlPanels(); // 更新XYZ面板状态
+            } else {
+                this.xyzControlsPanel.style.display = 'none';
+            }
+            
+            this.renderAxisList(); // 重新渲染轴列表
+        });
+        
+        // 添加XYZ模式下各轴选择事件
+        this.xAxisSelect.addEventListener('change', () => this.onXYZAxisSelected('X', this.xAxisSelect.value));
+        this.yAxisSelect.addEventListener('change', () => this.onXYZAxisSelected('Y', this.yAxisSelect.value));
+        this.zAxisSelect.addEventListener('change', () => this.onXYZAxisSelected('Z', this.zAxisSelect.value));
+        
+        // 添加XYZ模式下点动按钮事件
+        document.querySelectorAll('.xyz-controls .jog-button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const axisType = btn.dataset.axis;
+                const direction = btn.dataset.direction;
+                const axisName = this.selectedAxesByType[axisType];
+                
+                if (axisName) {
+                    this.jogAxisByType(axisType, direction);
+                }
+            });
+        });
+        
+        // 添加轴按钮点击事件
+        this.addAxisBtn.addEventListener('click', () => {
+            this.openAddAxisModal();
+        });
+        
+        // 添加轴保存按钮点击事件
+        this.addAxisSaveBtn.addEventListener('click', () => {
+            this.addOrUpdateAxis();
+        });
+        
+        // 添加轴取消按钮点击事件
+        this.addAxisCancelBtn.addEventListener('click', () => {
+            this.closeAddAxisModal();
+        });
+        
+        // 添加轴弹窗点击背景关闭
+        this.addAxisModal.querySelector('.modal-overlay').addEventListener('click', () => {
+            this.closeAddAxisModal();
+        });
+
+        if (this.simulatedImage.complete) {
+            updateImageDims();
+        } else {
+            this.simulatedImage.onload = updateImageDims;
+            this.simulatedImage.onerror = () => {
+                 console.error("无法加载模拟图像 favicon.png");
+                 this.statusBarImageDims.textContent = `加载失败`;
+            };
+        }
+    }
+
+    // 渲染轴列表
+    renderAxisList() {
+        if (!this.axisList) return;
+        
+        this.axisList.innerHTML = ''; // 清空列表
+        
+        // 如果没有轴数据，显示提示信息
+        if (this.simulatedAxes.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'axis-empty-message';
+            emptyMessage.textContent = '没有可用的轴数据';
+            this.axisList.appendChild(emptyMessage);
+            return;
+        }
+        
+        // 创建轴类型到轴的映射
+        const axesByType = {};
+        
+        // 归类所有轴，不按模式过滤
+        this.simulatedAxes.forEach(axisName => {
+            const axisInfo = this.axesInfo[axisName];
+            if (!axisInfo) return;
+            
+            // 按类型归类
+            if (!axesByType[axisInfo.type]) {
+                axesByType[axisInfo.type] = [];
+            }
+            axesByType[axisInfo.type].push(axisName);
+        });
+        
+        // 创建轴项目的函数
+        const createAxisItem = (axisName) => {
+            const axisInfo = this.axesInfo[axisName];
+            
+            const axisItem = document.createElement('div');
+            axisItem.className = 'axis-item' + (axisName === this.selectedAxis ? ' selected' : '');
+            
+            const axisNameSpan = document.createElement('span');
+            axisNameSpan.className = 'axis-item-name';
+            // 只显示轴名称和轴类型
+            axisNameSpan.textContent = `${axisName} (${axisInfo.type})`;
+            
+            const axisControls = document.createElement('div');
+            axisControls.className = 'axis-item-controls';
+            
+            const editBtn = document.createElement('button');
+            editBtn.className = 'axis-item-button';
+            editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+            editBtn.title = '编辑轴';
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'axis-item-button';
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.title = '删除轴';
+            
+            axisControls.appendChild(editBtn);
+            axisControls.appendChild(deleteBtn);
+            
+            axisItem.appendChild(axisNameSpan);
+            axisItem.appendChild(axisControls);
+            
+            // 点击轴项目选择该轴
+            axisItem.addEventListener('click', (e) => {
+                if (e.target.closest('.axis-item-button')) return; // 如果点击的是按钮，不执行选择
+                
+                if (this.isConnected) {
+                    this.selectedAxis = axisName;
+                    this.axisSelectDropdown.value = axisName;
+                    this.updateAxisInfo(axisName);
+                    this.updateControlStates(true); // 更新控制状态
+                    this.renderAxisList(); // 重新渲染列表以更新选中状态
+                }
+            });
+            
+            // 编辑轴按钮点击事件
+            editBtn.addEventListener('click', () => {
+                this.openEditAxisModal(axisName);
+            });
+            
+            // 删除轴按钮点击事件
+            deleteBtn.addEventListener('click', () => {
+                this.deleteAxis(axisName);
+            });
+            
+            return axisItem;
+        };
+        
+        // 按轴类型排序显示
+        const typeOrder = ['X', 'Y', 'Z', 'U', 'R'];
+        
+        // 按照排序后的轴类型显示
+        typeOrder.forEach(type => {
+            if (axesByType[type] && axesByType[type].length > 0) {
+                // 添加类型标题
+                const typeHeader = document.createElement('div');
+                typeHeader.className = 'axis-mode-header';
+                typeHeader.textContent = `${type}轴`;
+                this.axisList.appendChild(typeHeader);
+                
+                // 添加该类型下的所有轴
+                axesByType[type].forEach(axisName => {
+                    this.axisList.appendChild(createAxisItem(axisName));
+                });
+            }
+        });
+        
+        // 处理其他未在typeOrder中列出的轴类型
+        Object.keys(axesByType).forEach(type => {
+            if (!typeOrder.includes(type) && axesByType[type].length > 0) {
+                // 添加类型标题
+                const typeHeader = document.createElement('div');
+                typeHeader.className = 'axis-mode-header';
+                typeHeader.textContent = `${type}轴`;
+                this.axisList.appendChild(typeHeader);
+                
+                // 添加该类型下的所有轴
+                axesByType[type].forEach(axisName => {
+                    this.axisList.appendChild(createAxisItem(axisName));
+                });
+            }
+        });
+    }
+    
+    // 打开添加轴弹窗
+    openAddAxisModal() {
+        if (!this.addAxisModal) return;
+        
+        // 重置表单
+        this.newAxisNameInput.value = '';
+        this.newAxisTypeInput.value = 'Z'; // 默认Z轴
+        this.newAxisMinInput.value = '0';
+        this.newAxisMaxInput.value = '100';
+        this.newAxisCurrentInput.value = '10';
+        
+        // 显示弹窗
+        this.addAxisModal.classList.add('show');
+    }
+    
+    // 打开编辑轴弹窗
+    openEditAxisModal(axisName) {
+        if (!this.addAxisModal || !axisName || !this.axesInfo[axisName]) return;
+        
+        const axisInfo = this.axesInfo[axisName];
+        
+        // 设置表单值
+        this.newAxisNameInput.value = axisName;
+        this.newAxisTypeInput.value = axisInfo.type || 'Z';
+        this.newAxisMinInput.value = axisInfo.min;
+        this.newAxisMaxInput.value = axisInfo.max;
+        this.newAxisCurrentInput.value = axisInfo.current;
+        
+        // 显示弹窗
+        this.addAxisModal.classList.add('show');
+    }
+    
+    // 关闭添加轴弹窗
+    closeAddAxisModal() {
+        if (!this.addAxisModal) return;
+        this.addAxisModal.classList.remove('show');
+    }
+    
+    // 添加或更新轴
+    async addOrUpdateAxis() {
+        const axisName = this.newAxisNameInput.value.trim();
+        
+        if (!axisName) {
+            alert('请输入轴名称');
+            return;
+        }
+        
+        const axisType = this.newAxisTypeInput.value;
+        const axisMin = parseFloat(this.newAxisMinInput.value) || 0;
+        const axisMax = parseFloat(this.newAxisMaxInput.value) || 100;
+        const axisCurrent = parseFloat(this.newAxisCurrentInput.value) || 10;
+        
+        if (axisMin >= axisMax) {
+            alert('最小范围必须小于最大范围');
+            return;
+        }
+        
+        if (axisCurrent < axisMin || axisCurrent > axisMax) {
+            alert('当前位置必须在范围内');
+            return;
+        }
+        
+        // 检查是否已存在该轴（编辑情况）
+        const existingIndex = this.simulatedAxes.indexOf(axisName);
+        const isEditing = existingIndex !== -1;
+        
+        let success = false;
+        
+        if (isEditing) {
+            // 更新现有轴
+            success = await this.updateAxisOnServer(axisName, {
+                min: axisMin,
+                max: axisMax,
+                current: axisCurrent
+            });
+        } else {
+            // 添加新轴
+            success = await this.addAxisOnServer(
+                axisName,
+                axisType,
+                axisMin,
+                axisMax,
+                axisCurrent
+            );
+        }
+        
+        if (success) {
+            console.log(`${isEditing ? '更新' : '添加'}轴: ${axisName}, 类型: ${axisType}, 范围: ${axisMin}-${axisMax}mm, 当前位置: ${axisCurrent}mm`);
+            
+            // 更新UI
+            this.closeAddAxisModal();
+        }
+    }
+    
+    // 删除轴
+    async deleteAxis(axisName) {
+        if (!axisName || !this.axesInfo[axisName]) return;
+        
+        if (!confirm(`确定要删除轴 "${axisName}" 吗？`)) {
+            return;
+        }
+        
+        const success = await this.deleteAxisOnServer(axisName);
+        
+        if (success) {
+            console.log(`删除轴: ${axisName}`);
+        }
+    }
+    
+    // 填充轴选择下拉列表
+    populateAxisSelect() {
+        if (!this.axisSelectDropdown) return;
+        
+        // 清空下拉列表
+        this.axisSelectDropdown.innerHTML = '<option value="">--请选择--</option>';
+        
+        // 找出所有Z轴类型的轴
+        const zAxes = [];
+        this.simulatedAxes.forEach(axis => {
+            const axisInfo = this.axesInfo[axis];
+            // 只添加Z轴类型的选项，过滤掉其他类型的轴
+            if (!axisInfo || axisInfo.type !== 'Z') return;
+            zAxes.push(axis);
+        });
+        
+        // 添加所有Z轴选项
+        zAxes.forEach(axis => {
+            const axisInfo = this.axesInfo[axis];
+            const option = document.createElement('option');
+            option.value = axis;
+            option.textContent = `${axis}`;
+            this.axisSelectDropdown.appendChild(option);
+        });
+        
+        // 设置当前选择的轴
+        if (this.selectedAxis && this.simulatedAxes.includes(this.selectedAxis)) {
+            this.axisSelectDropdown.value = this.selectedAxis;
+        }
+    }
+
+    // 更新XYZ控制面板状态
+    updateXYZControlPanels() {
+        if (!this.xAxisSelect || !this.yAxisSelect || !this.zAxisSelect) return;
+        
+        // 清空所有轴选择器
+        this.xAxisSelect.innerHTML = '<option value="">--请选择--</option>';
+        this.yAxisSelect.innerHTML = '<option value="">--请选择--</option>';
+        this.zAxisSelect.innerHTML = '<option value="">--请选择--</option>';
+        
+        // 获取各类型的轴列表
+        const axesByType = {};
+        
+        // 先遍历所有轴，获取各类型轴的列表
+        this.simulatedAxes.forEach(axisName => {
+            const axisInfo = this.axesInfo[axisName];
+            if (!axisInfo) return;
+            
+            // 只处理XYZ模式下的轴或者独立模式下的轴
+            if (axisInfo.mode !== 'XYZ' && axisInfo.mode !== '独立') return;
+            
+            // 按类型归类
+            if (!axesByType[axisInfo.type]) {
+                axesByType[axisInfo.type] = [];
+            }
+            axesByType[axisInfo.type].push(axisName);
+        });
+        
+        console.log("可用轴数据按类型:", axesByType);
+        
+        // 填充轴选择器
+        ['X', 'Y', 'Z'].forEach(type => {
+            if (axesByType[type] && axesByType[type].length > 0) {
+                const selectElement = this[`${type.toLowerCase()}AxisSelect`];
+                
+                axesByType[type].forEach(axisName => {
+                    const axisInfo = this.axesInfo[axisName];
+                    const option = document.createElement('option');
+                    option.value = axisName;
+                    option.textContent = `${axisName} (${axisInfo.mode})`;
+                    selectElement.appendChild(option);
+                });
+                
+                // 恢复之前的选择（如果有）
+                if (this.selectedAxesByType[type] && axesByType[type].includes(this.selectedAxesByType[type])) {
+                    selectElement.value = this.selectedAxesByType[type];
+                }
+                
+                // 更新位置显示
+                this.updateAxisPositionDisplay(type);
+            }
+        });
+        
+        // 确保XYZ控制面板可见
+        if (this.xyzControlsPanel) {
+            this.xyzControlsPanel.style.display = 'block';
+        }
+    }
+    
+    // 处理XYZ模式下轴选择
+    async onXYZAxisSelected(axisType, axisName) {
+        this.selectedAxesByType[axisType] = axisName;
+        
+        // 更新位置显示
+        this.updateAxisPositionDisplay(axisType);
+        
+        // 如果是Z轴选择，还要同时更新主轴控制面板
+        if (axisType === 'Z' && axisName) {
+            // 发送选择轴请求到后端
+            const success = await this.selectAxisOnServer(axisName);
+            
+            if (success) {
+                this.selectedAxis = axisName;
+                this.axisSelectDropdown.value = axisName;
+                this.updateAxisInfo(axisName);
+                this.updateControlStates(true);
+            }
+        }
+    }
+    
+    // 更新轴位置显示
+    updateAxisPositionDisplay(axisType) {
+        const axisName = this.selectedAxesByType[axisType];
+        const positionElement = this[`${axisType.toLowerCase()}AxisPosition`];
+        
+        if (axisName && this.axesInfo[axisName]) {
+            positionElement.textContent = this.axesInfo[axisName].current.toFixed(2);
+        } else {
+            positionElement.textContent = '--';
+        }
+    }
+    
+    // 通过类型控制轴点动
+    jogAxisByType(axisType, direction) {
+        const axisName = this.selectedAxesByType[axisType];
+        if (!axisName || !this.axesInfo[axisName]) return;
+        
+        const step = parseFloat(this.xyzJogStep.value) || this.JOG_STEP;
+        const delta = direction === 'up' ? step : -step;
+        
+        // 发送移动请求到后端
+        this.moveAxisOnServer(axisName, delta, true);
     }
 
     // --- Initial Setup ---
@@ -720,11 +1347,17 @@ class CameraController {
         this.updateUI();
         this.updateFocusStatus('未连接');
         this.updateControlStates(false); // Ensure controls start disabled
+        
+        // 初始化XYZ控制面板
+        if (this.xyzControlsPanel) {
+            this.xyzControlsPanel.style.display = 'none'; // 默认隐藏，连接后会根据模式选择器显示
+        }
+        
         const updateImageDims = () => {
             if (this.simulatedImage.naturalWidth > 0) {
                 this.statusBarImageDims.textContent = `${this.simulatedImage.naturalWidth}, ${this.simulatedImage.naturalHeight}`;
             } else {
-                 this.statusBarImageDims.textContent = `---, ---`; // Handle case where image didn't load
+                this.statusBarImageDims.textContent = `---, ---`; // Handle case where image didn't load
             }
         };
 
@@ -736,6 +1369,364 @@ class CameraController {
                  console.error("无法加载模拟图像 favicon.png");
                  this.statusBarImageDims.textContent = `加载失败`;
             };
+        }
+    }
+
+    // 从后端获取轴数据
+    async fetchAxesData() {
+        try {
+            console.log("从后端获取轴数据...");
+            const response = await fetch('http://localhost:5000/axes');
+            
+            if (!response.ok) {
+                throw new Error(`获取轴数据失败: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.status === "ok") {
+                // 更新轴数据
+                this.simulatedAxes = data.axisList || [];
+                this.axesInfo = data.axes || {};
+                this.selectedAxis = data.selectedAxis || null;
+                
+                console.log(`从后端获取到 ${this.simulatedAxes.length} 个轴`);
+                
+                // 如果没有轴数据，创建默认轴配置
+                if (this.simulatedAxes.length === 0) {
+                    this.initDefaultAxes();
+                }
+                
+                // 确保只有一个Z轴
+                this.ensureSingleZAxis();
+                
+                // 确保有一个R轴
+                this.ensureRotationAxis();
+                
+                // 更新UI
+                this.populateAxisSelect();
+                
+                // 显示轴列表
+                this.renderAxisList();
+                
+                // 如果有选中的轴，更新轴信息显示
+                if (this.selectedAxis) {
+                    this.updateAxisInfo(this.selectedAxis);
+                }
+                
+                return true;
+            } else {
+                console.error("获取轴数据失败:", data.message);
+                return false;
+            }
+        } catch (error) {
+            console.error("获取轴数据异常:", error);
+            return false;
+        }
+    }
+    
+    // 确保只有一个Z轴
+    ensureSingleZAxis() {
+        // 找出所有Z轴
+        const zAxes = [];
+        this.simulatedAxes.forEach(axisName => {
+            if (this.axesInfo[axisName] && this.axesInfo[axisName].type === 'Z') {
+                zAxes.push(axisName);
+            }
+        });
+        
+        // 如果没有Z轴，创建一个
+        if (zAxes.length === 0) {
+            const axisName = '主Z轴';
+            this.simulatedAxes.push(axisName);
+            this.axesInfo[axisName] = {
+                type: 'Z',
+                min: 0,
+                max: 100,
+                current: 10
+            };
+            console.log(`创建了默认Z轴: ${axisName}`);
+        } 
+        // 如果有多个Z轴，保留第一个，删除其他的
+        else if (zAxes.length > 1) {
+            const keepZAxis = zAxes[0];
+            for (let i = 1; i < zAxes.length; i++) {
+                const axisToRemove = zAxes[i];
+                
+                // 从数组中移除
+                const index = this.simulatedAxes.indexOf(axisToRemove);
+                if (index > -1) {
+                    this.simulatedAxes.splice(index, 1);
+                }
+                
+                // 从对象中删除
+                delete this.axesInfo[axisToRemove];
+                
+                console.log(`移除多余Z轴: ${axisToRemove}`);
+            }
+        }
+    }
+    
+    // 确保有一个旋转轴
+    ensureRotationAxis() {
+        // 检查是否已有R轴
+        let hasRAxis = false;
+        this.simulatedAxes.forEach(axisName => {
+            if (this.axesInfo[axisName] && this.axesInfo[axisName].type === 'R') {
+                hasRAxis = true;
+            }
+        });
+        
+        // 如果没有R轴，创建一个
+        if (!hasRAxis) {
+            const axisName = '旋转轴';
+            this.simulatedAxes.push(axisName);
+            this.axesInfo[axisName] = {
+                type: 'R',
+                min: -180,
+                max: 180,
+                current: 0
+            };
+            console.log(`创建了默认旋转轴: ${axisName}`);
+        }
+    }
+    
+    // 初始化默认轴配置
+    initDefaultAxes() {
+        // 创建基本轴配置
+        const defaultAxes = [
+            { name: 'X轴-龙门', type: 'X', min: 0, max: 200, current: 100 },
+            { name: 'Y轴-龙门', type: 'Y', min: 0, max: 200, current: 150 },
+            { name: '主Z轴', type: 'Z', min: 0, max: 100, current: 10 },
+            { name: '旋转轴', type: 'R', min: -180, max: 180, current: 0 }
+        ];
+        
+        // 添加到系统
+        defaultAxes.forEach(axis => {
+            this.simulatedAxes.push(axis.name);
+            this.axesInfo[axis.name] = {
+                type: axis.type,
+                min: axis.min,
+                max: axis.max,
+                current: axis.current
+            };
+        });
+        
+        console.log(`已创建默认轴配置`);
+    }
+
+    // 向后端发送选择轴请求
+    async selectAxisOnServer(axisName) {
+        if (!this.isConnected || !axisName) return false;
+        
+        try {
+            console.log(`向后端发送选择轴请求: ${axisName}`);
+            const response = await fetch('http://localhost:5000/select_axis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ axisName })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`选择轴失败: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.status === "ok") {
+                console.log(`已选择轴: ${axisName}`);
+                return true;
+            } else {
+                console.error("选择轴失败:", data.message);
+                return false;
+            }
+        } catch (error) {
+            console.error("选择轴异常:", error);
+            return false;
+        }
+    }
+
+    // 向后端发送移动轴请求
+    async moveAxisOnServer(axisName, position, isRelative = false) {
+        if (!this.isConnected || !axisName) return false;
+        
+        try {
+            console.log(`向后端发送移动轴请求: ${axisName} 到 ${isRelative ? '相对位置' : '绝对位置'} ${position}`);
+            const response = await fetch('http://localhost:5000/move_axis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ axisName, position, isRelative })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error(`移动轴失败: ${errorData.message || response.statusText}`);
+                alert(`移动轴失败: ${errorData.message || "未知错误"}`);
+                return false;
+            }
+            
+            const data = await response.json();
+            
+            if (data.status === "ok") {
+                console.log(`轴 ${axisName} 已移动到 ${data.position}`);
+                
+                // 更新本地轴信息
+                if (this.axesInfo[axisName]) {
+                    this.axesInfo[axisName].current = data.position;
+                }
+                
+                // 如果有清晰度值返回，更新清晰度
+                if (data.clarity !== null && axisName === this.selectedAxis) {
+                    this.currentClarity = data.clarity;
+                }
+                
+                // 更新UI
+                this.updateUI();
+                this.updateAxisPositionDisplay(this.axesInfo[axisName].type);
+                
+                return true;
+            } else {
+                console.error("移动轴失败:", data.message);
+                alert(`移动轴失败: ${data.message}`);
+                return false;
+            }
+        } catch (error) {
+            console.error("移动轴异常:", error);
+            alert(`移动轴请求失败: ${error.message}`);
+            return false;
+        }
+    }
+
+    // 向后端发送添加轴请求
+    async addAxisOnServer(axisName, axisType, axisMin, axisMax, axisCurrent) {
+        if (!this.isConnected) return false;
+        
+        try {
+            console.log(`向后端发送添加轴请求: ${axisName}`);
+            const response = await fetch('http://localhost:5000/add_axis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    axisName,
+                    type: axisType,
+                    min: axisMin,
+                    max: axisMax,
+                    current: axisCurrent
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error(`添加轴失败: ${errorData.message || response.statusText}`);
+                alert(`添加轴失败: ${errorData.message || "未知错误"}`);
+                return false;
+            }
+            
+            const data = await response.json();
+            
+            if (data.status === "ok") {
+                console.log(`轴 ${axisName} 已添加`);
+                
+                // 重新获取轴数据
+                await this.fetchAxesData();
+                
+                return true;
+            } else {
+                console.error("添加轴失败:", data.message);
+                alert(`添加轴失败: ${data.message}`);
+                return false;
+            }
+        } catch (error) {
+            console.error("添加轴异常:", error);
+            alert(`添加轴请求失败: ${error.message}`);
+            return false;
+        }
+    }
+
+    // 向后端发送更新轴请求
+    async updateAxisOnServer(axisName, updates) {
+        if (!this.isConnected || !axisName) return false;
+        
+        try {
+            console.log(`向后端发送更新轴请求: ${axisName}`);
+            const requestData = { axisName, ...updates };
+            
+            const response = await fetch('http://localhost:5000/update_axis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`更新轴失败: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.status === "ok") {
+                console.log(`轴 ${axisName} 已更新`);
+                
+                // 更新本地轴信息
+                if (data.axis) {
+                    this.axesInfo[axisName] = data.axis;
+                }
+                
+                // 更新UI
+                this.updateUI();
+                
+                return true;
+            } else {
+                console.error("更新轴失败:", data.message);
+                return false;
+            }
+        } catch (error) {
+            console.error("更新轴异常:", error);
+            return false;
+        }
+    }
+
+    // 向后端发送删除轴请求
+    async deleteAxisOnServer(axisName) {
+        if (!this.isConnected || !axisName) return false;
+        
+        try {
+            console.log(`向后端发送删除轴请求: ${axisName}`);
+            const response = await fetch('http://localhost:5000/delete_axis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ axisName })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`删除轴失败: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.status === "ok") {
+                console.log(`轴 ${axisName} 已删除`);
+                
+                // 重新获取轴数据
+                await this.fetchAxesData();
+                
+                return true;
+            } else {
+                console.error("删除轴失败:", data.message);
+                return false;
+            }
+        } catch (error) {
+            console.error("删除轴异常:", error);
+            return false;
         }
     }
 }
@@ -757,16 +1748,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     controller.bestZFound = data.bestZ;
                     controller.selectedAxis = data.selectedAxis;
                     
+                    // 如果后端状态中包含轴信息，直接使用
+                    if (data.axes && data.axisList) {
+                        controller.simulatedAxes = data.axisList || [];
+                        controller.axesInfo = data.axes || {};
+                        controller.selectedAxis = data.selectedAxis || null;
+                        console.log(`从状态获取到 ${controller.simulatedAxes.length} 个轴`);
+                    }
+                    
                     // 更新UI显示
                     controller.footerStatus.textContent = "状态: 已连接";
                     controller.connectBtn.textContent = "断开连接";
                     controller.connectBtn.disabled = false;
                     
-                    // 填充数据并更新状态
-                    controller.populateSimulatedData();
-                    controller.updateControlStates(true);
-                    controller.updateUI();
-                    controller.updateFocusStatus(data.focusStatus);
+                    // 获取轴数据（如果状态中没有）
+                    if (!data.axes || !data.axisList) {
+                        controller.fetchAxesData().then(() => {
+                            // 填充数据并更新状态
+                            controller.populateSimulatedData();
+                            controller.updateControlStates(true);
+                            controller.updateUI();
+                            controller.updateFocusStatus(data.focusStatus);
+                        });
+                    } else {
+                        // 直接更新UI
+                        controller.populateSimulatedData();
+                        controller.updateControlStates(true);
+                        controller.updateUI();
+                        controller.updateFocusStatus(data.focusStatus);
+                    }
                 } else {
                     // 后端状态不是已连接，尝试连接
                     controller.connectCamera();

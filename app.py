@@ -31,7 +31,17 @@ camera_state = {
         '增益': {'type': 'number', 'value': 1.5, 'min': 0, 'max': 16, 'step': 0.1},
         '触发模式': {'type': 'select', 'options': ['连续采集', '软件触发'], 'value': '连续采集'},
     },
-    "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400}
+    "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400},
+    # 添加轴相关信息
+    "selectedAxis": None,
+    "axes": {
+        "主Z轴": {"type": "Z", "mode": "XYZ", "min": 0, "max": 100, "current": 10},
+        "副Z轴-A": {"type": "Z", "mode": "XYZR", "min": 5, "max": 150, "current": 15},
+        "龙门Z轴": {"type": "Z", "mode": "独立", "min": 10, "max": 200, "current": 25},
+        "X轴-龙门": {"type": "X", "mode": "XYZ", "min": 0, "max": 500, "current": 100},
+        "Y轴-龙门": {"type": "Y", "mode": "XYZ", "min": 0, "max": 500, "current": 150}
+    },
+    "axisList": ["主Z轴", "副Z轴-A", "龙门Z轴", "X轴-龙门", "Y轴-龙门"]
 }
 
 focus_thread = None
@@ -155,6 +165,26 @@ def connect_camera():
     camera_state["isCapturing"] = False
     camera_state["isRecording"] = False
     camera_state["roiEnabled"] = False
+    
+    # 如果是新连接，重置轴列表
+    if "selectedAxis" not in camera_state or camera_state["selectedAxis"] is None:
+        # 设置默认的轴列表
+        camera_state["axes"] = {
+            "主Z轴": {"type": "Z", "mode": "XYZ", "min": 0, "max": 100, "current": 10},
+            "副Z轴-A": {"type": "Z", "mode": "XYZR", "min": 5, "max": 150, "current": 15},
+            "龙门Z轴": {"type": "Z", "mode": "独立", "min": 10, "max": 200, "current": 25},
+            "X轴-龙门": {"type": "X", "mode": "XYZ", "min": 0, "max": 500, "current": 100},
+            "Y轴-龙门": {"type": "Y", "mode": "XYZ", "min": 0, "max": 500, "current": 150}
+        }
+        camera_state["axisList"] = ["主Z轴", "副Z轴-A", "龙门Z轴", "X轴-龙门", "Y轴-龙门"]
+        
+        # 默认选择第一个Z轴
+        for axis_name in camera_state["axisList"]:
+            if camera_state["axes"][axis_name]["type"] == "Z":
+                camera_state["selectedAxis"] = axis_name
+                camera_state["currentZ"] = camera_state["axes"][axis_name]["current"]
+                camera_state["clarity"] = calculate_clarity(camera_state["currentZ"])
+                break
 
     print(f"后端: 相机 {camera_state['serialNumber']} 已连接")
     return jsonify(camera_state)
@@ -170,13 +200,20 @@ def disconnect_camera():
         stop_focus_flag.set() # 发送停止信号
         focus_thread.join(timeout=1.0) # 等待线程结束
     
+    # 保存当前轴信息用于重新连接
+    saved_axes = camera_state.get("axes", {})
+    saved_axis_list = camera_state.get("axisList", [])
+    
     # 重置状态
     camera_state = {
         "isConnected": False, "isFocusing": False, "isCapturing": False, "isRecording": False,
         "roiEnabled": False, "currentZ": 10.0, "bestZ": 15.5, # 可以保留上次的最佳Z
         "zRange": {"min": 5.0, "max": 25.0}, "clarity": 0.0, "focusStatus": "未连接",
         "serialNumber": None, "configFile": None, "savePath": None, "cameraName": None,
-        "cameraModel": None, "properties": {}, "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400}
+        "cameraModel": None, "properties": {}, "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400},
+        "selectedAxis": None,
+        "axes": saved_axes,
+        "axisList": saved_axis_list
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -294,6 +331,216 @@ def set_property():
     else:
         return jsonify({"status": "error", "message": f"未知属性: {prop_name}"}), 404
 
+# 添加获取轴列表的API
+@app.route('/axes', methods=['GET'])
+def get_axes():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    return jsonify({
+        "status": "ok",
+        "axisList": camera_state["axisList"],
+        "axes": camera_state["axes"],
+        "selectedAxis": camera_state["selectedAxis"]
+    })
+
+# 添加更新轴信息的API
+@app.route('/update_axis', methods=['POST'])
+def update_axis():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    data = request.json
+    axis_name = data.get('axisName')
+    
+    if not axis_name or axis_name not in camera_state["axes"]:
+        return jsonify({"status": "error", "message": "轴名称无效"}), 400
+    
+    # 更新轴信息
+    if 'min' in data:
+        camera_state["axes"][axis_name]["min"] = float(data['min'])
+    if 'max' in data:
+        camera_state["axes"][axis_name]["max"] = float(data['max'])
+    if 'current' in data:
+        camera_state["axes"][axis_name]["current"] = float(data['current'])
+    if 'mode' in data:
+        camera_state["axes"][axis_name]["mode"] = data['mode']
+    
+    # 如果更新了当前选择的Z轴位置，同时更新currentZ和clarity
+    if axis_name == camera_state["selectedAxis"] and camera_state["axes"][axis_name]["type"] == "Z" and 'current' in data:
+        camera_state["currentZ"] = float(data['current'])
+        camera_state["clarity"] = calculate_clarity(camera_state["currentZ"])
+    
+    return jsonify({
+        "status": "ok", 
+        "message": f"轴 {axis_name} 已更新",
+        "axis": camera_state["axes"][axis_name]
+    })
+
+# 添加移动轴的API
+@app.route('/move_axis', methods=['POST'])
+def move_axis():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    if camera_state["isFocusing"]:
+        return jsonify({"status": "error", "message": "对焦中无法移动轴"}), 400
+    
+    data = request.json
+    axis_name = data.get('axisName')
+    position = data.get('position')
+    is_relative = data.get('isRelative', False)
+    
+    if not axis_name or axis_name not in camera_state["axes"]:
+        return jsonify({"status": "error", "message": "轴名称无效"}), 400
+    
+    if position is None:
+        return jsonify({"status": "error", "message": "未指定目标位置"}), 400
+    
+    axis_info = camera_state["axes"][axis_name]
+    
+    # 计算新位置
+    try:
+        position = float(position)
+        current_position = axis_info["current"]
+        
+        if is_relative:
+            new_position = current_position + position
+        else:
+            new_position = position
+        
+        # 检查范围
+        if new_position < axis_info["min"] or new_position > axis_info["max"]:
+            return jsonify({
+                "status": "error", 
+                "message": f"目标位置 {new_position} 超出轴范围 [{axis_info['min']}, {axis_info['max']}]"
+            }), 400
+        
+        # 模拟移动延迟
+        time.sleep(0.1)
+        
+        # 更新位置
+        axis_info["current"] = round(new_position, 2)
+        
+        # 如果是Z轴，同时更新currentZ和clarity
+        if axis_info["type"] == "Z" and axis_name == camera_state["selectedAxis"]:
+            camera_state["currentZ"] = axis_info["current"]
+            camera_state["clarity"] = calculate_clarity(camera_state["currentZ"])
+        
+        return jsonify({
+            "status": "ok", 
+            "message": f"轴 {axis_name} 已移动到 {axis_info['current']}",
+            "position": axis_info["current"],
+            "clarity": camera_state["clarity"] if axis_info["type"] == "Z" and axis_name == camera_state["selectedAxis"] else None
+        })
+    
+    except ValueError:
+        return jsonify({"status": "error", "message": "位置值无效"}), 400
+
+# 添加选择轴的API
+@app.route('/select_axis', methods=['POST'])
+def select_axis():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    data = request.json
+    axis_name = data.get('axisName')
+    
+    if not axis_name or axis_name not in camera_state["axes"]:
+        return jsonify({"status": "error", "message": "轴名称无效"}), 400
+    
+    # 更新选中的轴
+    camera_state["selectedAxis"] = axis_name
+    
+    # 如果是Z轴，更新currentZ和clarity
+    if camera_state["axes"][axis_name]["type"] == "Z":
+        camera_state["currentZ"] = camera_state["axes"][axis_name]["current"]
+        camera_state["clarity"] = calculate_clarity(camera_state["currentZ"])
+    
+    return jsonify({
+        "status": "ok", 
+        "message": f"已选择轴 {axis_name}",
+        "selectedAxis": axis_name
+    })
+
+# 添加新轴的API
+@app.route('/add_axis', methods=['POST'])
+def add_axis():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    data = request.json
+    axis_name = data.get('axisName')
+    axis_type = data.get('type')
+    axis_mode = data.get('mode')
+    axis_min = data.get('min')
+    axis_max = data.get('max')
+    axis_current = data.get('current')
+    
+    if not axis_name or not axis_type or not axis_mode or axis_min is None or axis_max is None or axis_current is None:
+        return jsonify({"status": "error", "message": "轴信息不完整"}), 400
+    
+    # 检查轴名称是否已存在
+    if axis_name in camera_state["axes"]:
+        return jsonify({"status": "error", "message": f"轴 {axis_name} 已存在"}), 400
+    
+    try:
+        axis_min = float(axis_min)
+        axis_max = float(axis_max)
+        axis_current = float(axis_current)
+        
+        # 检查范围
+        if axis_min >= axis_max:
+            return jsonify({"status": "error", "message": "最小范围必须小于最大范围"}), 400
+        
+        if axis_current < axis_min or axis_current > axis_max:
+            return jsonify({"status": "error", "message": "当前位置必须在范围内"}), 400
+        
+        # 添加新轴
+        camera_state["axes"][axis_name] = {
+            "type": axis_type,
+            "mode": axis_mode,
+            "min": axis_min,
+            "max": axis_max,
+            "current": axis_current
+        }
+        
+        # 更新轴列表
+        camera_state["axisList"].append(axis_name)
+        
+        return jsonify({
+            "status": "ok", 
+            "message": f"轴 {axis_name} 已添加",
+            "axis": camera_state["axes"][axis_name]
+        })
+    
+    except ValueError:
+        return jsonify({"status": "error", "message": "轴参数值无效"}), 400
+
+# 删除轴的API
+@app.route('/delete_axis', methods=['POST'])
+def delete_axis():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    data = request.json
+    axis_name = data.get('axisName')
+    
+    if not axis_name or axis_name not in camera_state["axes"]:
+        return jsonify({"status": "error", "message": "轴名称无效"}), 400
+    
+    # 检查是否是当前选中的轴
+    if axis_name == camera_state["selectedAxis"]:
+        camera_state["selectedAxis"] = None
+    
+    # 删除轴
+    del camera_state["axes"][axis_name]
+    camera_state["axisList"].remove(axis_name)
+    
+    return jsonify({
+        "status": "ok", 
+        "message": f"轴 {axis_name} 已删除"
+    })
 
 if __name__ == '__main__':
     # 启动浏览器的函数

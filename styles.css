@@ -573,4 +573,355 @@ input[type=range]::-moz-range-thumb {
 /* Style for cancel button perhaps */
 /* Optional: Add icons to buttons if desired */
 /* .modal-footer button#modal-save-axis-btn::before { content: '\f0c7'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: var(--spacing-small); } */
-/* .modal-footer button#modal-cancel-axis-btn::before { content: '\f00d'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: var(--spacing-small); } */ 
+/* .modal-footer button#modal-cancel-axis-btn::before { content: '\f00d'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-right: var(--spacing-small); } */
+
+/* 轴信息和点动寸动控制相关样式 */
+.axis-info {
+    margin-bottom: var(--spacing-medium);
+}
+
+.jog-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-small);
+}
+
+.jog-button {
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    color: var(--text-light);
+    width: 40px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: var(--border-radius);
+}
+
+.jog-button:hover:not(:disabled) {
+    background-color: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+
+.jog-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 自动对焦参数相关样式 */
+.toggle-button {
+    padding: var(--spacing-small) var(--spacing-medium);
+    margin-top: var(--spacing-small);
+    width: 100%;
+    text-align: center;
+}
+
+.hidden-section {
+    display: none;
+    margin-top: var(--spacing-medium);
+    padding: var(--spacing-medium);
+    background-color: var(--bg-medium);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-dark);
+}
+
+.hidden-section.show {
+    display: block;
+}
+
+.param-item {
+    margin-bottom: var(--spacing-medium);
+}
+
+.param-item:last-child {
+    margin-bottom: 0;
+}
+
+.param-item label {
+    margin-bottom: var(--spacing-small);
+    font-size: 0.9em;
+}
+
+.param-item input {
+    width: 100%;
+}
+
+.input-group span {
+    display: flex;
+    align-items: center;
+    padding: 0 var(--spacing-small);
+    color: var(--text-medium);
+}
+
+/* 轴配置面板样式 */
+.axis-config-panel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(45, 45, 45, 0.85);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    z-index: 100;
+    width: 230px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.axis-config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-small);
+    background-color: rgba(61, 61, 61, 0.9);
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.axis-config-controls {
+    padding: var(--spacing-small);
+    border-bottom: 1px solid var(--border-dark);
+    background-color: rgba(55, 55, 55, 0.9);
+}
+
+.mode-selector {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+}
+
+.mode-selector label {
+    font-size: 0.9em;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.mode-selector select {
+    flex-grow: 1;
+    font-size: 0.9em;
+    height: 24px;
+    padding: 2px 4px;
+}
+
+.axis-config-header h3 {
+    margin: 0;
+    font-size: 1em;
+    color: var(--text-light);
+    border: none;
+    padding: 0;
+}
+
+.add-button {
+    background: none;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: var(--border-radius);
+}
+
+.add-button:hover {
+    background-color: var(--accent-blue);
+}
+
+.axis-list {
+    margin-top: var(--spacing-medium);
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    background-color: var(--bg-darker);
+    padding: var(--spacing-small);
+}
+
+.axis-mode-header {
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    font-weight: bold;
+    padding: var(--spacing-small) var(--spacing-medium);
+    margin-top: var(--spacing-medium);
+    border-radius: var(--border-radius);
+    font-size: 0.95em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.axis-item {
+    padding: var(--spacing-small);
+    cursor: pointer;
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-small);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: rgba(61, 61, 61, 0.8);
+}
+
+.axis-item:hover {
+    background-color: rgba(74, 74, 74, 0.9);
+}
+
+.axis-item.selected {
+    background-color: rgba(24, 144, 255, 0.85);
+    color: white;
+}
+
+.axis-item-name {
+    flex-grow: 1;
+}
+
+.axis-item-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.axis-item-button {
+    background: none;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px;
+    border-radius: 2px;
+}
+
+.axis-item-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 轴添加弹窗样式 */
+.add-axis-modal .modal-content {
+    max-width: 350px;
+}
+
+.axis-type-header {
+    font-size: 0.9em;
+    color: var(--accent-blue);
+    padding: var(--spacing-small) var(--spacing-small) 2px;
+    margin-top: var(--spacing-small);
+    font-weight: bold;
+}
+
+.axis-mode-header:first-child {
+    margin-top: 0;
+}
+
+/* XYZ模式三轴控制样式 */
+.xyz-controls {
+    margin-top: var(--spacing-medium);
+    padding: var(--spacing-medium);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--border-radius);
+    background-color: var(--bg-darker);
+    margin-bottom: var(--spacing-medium);
+}
+
+.axis-control-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    padding: 2px 0;
+}
+
+.axis-control-row:last-of-type {
+    margin-bottom: 4px;
+}
+
+.axis-label {
+    flex: 0 0 30px;
+    font-weight: bold;
+    color: var(--accent-blue);
+}
+
+.axis-select-container {
+    flex: 1;
+    margin: 0 4px;
+}
+
+.axis-select {
+    width: 100%;
+    font-size: 0.85em;
+    height: 24px;
+    padding: 2px 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.axis-jog-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.micro-button {
+    padding: 2px 4px;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.axis-position {
+    width: 40px;
+    text-align: center;
+    font-family: monospace;
+}
+
+.axis-step-control {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.axis-step-control label {
+    font-size: 0.85em;
+    margin: 0;
+}
+
+.axis-step-control input {
+    font-size: 0.85em;
+    padding: 2px 4px;
+    height: 22px;
+}
+
+/* 常规样式修改 */
+.axis-mode-header {
+    font-size: 0.85em;
+    color: var(--text-medium);
+    padding: var(--spacing-small);
+    margin-top: var(--spacing-small);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.xyz-controls h4 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-medium);
+    color: var(--text-light);
+    font-size: 1em;
+    font-weight: normal;
+    border-bottom: 1px solid var(--border-medium);
+    padding-bottom: var(--spacing-small);
+}
+
+/* 轴列表为空时的提示信息 */
+.axis-empty-message {
+    padding: var(--spacing-medium);
+    color: var(--text-medium);
+    text-align: center;
+    font-style: italic;
+    background-color: var(--bg-darker);
+    border-radius: var(--border-radius);
+    margin: var(--spacing-medium) 0;
+} 

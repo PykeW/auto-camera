@@ -26,6 +26,19 @@
             <section class="camera-view">
                 <img id="simulated-image" src="favicon.png" alt="模拟相机图像">
                 <div class="focus-overlay" id="focus-roi-overlay" style="display: none;"></div>
+                
+                <!-- 轴配置面板 -->
+                <div class="axis-config-panel">
+                    <div class="axis-config-header">
+                        <h3>轴配置</h3>
+                        <button id="add-axis-btn" class="add-button" title="添加新轴"><i class="fas fa-plus"></i></button>
+                    </div>
+                    
+                    <!-- 常规轴列表 -->
+                    <div class="axis-list" id="axis-list">
+                        <!-- 轴列表将由JS填充 -->
+                    </div>
+                </div>
             </section>
 
             <aside class="control-panel" id="control-panel-content">
@@ -34,7 +47,6 @@
                      <div class="input-group">
                         <select id="serial-number" disabled><option>请连接...</option></select>
                         <button id="connect-btn" class="connect-button">连接</button>
-                        <button id="config-axis-btn" class="select-button" title="配置相机Z轴" disabled>配置轴</button>
                     </div>
                 </div>
 
@@ -76,18 +88,72 @@
                  <div class="panel-section requires-connection">
                     <h3>Z轴控制 / 对焦</h3>
                     <div class="control-item">
+                        <label for="axis-select">选择Z轴:</label>
+                        <select id="axis-select" disabled>
+                            <option value="">--请选择--</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 轴信息区域 -->
+                    <div class="control-item axis-info">
+                        <label>轴范围 (mm):</label>
+                        <div class="input-group">
+                            <label style="width:30px">起点</label>
+                            <input type="number" id="axis-min" value="0" min="0" max="1000" step="0.1" style="flex-grow:1" disabled>
+                            <label style="width:30px">终点</label>
+                            <input type="number" id="axis-max" value="100" min="0" max="1000" step="0.1" style="flex-grow:1" disabled>
+                        </div>
+                    </div>
+                    
+                    <div class="control-item">
                         <label for="current-z">当前 Z 位置 (mm):</label>
                         <input type="text" id="current-z" value="--" readonly disabled>
                     </div>
-                     <div class="control-item">
+                    
+                    <!-- 点动/寸动控制 -->
+                    <div class="control-item">
+                        <label>手动调整 Z 轴:</label>
+                        <div class="jog-controls">
+                            <button id="jog-down" class="jog-button" disabled><i class="fas fa-minus"></i></button>
+                            <input type="number" id="jog-step" value="0.1" min="0.01" max="10" step="0.01" style="width:60px" disabled>
+                            <button id="jog-up" class="jog-button" disabled><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-item">
                         <label for="clarity-value">当前清晰度:</label>
                         <input type="text" id="clarity-value" value="--" readonly disabled>
                     </div>
+                    
+                    <!-- 自动对焦参数设置 -->
+                    <div class="control-item">
+                        <label>自动对焦参数:</label>
+                        <button id="toggle-focus-params" class="toggle-button" disabled>显示参数</button>
+                        <div id="focus-params-container" class="hidden-section">
+                            <div class="param-item">
+                                <label for="focus-scan-range">扫描范围 (mm):</label>
+                                <div class="input-group">
+                                    <input type="number" id="focus-scan-min" value="5" min="0" max="100" step="0.5" style="flex-grow:1" disabled>
+                                    <span>至</span>
+                                    <input type="number" id="focus-scan-max" value="25" min="0" max="100" step="0.5" style="flex-grow:1" disabled>
+                                </div>
+                            </div>
+                            <div class="param-item">
+                                <label for="focus-step-rough">粗扫步长 (mm):</label>
+                                <input type="number" id="focus-step-rough" value="1.0" min="0.1" max="5" step="0.1" disabled>
+                            </div>
+                            <div class="param-item">
+                                <label for="focus-step-fine">精扫步长 (mm):</label>
+                                <input type="number" id="focus-step-fine" value="0.1" min="0.01" max="1" step="0.01" disabled>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="control-item focus-controls">
                         <button id="start-focus-btn" class="primary-button" disabled><i class="fas fa-crosshairs"></i> 开始自动对焦</button>
                         <button id="stop-focus-btn" class="danger-button" disabled><i class="fas fa-stop-circle"></i> 停止</button>
                     </div>
-                     <div class="control-item focus-status">
+                    <div class="control-item focus-status">
                         <label>对焦状态:</label>
                         <span id="focus-status-text" class="status-未连接">未连接</span>
                     </div>
@@ -124,25 +190,43 @@
             <span>缩放: 100%</span>
         </footer>
 
-        <!-- Z轴配置弹窗 -->
-        <div id="axis-config-modal" class="modal" >
+        <!-- 添加轴弹窗 -->
+        <div id="add-axis-modal" class="modal add-axis-modal">
           <div class="modal-overlay"></div>
           <div class="modal-content">
-            <h2>相机 Z 轴配置 (模拟)</h2>
+            <div class="modal-header">
+              <h2>添加新轴</h2>
+            </div>
             <div class="modal-body">
-              <label for="modal-camera-sn">当前相机:</label>
-              <input type="text" id="modal-camera-sn" disabled>
-
-              <label for="axis-select">选择 Z 轴:</label>
-              <select id="axis-select">
-                <!-- 选项将由 JS 填充 -->
-                <option value="">--请选择--</option>
-              </select>
-              <p class="modal-note">注意: 轴列表由模拟数据提供。</p>
+              <div class="form-group">
+                <label for="new-axis-name">轴名称:</label>
+                <input type="text" id="new-axis-name" placeholder="输入新轴名称">
+              </div>
+              <div class="form-group">
+                <label for="new-axis-type">轴类型:</label>
+                <select id="new-axis-type">
+                  <option value="X">X轴</option>
+                  <option value="Y">Y轴</option>
+                  <option value="Z">Z轴</option>
+                  <option value="R">R轴 (旋转)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="new-axis-min">最小范围 (mm):</label>
+                <input type="number" id="new-axis-min" value="0" min="0" max="1000" step="0.1">
+              </div>
+              <div class="form-group">
+                <label for="new-axis-max">最大范围 (mm):</label>
+                <input type="number" id="new-axis-max" value="100" min="0" max="1000" step="0.1">
+              </div>
+              <div class="form-group">
+                <label for="new-axis-current">当前位置 (mm):</label>
+                <input type="number" id="new-axis-current" value="10" min="0" max="1000" step="0.1">
+              </div>
             </div>
             <div class="modal-footer">
-              <button id="modal-save-axis-btn">保存</button>
-              <button id="modal-cancel-axis-btn">取消</button>
+              <button id="add-axis-cancel-btn">取消</button>
+              <button id="add-axis-save-btn">添加</button>
             </div>
           </div>
         </div>

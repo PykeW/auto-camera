@@ -1,0 +1,171 @@
+---
+description: 代码修改指南
+globs: 
+alwaysApply: false
+---
+# 代码修改指南
+
+## 基本原则
+
+- **复用现有代码**：在添加新功能时，应首先研究现有代码结构，尽可能复用已有的逻辑和样式，避免重复实现相似功能
+- **保持一致性**：新代码应与现有代码保持一致的命名风格、缩进格式和注释风格
+- **避免代码堆叠**：不要简单地在现有代码上添加新层级，应适当重构以保持代码结构清晰
+- **最小化修改范围**：修改应限定在必要的范围内，避免不必要的大规模重写
+- **保护核心逻辑**：确保修改不破坏现有功能的正常逻辑
+
+## 修改步骤
+
+1. **分析当前代码**：
+   - 理解现有功能和实现方式
+   - 识别需要修改的具体部分
+   - 找出可以复用的现有方法和样式
+
+2. **计划修改方案**：
+   - 设计修改的最小实现路径
+   - 考虑修改对现有功能的潜在影响
+   - 确定需要新增、修改和删除的代码部分
+
+3. **实施修改**：
+   - 按照计划的顺序执行修改
+   - 尽量使用现有的变量、函数和样式类
+   - 添加必要的注释解释修改目的和方法
+
+4. **测试修改**：
+   - 验证新增功能正常工作
+   - 确认现有功能未受到负面影响
+   - 检查边界情况和错误处理
+
+## 相机控制系统代码风格指南
+
+### HTML结构
+- 保持与现有HTML结构的一致性，包括标签嵌套层次和类命名方式
+- 使用语义化标签，如`section`、`header`、`footer`等
+- 遵循`.panel-section`和`.control-item`的使用模式组织控件
+- 为新UI元素添加合适的FontAwesome图标保持视觉一致性
+
+### CSS样式
+- 复用CSS变量系统（如`--bg-dark`, `--accent-blue`等）
+- 遵循现有的命名规范（如`.status-*`, `.panel-section`等）
+- 使用`.requires-connection`类标记需要连接状态的元素
+- 新增状态样式应按照现有状态样式的模式定义
+- 保持与现有元素的间距和边距一致性
+
+### JavaScript编码
+- 扩展`CameraController`类而非创建新的控制器类
+- 对新增功能创建独立的方法，并与现有方法保持一致的命名风格
+- 使用`async/await`处理异步操作，保持与现有代码风格一致
+- 状态更新应通过`updateUI()`和`updateControlStates()`方法进行集中处理
+- 遵循现有事件绑定模式，将所有事件监听添加到`initializeEventListeners()`方法中
+
+### 后端API扩展
+- 新增API端点应遵循RESTful设计原则
+- 复用现有API的错误处理和响应格式
+- 保持与前端通信的一致性，如状态更新、错误码等
+- 遵循现有的模拟逻辑实现方式
+- 使用多线程处理长时间运行的操作，保持非阻塞服务
+
+## 常见组件修改指南
+
+### 添加新控制面板
+```html
+<div class="panel-section requires-connection">
+    <h3>新功能面板</h3>
+    <div class="control-item">
+        <!-- 控件内容 -->
+    </div>
+</div>
+```
+
+### 添加新的状态类型
+```css
+.status-新状态 { 
+    background-color: var(--accent-color); 
+    color: var(--text-light); 
+}
+```
+
+### 扩展控制器方法
+```javascript
+async newFeatureMethod() {
+    if (!this.isConnected) return;
+    // 实现新功能逻辑
+    this.updateUI();
+}
+```
+
+### 添加API端点
+```python
+@app.route('/new_feature', methods=['POST'])
+def new_feature():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    # 实现功能逻辑
+    
+    return jsonify({"status": "ok", "message": "操作成功"})
+```
+
+## 前端修改指南 (script.js)
+
+### 轴控制系统
+
+1. **轴模式选择器更新**
+   - 使用`updateAxisModeSelect()`函数更新模式选择器
+   - 只显示存在对应轴数据的模式
+   - 修改前：
+     ```javascript
+     this.axisModeSelect.innerHTML = '...固定选项...';
+     ```
+   - 修改后：
+     ```javascript
+     this.updateAxisModeSelect(); // 动态更新可用模式
+     ```
+
+2. **XYZ模式下的轴选择列表**
+   - 在`updateXYZControlPanels()`函数中处理轴选择列表的填充
+   - 允许显示独立模式的轴，避免轴选择列表为空
+   - 在轴选择器中包含轴的名称和模式信息
+
+3. **轴列表渲染**
+   - 使用`renderAxisList()`按轴类型分组显示
+   - 优先处理X、Y、Z、U、R等常见轴类型
+   - 为空轴列表添加提示信息
+
+### 事件处理
+
+1. **模式切换处理**
+   - 模式变更时需要同时处理XYZ控制面板的显示/隐藏
+   - 使用`updateXYZControlPanels()`更新控制面板状态
+   - 调用`renderAxisList()`重新渲染轴列表
+
+2. **轴选择事件**
+   - 轴选择变更时，通过`selectAxisOnServer()`通知后端
+   - 更新相关UI显示，如位置和清晰度信息
+
+## 后端修改指南 (app.py)
+
+1. **API端点修改**
+   - 后端API端点应保持一致的响应格式
+   - 统一使用`jsonify()`返回JSON响应
+   - 错误处理应返回合适的HTTP状态码
+
+2. **轴配置修改**
+   - 修改轴配置时保持数据一致性
+   - 添加新轴时执行范围验证
+   - 删除轴时检查依赖关系
+
+## 样式修改指南 (styles.css)
+
+1. **控件尺寸与位置**
+   - 轴配置面板宽度应适应内容，推荐230px
+   - 为长文本添加溢出处理：
+     ```css
+     overflow: hidden;
+     text-overflow: ellipsis;
+     white-space: nowrap;
+     ```
+
+2. **状态指示样式**
+   - 使用一致的颜色方案指示不同状态
+   - 对焦状态: 蓝色(进行中), 绿色(成功), 红色(错误)
+   - 连接状态: 灰色(未连接), 绿色(已连接)

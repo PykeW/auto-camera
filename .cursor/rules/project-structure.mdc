@@ -5,32 +5,72 @@ alwaysApply: false
 ---
 # 相机控制系统项目结构
 
-这是一个前后端分离的相机控制系统模拟应用作为原型设计使用。
+这是一个前后端分离的相机控制系统模拟应用，作为原型设计和开发参考使用。
 
-## 主要组件
+## 技术栈
 
 ### 前端
-- [index.html](mdc:index.html) - 主HTML页面，包含UI结构
-- [styles.css](mdc:styles.css) - 样式表文件
-- [script.js](mdc:script.js) - 前端JavaScript代码，负责UI交互和与后端API通信
+- 原生HTML/CSS/JavaScript
+- 使用Font Awesome图标
+- 不依赖任何框架，轻量级实现
 
 ### 后端
-- [app.py](mdc:app.py) - Flask后端服务器，提供相机控制API
-- 使用Flask和flask_cors实现API服务
+- Python Flask后端
+- RESTful API设计
+- 使用Flask-CORS处理跨域请求
 
-### 环境配置
-- [Pipfile](mdc:Pipfile) - pipenv环境配置文件
-- [Pipfile.lock](mdc:Pipfile.lock) - pipenv依赖锁定文件
+## 项目文件结构
 
-## 主要功能
-1. 相机连接/断开
-2. 图像采集（连续采集、单张拍照、录制）
-3. 自动对焦功能
-4. ROI区域设置
-5. 相机属性调整
+```
+auto-camera/
+├── app.py           # Flask后端服务器，提供相机控制API
+├── favicon.png      # 网站图标
+├── index.html       # 主HTML页面，包含UI结构
+├── Pipfile          # pipenv环境配置文件
+├── Pipfile.lock     # pipenv依赖锁定文件
+├── script.js        # 前端JavaScript代码，CameraController类实现
+└── styles.css       # CSS样式文件
+```
 
-## 运行方式
-1. 安装依赖: `pipenv install` 和 `pipenv install flask-cors`
-2. 启动后端: `pipenv run python app.py` 或 `python app.py`
+## 核心功能模块
+
+### 相机连接管理
+- 相机连接/断开
+- 相机属性读取与设置
+- 状态监控
+
+### 图像采集功能
+- 连续采集
+- 单张拍照
+- 视频录制
+- 软件触发
+
+### 自动对焦系统
+- 自动对焦流程（粗对焦+精对焦）
+- 对焦状态实时监控
+- 清晰度计算与显示
+
+### 多轴控制系统
+- 支持多种轴配置（XYZ、XYZU、XYZR等）
+- 轴参数配置
+- 点动/寸动控制
+
+### ROI区域控制
+- 区域选择
+- 参数配置
+
+## 数据流
+1. 前端通过RESTful API与后端通信
+2. 后端模拟相机设备响应
+3. 前端实时更新UI反映后端状态
+
+## 启动方式
+1. 安装依赖: `pipenv install`
+2. 启动后端: `pipenv run python app.py`
 3. 后端会自动在浏览器中打开前端页面
+
+## 开发注意事项
+- 模拟了真实相机设备的行为和状态
+- 实现了完整的异步操作流程
+- 提供了详细的UI交互反馈
 
