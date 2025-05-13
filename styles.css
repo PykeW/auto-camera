@@ -963,4 +963,117 @@ input:checked + .slider:before {
 .status-保存参数中 { color: #3F51B5; }
 .status-已对焦 { color: #4CAF50; }
 .status-已停止 { color: #F44336; }
-.status-错误 { color: #F44336; } 
+.status-错误 { color: #F44336; }
+
+/* === 弹窗样式 === */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.modal.show {
+    display: flex;
+    opacity: 1;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: var(--bg-dark);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(-20px);
+    transition: transform 0.3s ease;
+}
+
+.modal.show .modal-content {
+    transform: translateY(0);
+}
+
+.modal-header {
+    padding: var(--spacing-large);
+    border-bottom: 1px solid var(--border-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.2em;
+    font-weight: normal;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-medium);
+}
+
+.close-button:hover {
+    color: var(--text-light);
+}
+
+.modal-body {
+    padding: var(--spacing-large);
+    overflow-y: auto;
+    max-height: calc(90vh - 130px);
+}
+
+.modal-footer {
+    padding: var(--spacing-large);
+    border-top: 1px solid var(--border-dark);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-medium);
+}
+
+.config-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-large);
+}
+
+.config-section .control-item {
+    margin-bottom: 0;
+}
+
+.config-section input[type="number"] {
+    text-align: right;
+}
+
+/* 添加一个配置按钮样式 */
+.config-button {
+    background: none;
+    border: none;
+    color: var(--text-medium);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--border-radius);
+}
+
+.config-button:hover {
+    color: var(--text-light);
+    background-color: var(--bg-medium);
+} 

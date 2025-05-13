@@ -41,6 +41,7 @@
                                     <option value="10.0">10.0</option>
                                 </select>
                                 <button class="jog-btn plus" data-axis="X">+</button>
+                                <button class="config-button" data-axis="X" title="配置X轴"><i class="fas fa-cog"></i></button>
                             </div>
                         </div>
                         <div class="axis-item">
@@ -56,6 +57,7 @@
                                     <option value="10.0">10.0</option>
                                 </select>
                                 <button class="jog-btn plus" data-axis="Y">+</button>
+                                <button class="config-button" data-axis="Y" title="配置Y轴"><i class="fas fa-cog"></i></button>
                             </div>
                         </div>
                         <div class="axis-item">
@@ -71,6 +73,7 @@
                                     <option value="5.0">5.0</option>
                                 </select>
                                 <button class="jog-btn plus" data-axis="Z">+</button>
+                                <button class="config-button" data-axis="Z" title="配置Z轴"><i class="fas fa-cog"></i></button>
                             </div>
                         </div>
                         <div class="axis-item">
@@ -86,6 +89,7 @@
                                     <option value="45.0">45.0</option>
                                 </select>
                                 <button class="jog-btn plus" data-axis="U">+</button>
+                                <button class="config-button" data-axis="U" title="配置U轴"><i class="fas fa-cog"></i></button>
                             </div>
                         </div>
                     </div>
@@ -298,6 +302,61 @@
         </footer>
 
         <script src="script.js"></script>
+    </div>
+
+    <!-- 轴配置弹窗 -->
+    <div id="axis-config-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>轴配置</h3>
+                <button class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-section">
+                    <div class="control-item">
+                        <label for="axis-select">选择轴：</label>
+                        <select id="axis-select">
+                            <option value="X">X轴</option>
+                            <option value="Y">Y轴</option>
+                            <option value="Z">Z轴</option>
+                            <option value="U">U轴</option>
+                        </select>
+                    </div>
+                    <div class="control-item">
+                        <label for="encoder-value">编码器值：</label>
+                        <input type="number" id="encoder-value" readonly>
+                    </div>
+                    <div class="control-item">
+                        <label for="axis-ratio">轴当量(mm/p)：</label>
+                        <input type="number" id="axis-ratio" step="0.0001" min="0">
+                    </div>
+                    <div class="control-item">
+                        <label for="axis-backlash">反向间隙(mm)：</label>
+                        <input type="number" id="axis-backlash" step="0.001" min="0">
+                    </div>
+                    <div class="control-item">
+                        <label for="axis-speed">运动速度(mm/s)：</label>
+                        <input type="number" id="axis-speed" step="0.1" min="0">
+                    </div>
+                    <div class="control-item">
+                        <label for="axis-acc">加速度(mm/s²)：</label>
+                        <input type="number" id="axis-acc" step="0.1" min="0">
+                    </div>
+                    <div class="control-item">
+                        <label for="soft-limit-min">软限位最小值(mm)：</label>
+                        <input type="number" id="soft-limit-min">
+                    </div>
+                    <div class="control-item">
+                        <label for="soft-limit-max">软限位最大值(mm)：</label>
+                        <input type="number" id="soft-limit-max">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="save-axis-config" class="primary-button">保存配置</button>
+                <button id="cancel-axis-config" class="danger-button">取消</button>
+            </div>
+        </div>
     </div>
 </body>
 </html> 

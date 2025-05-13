@@ -38,7 +38,13 @@ camera_state = {
     "XPosition": 0.0,
     "YPosition": 0.0,
     "ZPosition": 0.0,
-    "UPosition": 0.0
+    "UPosition": 0.0,
+    "axisLimits": {
+        "X": {"min": -100.0, "max": 100.0},
+        "Y": {"min": -100.0, "max": 100.0},
+        "Z": {"min": 0.0, "max": 50.0},
+        "U": {"min": -180.0, "max": 180.0}
+    }
 }
 
 focus_thread = None
@@ -210,12 +216,34 @@ def disconnect_camera():
     
     # 重置状态
     camera_state = {
-        "isConnected": False, "isFocusing": False, "isCapturing": False, "isRecording": False,
-        "roiEnabled": False, "currentZ": 10.0, "bestZ": 15.5, # 可以保留上次的最佳Z
-        "zRange": {"min": 5.0, "max": 25.0}, "clarity": 0.0, "focusStatus": "未连接",
-        "serialNumber": None, "configFile": None, "savePath": None, "cameraName": None,
-        "cameraModel": None, "properties": {}, "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400},
-        "selectedAxisId": None, "XPosition": 0.0, "YPosition": 0.0, "ZPosition": 0.0, "UPosition": 0.0
+        "isConnected": False,
+        "isFocusing": False,
+        "isCapturing": False,
+        "isRecording": False,
+        "roiEnabled": False,
+        "currentZ": 10.0,
+        "bestZ": 15.5,
+        "zRange": {"min": 5.0, "max": 25.0},
+        "clarity": 0.0,
+        "focusStatus": "未连接",
+        "serialNumber": None,
+        "configFile": None,
+        "savePath": None,
+        "cameraName": None,
+        "cameraModel": None,
+        "properties": {},
+        "roiCoords": {"l": 150, "t": 100, "r": 450, "b": 400},
+        "selectedAxisId": None,
+        "XPosition": 0.0,
+        "YPosition": 0.0,
+        "ZPosition": 0.0,
+        "UPosition": 0.0,
+        "axisLimits": {
+            "X": {"min": -100.0, "max": 100.0},
+            "Y": {"min": -100.0, "max": 100.0},
+            "Z": {"min": 0.0, "max": 50.0},
+            "U": {"min": -180.0, "max": 180.0}
+        }
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -423,6 +451,55 @@ def jog_axis():
     
     print(f"后端: {axis}轴点动 {step:+.3f}, 新位置: {new_pos:.3f}")
     return jsonify(camera_state)
+
+@app.route('/save_axis_config', methods=['POST'])
+def save_axis_config():
+    if not camera_state["isConnected"]:
+        return jsonify({"status": "error", "message": "相机未连接"}), 400
+    
+    data = request.json
+    axis = data.get('axis')
+    config = data.get('config')
+    limits = data.get('limits')
+    
+    if not all([axis, config, limits]):
+        return jsonify({"status": "error", "message": "缺少必要参数"}), 400
+    
+    # 验证轴
+    if axis not in ['X', 'Y', 'Z', 'U']:
+        return jsonify({"status": "error", "message": "无效的轴"}), 400
+    
+    # 验证配置参数
+    try:
+        ratio = float(config['ratio'])
+        backlash = float(config['backlash'])
+        speed = float(config['speed'])
+        acc = float(config['acc'])
+        min_limit = float(limits['min'])
+        max_limit = float(limits['max'])
+        
+        # 验证参数范围
+        if ratio <= 0 or backlash < 0 or speed <= 0 or acc <= 0:
+            raise ValueError("参数必须为正数")
+        if min_limit >= max_limit:
+            raise ValueError("最小限位必须小于最大限位")
+            
+    except (ValueError, KeyError) as e:
+        return jsonify({"status": "error", "message": f"参数无效: {str(e)}"}), 400
+    
+    # 更新轴配置（这里只是模拟，实际应用中需要与运动控制系统交互）
+    camera_state["axisLimits"][axis] = {"min": min_limit, "max": max_limit}
+    
+    print(f"后端: 已保存{axis}轴配置 - 当量:{ratio}, 间隙:{backlash}, 速度:{speed}, 加速度:{acc}")
+    print(f"后端: {axis}轴限位更新为 [{min_limit}, {max_limit}]")
+    
+    return jsonify({
+        "status": "ok",
+        "message": f"{axis}轴配置已保存",
+        "axis": axis,
+        "config": config,
+        "limits": camera_state["axisLimits"][axis]
+    })
 
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义

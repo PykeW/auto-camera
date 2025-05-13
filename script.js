@@ -18,29 +18,59 @@ let cameraState = {
 };
 
 // DOM 元素
-const connectBtn = document.getElementById('connect-btn');
-const serialInput = document.getElementById('serial-number');
-const statusText = document.getElementById('status-text');
-const focusStatusText = document.getElementById('focus-status-text');
-const currentZInput = document.getElementById('current-z');
-const clarityInput = document.getElementById('clarity-value');
-const startFocusBtn = document.getElementById('start-focus-btn');
-const stopFocusBtn = document.getElementById('stop-focus-btn');
+let connectBtn, serialInput, statusText, focusStatusText, currentZInput, clarityInput;
+let startFocusBtn, stopFocusBtn, axisInputs, jogBtns, stepSelects;
+let axisConfigModal, axisSelect, encoderValue, axisRatio, axisBacklash, axisSpeed;
+let axisAcc, softLimitMin, softLimitMax;
 
-// 轴配置输入框和控制按钮
-const axisInputs = {
-    x: document.getElementById('x-axis'),
-    y: document.getElementById('y-axis'),
-    z: document.getElementById('z-axis'),
-    u: document.getElementById('u-axis')
+// 初始化DOM引用
+function initializeDOMReferences() {
+    // 基础控件
+    connectBtn = document.getElementById('connect-btn');
+    serialInput = document.getElementById('serial-number');
+    statusText = document.getElementById('status-text');
+    focusStatusText = document.getElementById('focus-status-text');
+    currentZInput = document.getElementById('current-z');
+    clarityInput = document.getElementById('clarity-value');
+    startFocusBtn = document.getElementById('start-focus-btn');
+    stopFocusBtn = document.getElementById('stop-focus-btn');
+
+    // 轴控件
+    axisInputs = {
+        x: document.getElementById('x-axis'),
+        y: document.getElementById('y-axis'),
+        z: document.getElementById('z-axis'),
+        u: document.getElementById('u-axis')
+    };
+
+    // 点动和步进控件
+    jogBtns = document.querySelectorAll('.jog-btn');
+    stepSelects = document.querySelectorAll('.step-select');
+
+    // 配置弹窗控件
+    axisConfigModal = document.getElementById('axis-config-modal');
+    axisSelect = document.getElementById('axis-select');
+    encoderValue = document.getElementById('encoder-value');
+    axisRatio = document.getElementById('axis-ratio');
+    axisBacklash = document.getElementById('axis-backlash');
+    axisSpeed = document.getElementById('axis-speed');
+    axisAcc = document.getElementById('axis-acc');
+    softLimitMin = document.getElementById('soft-limit-min');
+    softLimitMax = document.getElementById('soft-limit-max');
+}
+
+// 轴配置相关
+const axisConfigs = {
+    X: { ratio: 0.001, backlash: 0.01, speed: 10.0, acc: 100.0 },
+    Y: { ratio: 0.001, backlash: 0.01, speed: 10.0, acc: 100.0 },
+    Z: { ratio: 0.001, backlash: 0.005, speed: 5.0, acc: 50.0 },
+    U: { ratio: 0.01, backlash: 0.02, speed: 20.0, acc: 200.0 }
 };
-
-// 获取所有点动按钮和步进选择器
-const jogBtns = document.querySelectorAll('.jog-btn');
-const stepSelects = document.querySelectorAll('.step-select');
 
 // 更新轴配置显示
 function updateAxisDisplay(state) {
+    if (!state) return;
+    
     Object.keys(axisInputs).forEach(axis => {
         const input = axisInputs[axis];
         if (input) {
@@ -52,7 +82,7 @@ function updateAxisDisplay(state) {
             const btns = document.querySelectorAll(`.jog-btn[data-axis="${axis.toUpperCase()}"]`);
             btns.forEach(btn => {
                 btn.disabled = !state.isConnected;
-                if (state.isConnected) {
+                if (state.isConnected && state.axisLimits && state.axisLimits[axis.toUpperCase()]) {
                     const isPlus = btn.classList.contains('plus');
                     const limit = state.axisLimits[axis.toUpperCase()];
                     const step = parseFloat(document.querySelector(`.step-select[data-axis="${axis.toUpperCase()}"]`).value);
@@ -65,6 +95,12 @@ function updateAxisDisplay(state) {
                     }
                 }
             });
+            
+            // 更新配置按钮状态
+            const configBtn = document.querySelector(`.config-button[data-axis="${axis.toUpperCase()}"]`);
+            if (configBtn) {
+                configBtn.disabled = !state.isConnected;
+            }
         }
     });
     
@@ -155,7 +191,7 @@ function startStatusPolling() {
                 // 根据状态设置下次轮询间隔
                 const interval = state.isFocusing ? 100 : 500;
                 pollTimeout = setTimeout(poll, interval);
-            } catch (error) {
+        } catch (error) {
                 console.error('状态更新失败:', error);
                 pollTimeout = setTimeout(poll, 1000); // 出错时降低请求频率
             }
@@ -186,7 +222,7 @@ async function toggleConnection() {
             });
             const state = await response.json();
             updateStatus(state);
-        } else {
+            } else {
             // 断开连接前先停止自动对焦
             if (cameraState.isFocusing) {
                 await stopAutoFocus();
@@ -202,7 +238,7 @@ async function toggleConnection() {
                 isZConfigured: false
             });
         }
-    } catch (error) {
+        } catch (error) {
         console.error('连接操作失败:', error);
     }
 }
@@ -220,7 +256,7 @@ async function startAutoFocus() {
         const response = await fetch('/start_focus', { method: 'POST' });
         const state = await response.json();
         updateStatus(state);
-    } catch (error) {
+        } catch (error) {
         console.error('开始自动对焦失败:', error);
     }
 }
@@ -231,14 +267,90 @@ async function stopAutoFocus() {
         const response = await fetch('/stop_focus', { method: 'POST' });
         const state = await response.json();
         updateStatus(state);
-    } catch (error) {
+        } catch (error) {
         console.error('停止自动对焦失败:', error);
     }
 }
 
+// 显示轴配置弹窗
+function showAxisConfigModal(axis) {
+    // 设置当前选中的轴
+    axisSelect.value = axis;
+    
+    // 获取当前轴的配置
+    const config = axisConfigs[axis];
+    
+    // 设置编码器值（从当前位置获取）
+    encoderValue.value = cameraState[`${axis}Position`] || 0;
+    
+    // 设置其他配置值
+    axisRatio.value = config.ratio;
+    axisBacklash.value = config.backlash;
+    axisSpeed.value = config.speed;
+    axisAcc.value = config.acc;
+    
+    // 设置软限位
+    const limits = cameraState.axisLimits[axis];
+    softLimitMin.value = limits.min;
+    softLimitMax.value = limits.max;
+    
+    // 显示弹窗
+    axisConfigModal.classList.add('show');
+}
+
+// 隐藏轴配置弹窗
+function hideAxisConfigModal() {
+    axisConfigModal.classList.remove('show');
+}
+
+// 保存轴配置
+function saveAxisConfig() {
+    const axis = axisSelect.value;
+    const config = {
+        ratio: parseFloat(axisRatio.value),
+        backlash: parseFloat(axisBacklash.value),
+        speed: parseFloat(axisSpeed.value),
+        acc: parseFloat(axisAcc.value)
+    };
+    
+    // 更新软限位
+    const min = parseFloat(softLimitMin.value);
+    const max = parseFloat(softLimitMax.value);
+    if (min < max) {
+        cameraState.axisLimits[axis] = { min, max };
+    }
+    
+    // 更新配置
+    axisConfigs[axis] = config;
+    
+    // 发送到后端（这里需要添加实际的API调用）
+    fetch('/save_axis_config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            axis,
+            config,
+            limits: { min, max }
+        })
+    }).then(response => response.json())
+      .then(data => {
+          console.log('轴配置已保存:', data);
+          hideAxisConfigModal();
+      })
+      .catch(error => {
+          console.error('保存轴配置失败:', error);
+      });
+}
+
 // 事件监听器
 document.addEventListener('DOMContentLoaded', () => {
+    // 初始化所有DOM引用
+    initializeDOMReferences();
+    
+    // 更新连接按钮初始状态
     updateConnectButton();
+    
+    // 启动状态轮询
     startStatusPolling();
     
     // 连接按钮点击事件
@@ -262,6 +374,65 @@ document.addEventListener('DOMContentLoaded', () => {
             jogAxis(axis, direction);
         });
     });
+
+    // 配置按钮点击事件
+    document.querySelectorAll('.config-button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); // 阻止默认行为
+            const axis = e.currentTarget.dataset.axis;
+            if (axis && cameraState.isConnected) {
+                showAxisConfigModal(axis);
+            }
+        });
+    });
+    
+    // 关闭按钮点击事件
+    const closeBtn = document.querySelector('.close-button');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideAxisConfigModal);
+    }
+    
+    // 取消按钮点击事件
+    const cancelBtn = document.getElementById('cancel-axis-config');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', hideAxisConfigModal);
+    }
+    
+    // 保存按钮点击事件
+    const saveBtn = document.getElementById('save-axis-config');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveAxisConfig);
+    }
+    
+    // 点击弹窗外部关闭
+    const modal = document.getElementById('axis-config-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideAxisConfigModal();
+            }
+        });
+    }
+    
+    // 轴选择改变事件
+    const axisSelect = document.getElementById('axis-select');
+    if (axisSelect) {
+        axisSelect.addEventListener('change', (e) => {
+            const axis = e.target.value;
+            if (axis && axisConfigs[axis] && cameraState.axisLimits && cameraState.axisLimits[axis]) {
+                const config = axisConfigs[axis];
+                const limits = cameraState.axisLimits[axis];
+                
+                document.getElementById('axis-ratio').value = config.ratio;
+                document.getElementById('axis-backlash').value = config.backlash;
+                document.getElementById('axis-speed').value = config.speed;
+                document.getElementById('axis-acc').value = config.acc;
+                document.getElementById('soft-limit-min').value = limits.min;
+                document.getElementById('soft-limit-max').value = limits.max;
+                document.getElementById('encoder-value').value = cameraState[`${axis}Position`] || 0;
+            }
+        });
+    }
 
     // 自动连接
     setTimeout(autoConnect, 500); // 延迟500ms后自动连接

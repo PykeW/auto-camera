@@ -1,7 +1,7 @@
 ---
-description: 开发工作流程指南
+description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # 开发工作流程指南
 
