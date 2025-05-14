@@ -1427,6 +1427,73 @@ def simulate_calibration_process():
         calibration_state["isCalibrating"] = False
         print("后端: 标定出错，isCalibrating设置为False")
 
+# 添加获取相机实时图像的API端点
+@app.route('/get_camera_image', methods=['GET'])
+def get_camera_image():
+    """获取相机实时图像"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    try:
+        # 使用favicon.png作为相机图像
+        image_path = os.path.join(os.path.dirname(__file__), 'favicon.png')
+        
+        # 如果文件不存在，则回退到模拟图像
+        if not os.path.exists(image_path):
+            # 生成一个模拟的相机图像
+            width = 640
+            height = 480
+            image = Image.new('RGB', (width, height), color='#222222')
+            draw = ImageDraw.Draw(image)
+            
+            # 添加网格线
+            for x in range(0, width, 40):
+                draw.line([(x, 0), (x, height)], fill='#444444')
+            for y in range(0, height, 40):
+                draw.line([(0, y), (width, y)], fill='#444444')
+            
+            # 添加中心十字线
+            center_x = width // 2
+            center_y = height // 2
+            draw.line([(center_x, 0), (center_x, height)], fill='#777777', width=2)
+            draw.line([(0, center_y), (width, center_y)], fill='#777777', width=2)
+            
+            draw.text((10, 10), f"相机: {camera_state['serialNumber']}", fill='white')
+            draw.text((10, 50), f"当前对焦位置: {camera_state['ZPosition']:.3f}mm", fill='white')
+            
+            # 如果启用了ROI，绘制ROI区域
+            if camera_state["roiEnabled"]:
+                roi = camera_state["roiCoords"]
+                draw.rectangle([roi["l"], roi["t"], roi["r"], roi["b"]], outline='red', width=2)
+            
+            # 转换为二进制数据
+            buffer = io.BytesIO()
+            image.save(buffer, format='JPEG')
+            buffer.seek(0)
+            
+            # 转换为base64字符串
+            img_str = base64.b64encode(buffer.getvalue()).decode()
+            
+            return jsonify({
+                "success": True,
+                "image": f"data:image/jpeg;base64,{img_str}"
+            })
+        else:
+            # 使用favicon.png作为相机图像
+            with open(image_path, 'rb') as f:
+                img_data = f.read()
+                
+            # 转换为base64字符串
+            img_str = base64.b64encode(img_data).decode()
+            
+            return jsonify({
+                "success": True,
+                "image": f"data:image/png;base64,{img_str}"
+            })
+    except Exception as e:
+        print(f"获取相机图像出错: {str(e)}")
+        return jsonify({"success": False, "message": f"获取相机图像出错: {str(e)}"}), 500
+
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义
     app.run(host='0.0.0.0', port=5000, debug=True) 

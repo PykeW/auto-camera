@@ -1761,34 +1761,36 @@ input:checked + .slider:before {
     text-align: left;
 }
 
-/* 图像左上角对焦信息显示 */
+/* 相机图像信息叠加层 */
 .camera-info-overlay {
     position: absolute;
     top: 10px;
-    left: 10px;
-    z-index: 10;
+    right: 10px;
     background-color: rgba(0, 0, 0, 0.6);
     border-radius: 4px;
-    padding: 5px 8px;
-    font-size: 12px;
-    color: white;
-    pointer-events: none;
-    min-width: 150px;
+    padding: 6px 10px;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-family: "Consolas", monospace;
+    font-size: 13px;
 }
 
 .info-item {
     display: flex;
-    justify-content: space-between;
-    margin: 2px 0;
+    align-items: center;
+    margin: 3px 0;
 }
 
 .info-label {
-    margin-right: 10px;
-    font-weight: bold;
+    color: var(--text-medium);
+    margin-right: 6px;
+    font-weight: normal;
 }
 
 .info-value {
-    text-align: right;
+    color: var(--accent-green);
+    font-weight: bold;
 }
 
 /* 轴位置控制区域样式 */

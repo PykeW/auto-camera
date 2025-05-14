@@ -26,9 +26,15 @@
         <main class="main-content">
             <section class="camera-view">
                 <div class="camera-image">
-                    <img id="camera-feed" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" alt="相机画面">
+                    <img id="camera-feed" src="favicon.png" alt="相机画面">
                     <div class="roi-overlay" style="display: none;">
                         <div class="roi-box"></div>
+                    </div>
+                    <div class="camera-info-overlay">
+                        <div class="info-item" id="focus-info">
+                            <span class="info-label">清晰度:</span>
+                            <span class="info-value" id="clarity-display">--</span>
+                        </div>
                     </div>
                 </div>
                 

@@ -39,7 +39,9 @@ let cameraState = {
         "4": "U"
     },
     // 添加单位显示设置
-    displayUnit: 'mm' // 默认单位为mm
+    displayUnit: 'mm', // 默认单位为mm
+    // 添加相机图像URL
+    cameraImageUrl: null
 };
 
 // 相机标定相关状态
@@ -328,6 +330,12 @@ function updateStatus(state) {
         clarityInput.value = state.clarity ? state.clarity.toFixed(3) : '--';
     }
     
+    // 更新图像中显示的清晰度值
+    const clarityDisplay = document.getElementById('clarity-display');
+    if (clarityDisplay) {
+        clarityDisplay.textContent = state.clarity ? state.clarity.toFixed(3) : '--';
+    }
+    
     // 更新按钮状态
     if (startFocusBtn) {
         startFocusBtn.disabled = !state.isConnected || state.isFocusing;
@@ -357,6 +365,11 @@ function updateStatus(state) {
     }
     if (savePathInput && state.savePath) {
         savePathInput.value = state.savePath;
+    }
+    
+    // 始终获取相机图像，只要相机已连接
+    if (state.isConnected) {
+        fetchCameraImage();
     }
     
     // 更新对焦参数设置按钮状态
@@ -467,7 +480,12 @@ async function toggleConnection() {
             });
             const state = await response.json();
             updateStatus(state);
-            } else {
+            
+            // 相机连接后立即获取图像
+            if (state.isConnected) {
+                fetchCameraImage();
+            }
+        } else {
             // 断开连接前先停止自动对焦
             if (cameraState.isFocusing) {
                 await stopAutoFocus();
@@ -483,7 +501,7 @@ async function toggleConnection() {
                 isZConfigured: false
             });
         }
-        } catch (error) {
+    } catch (error) {
         console.error('连接操作失败:', error);
     }
 }
@@ -2905,4 +2923,22 @@ function showMessage(message, type = 'info') {
         messageEl.classList.remove('show');
         setTimeout(() => messageEl.remove(), 300);
     }, 3000);
+}
+
+// 获取相机实时图像
+async function fetchCameraImage() {
+    if (!cameraState.isConnected) return;
+    
+    try {
+        const response = await fetch('/get_camera_image');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.image) {
+                cameraState.cameraImageUrl = data.image;
+                document.getElementById('camera-feed').src = data.image;
+            }
+        }
+    } catch (error) {
+        console.error('获取相机图像失败:', error);
+    }
 }
