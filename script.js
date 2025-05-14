@@ -798,33 +798,32 @@ async function saveFocusParams() {
 function toggleRoiDrawing() {
     if (!cameraState.isConnected) return;
     
+    // 切换ROI绘制状态
     cameraState.isDrawingROI = !cameraState.isDrawingROI;
     console.log('切换ROI绘制模式:', cameraState.isDrawingROI ? '开启' : '关闭');
     
+    // 如果当前是绘制ROI状态
     if (cameraState.isDrawingROI) {
-        // 开始绘制 - 显示ROI工具面板
+        enableRoiDrawing();
         drawRoiFocusBtn.classList.add('active');
         
-        // 显示工具面板而不是按钮组
+        // 显示ROI工具面板
         const roiToolsPanel = document.getElementById('roi-tools-panel');
         if (roiToolsPanel) {
-            roiToolsPanel.classList.add('show');
+            roiToolsPanel.style.display = 'flex';
+            // 确保工具面板位置在相机视图的右上角
+            roiToolsPanel.style.top = '10px';
+            roiToolsPanel.style.right = '10px';
         }
-        
-        // 启用ROI绘制模式
-        enableRoiDrawing();
     } else {
-        // 取消绘制
+        disableRoiDrawing();
         drawRoiFocusBtn.classList.remove('active');
         
-        // 隐藏工具面板
+        // 隐藏ROI工具面板
         const roiToolsPanel = document.getElementById('roi-tools-panel');
         if (roiToolsPanel) {
-            roiToolsPanel.classList.remove('show');
+            roiToolsPanel.style.display = 'none';
         }
-        
-        // 禁用ROI绘制模式
-        disableRoiDrawing();
     }
 }
 
@@ -1242,6 +1241,7 @@ function clearRoi() {
     console.log('ROI已删除');
 }
 
+// 切换ROI可见性
 function toggleRoiVisibility() {
     if (!cameraState.roiCoords) return;
     
@@ -2277,11 +2277,12 @@ function initializeRoiTools() {
     document.getElementById('draw-mode-container').addEventListener('click', () => switchDrawMode('draw'));
     document.getElementById('edit-mode-container').addEventListener('click', () => switchDrawMode('edit'));
     
-    // 操作按钮
-    document.getElementById('confirm-roi-tool-btn').addEventListener('click', confirmRoi);
-    document.getElementById('cancel-roi-tool-btn').addEventListener('click', cancelRoi);
-    document.getElementById('toggle-visibility-roi-btn').addEventListener('click', toggleRoiVisibility);
-    document.getElementById('delete-roi-btn').addEventListener('click', clearRoi);
+    // 移除对已删除按钮的事件监听
+    // document.getElementById('confirm-roi-tool-btn').addEventListener('click', confirmRoi);
+    // document.getElementById('cancel-roi-tool-btn').addEventListener('click', cancelRoi);
+    // document.getElementById('toggle-visibility-roi-btn').addEventListener('click', toggleRoiVisibility);
+    // document.getElementById('delete-roi-btn').addEventListener('click', clearRoi);
+    
     document.getElementById('close-roi-tools').addEventListener('click', closeRoiTools);
 }
 
@@ -2293,7 +2294,7 @@ function closeRoiTools() {
     // 隐藏工具面板
     const roiToolsPanel = document.getElementById('roi-tools-panel');
     if (roiToolsPanel) {
-        roiToolsPanel.classList.remove('show');
+        roiToolsPanel.style.display = 'none';
     }
     
     // 禁用ROI绘制模式
@@ -2541,6 +2542,6 @@ function editRoi() {
     // 显示ROI工具面板
     const roiToolsPanel = document.getElementById('roi-tools-panel');
     if (roiToolsPanel) {
-        roiToolsPanel.classList.add('show');
+        roiToolsPanel.style.display = 'flex';
     }
 }

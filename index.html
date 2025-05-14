@@ -130,12 +130,9 @@
                                     <div class="radio-circle"></div>
                                     <label>编辑</label>
                                 </div>
-                            </div>
-                            <div class="roi-option-group">
-                                <button class="roi-tool-button" id="confirm-roi-tool-btn" title="确认">确认</button>
-                                <button class="roi-tool-button" id="cancel-roi-tool-btn" title="取消">取消</button>
-                                <button class="roi-tool-button" id="toggle-visibility-roi-btn" title="显示/隐藏">显示</button>
-                                <button class="roi-tool-button" id="delete-roi-btn" title="删除">删除</button>
+                                <div class="redraw-button-container">
+                                    <button class="roi-tool-button" id="redraw-roi-btn">重画</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -273,7 +270,7 @@
                     
                     <!-- 当前轴位置显示和点动控制 -->
                     <div class="control-item side-by-side">
-                        <label for="focus-axis-position">轴位置控制:</label>
+                        <label for="focus-axis-position">轴位置:</label>
                         <div class="axis-position-control">
                             <button class="jog-btn minus" id="focus-jog-minus">-</button>
                             <input type="text" id="focus-axis-position" value="0" readonly>
