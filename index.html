@@ -273,15 +273,11 @@
                         <label for="focus-axis-position">轴位置:</label>
                         <div class="axis-position-control">
                             <button class="jog-btn minus" id="focus-jog-minus">-</button>
-                            <input type="text" id="focus-axis-position" value="0" readonly style="text-align: left;">
+                            <input type="text" id="focus-axis-position" value="0" readonly style="text-align: left; width: 80px; min-width: 80px;">
                             <button class="jog-btn plus" id="focus-jog-plus">+</button>
                         </div>
-                    </div>
-                    
-                    <!-- 新增步进控制下拉列表 -->
-                    <div class="control-item side-by-side">
-                        <label for="focus-step-select">步进量:</label>
-                        <select id="focus-step-select" class="compact-select">
+                        <!-- 步进量下拉框移到这里 -->
+                        <select id="focus-step-select" class="compact-select" style="margin-left: 10px; width: auto; min-width: 65px; flex: 0 0 auto;">
                             <option value="1">1</option>
                             <option value="10">10</option>
                             <option value="100" selected>100</option>
@@ -296,7 +292,7 @@
                         <input type="text" id="clarity-value" value="--" readonly disabled="" style="text-align: left;">
                     </div>
                     
-                    <!-- 修改为搜索范围和搜索颗粒度 -->
+                    <!-- 修改为搜索范围和对焦步进 -->
                     <div class="control-item side-by-side compact-row">
                         <label for="focus-range">搜索范围:</label>
                         <div class="input-group">
@@ -304,7 +300,7 @@
                         </div>
                     </div>
                     <div class="control-item side-by-side compact-row">
-                        <label for="focus-step">搜索颗粒度:</label>
+                        <label for="focus-step">对焦步进:</label>
                         <div class="input-group">
                             <input type="number" id="focus-step" value="500" step="10" min="1" class="compact-input" style="text-align: left;">
                         </div>

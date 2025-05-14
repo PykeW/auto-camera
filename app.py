@@ -20,7 +20,20 @@ def index():
 
 @app.route('/<path:path>')
 def serve_static(path):
-    return send_file(path)
+    # 忽略Chrome DevTools相关请求
+    if path.startswith('.well-known'):
+        return '', 404  # 返回404状态码
+    
+    # 让Flask的路由系统先处理API路径
+    if path in ['connect', 'disconnect', 'status', 'start_focus', 'stop_focus'] or path.startswith('api/'):
+        # 这里不处理API路径，让Flask路由系统来处理
+        return '', 404
+    
+    try:
+        return send_file(path)
+    except FileNotFoundError:
+        # 文件不存在时返回404而不是500错误
+        return '', 404
 
 # --- 模拟状态 ---
 camera_state = {
@@ -68,7 +81,7 @@ camera_state = {
     # 添加自动对焦参数 - 统一使用编码器值
     "focusParams": {
         "range": 5000,       # 搜索范围(编码器值)
-        "step": 500,         # 搜索颗粒度(编码器值)
+        "step": 500,         # 对焦步进(编码器值)
         "exposure": 5000,
         "gain": 1.0,
         "times": 1,
@@ -159,7 +172,7 @@ def simulate_focus_process():
         start_z = max(0, current_z_encoder - search_range)
         end_z = current_z_encoder + search_range
         
-        print(f"后端: 对焦参数 - 当前Z位置: {current_z_encoder}, 搜索范围: ±{search_range}, 起点: {start_z}, 终点: {end_z}, 步进: {step_size}")
+        print(f"后端: 对焦参数 - 当前Z位置: {current_z_encoder}, 搜索范围: ±{search_range}, 起点: {start_z}, 终点: {end_z}, 对焦步进: {step_size}")
         
         time.sleep(0.2) # 模拟初始化
 
@@ -362,7 +375,7 @@ def connect_camera():
     # 显式初始化对焦参数
     camera_state["focusParams"] = {
         "range": 5000,       # 搜索范围(编码器值)
-        "step": 500,         # 搜索颗粒度(编码器值)
+        "step": 500,         # 对焦步进(编码器值)
         "exposure": 5000,
         "gain": 1.0,
         "times": 1,
@@ -427,7 +440,7 @@ def disconnect_camera():
         # 添加自动对焦参数
         "focusParams": {
             "range": 5000,       # 搜索范围(编码器值)
-            "step": 500,         # 搜索颗粒度(编码器值)
+            "step": 500,         # 对焦步进(编码器值)
             "exposure": 5000,
             "gain": 1.0,
             "times": 1,
