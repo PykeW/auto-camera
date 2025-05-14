@@ -126,7 +126,7 @@ body {
 .control-panel {
     width: var(--panel-width);
     background-color: var(--bg-dark);
-    padding: 0;
+    padding: 10px;
     overflow-y: auto;
     flex-shrink: 0;
     color: var(--text-light);
@@ -134,6 +134,7 @@ body {
     scrollbar-width: none;
     -ms-overflow-style: none;
     max-width: 100%;
+    max-height: calc(100vh - 120px);
 }
 .control-panel::-webkit-scrollbar {
     display: none;
@@ -168,7 +169,8 @@ body {
 
 /* 面板区块 */
 .panel-section {
-    padding: var(--spacing-medium) var(--spacing-large);
+    margin-bottom: 15px;
+    padding-bottom: 15px;
     border-bottom: 1px solid var(--border-dark);
 }
 
@@ -202,7 +204,7 @@ body {
 
 /* 表单控件 */
 .control-item {
-    margin-bottom: var(--spacing-medium);
+    margin-bottom: 8px;
 }
 
 label {
@@ -264,9 +266,16 @@ select {
 }
 
 .compact-select {
-    height: 24px;
-    padding-top: 2px;
-    padding-bottom: 2px;
+    width: 100%;
+    max-width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--border-medium);
+    border-radius: 3px;
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    font-size: 0.9em;
+    height: 28px;
+    box-sizing: border-box;
 }
 
 /* 按钮 */
@@ -363,7 +372,10 @@ button:hover:not(:disabled) {
 /* 输入组 */
 .input-group {
     display: flex;
-    gap: var(--spacing-small);
+    flex-wrap: nowrap;
+    align-items: center;
+    flex: 1;
+    max-width: 100%;
 }
 
 .input-group input {
@@ -970,9 +982,9 @@ input:checked + .slider:before {
 /* === 工具类 === */
 
 .separator {
+    margin: 15px 0;
     border: none;
     border-top: 1px solid var(--border-dark);
-    margin: var(--spacing-large) 0;
 }
 
 /* === 响应式布局 === */
@@ -1057,30 +1069,45 @@ input:checked + .slider:before {
 }
 
 .jog-btn {
-    width: 30px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
     padding: 0;
-    background: #444;
-    border: 1px solid #666;
-    color: white;
-    border-radius: 3px;
-    cursor: pointer;
+    border: 1px solid var(--border-medium);
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    font-size: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s ease;
 }
 
-.jog-btn:hover {
-    background: #555;
+.jog-btn:hover:not(:disabled) {
+    background-color: var(--accent-blue);
+    color: white;
 }
 
-.jog-btn:active {
-    background: #666;
+.jog-btn:active:not(:disabled) {
+    background-color: var(--accent-yellow);
+    color: var(--text-dark);
 }
 
-.jog-btn.disabled {
+.jog-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.jog-btn.minus {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.jog-btn.plus {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
 }
 
 .step-select {
@@ -1563,21 +1590,23 @@ input:checked + .slider:before {
 .axis-position-control {
     display: flex;
     align-items: center;
-    gap: 5px;
-    width: 100%;
-    min-width: 0;
-    flex-wrap: nowrap;
+    flex: 1;
+    max-width: 100%;
+    height: 28px;
 }
 
 .axis-position-control input {
     flex: 1;
-    min-width: 60px;
     text-align: center;
+    margin: 0 4px;
+    height: 28px;
+    padding: 4px;
+    box-sizing: border-box;
     background-color: var(--bg-medium);
-    border: 1px solid var(--border-dark);
-    border-radius: var(--border-radius);
-    padding: 4px 8px;
     color: var(--text-light);
+    border: 1px solid var(--border-medium);
+    border-radius: 3px;
+    max-width: 100px;
 }
 
 .axis-position-control .jog-btn {
@@ -2099,4 +2128,67 @@ input:checked + .slider:before {
 .roi-tools-panel.show {
     display: flex;
     animation: fadeIn 0.3s ease forwards;
+}
+
+/* 优化侧边布局 */
+.side-by-side {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.side-by-side label {
+    width: 80px;
+    min-width: 80px;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+}
+
+.side-by-side input,
+.side-by-side select {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 紧凑输入框样式优化 */
+.compact-input {
+    width: 100%;
+    max-width: 100%;
+    padding: 4px 8px;
+    border: 1px solid var(--border-medium);
+    border-radius: 3px;
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    font-size: 0.9em;
+    height: 28px;
+    box-sizing: border-box;
+}
+
+/* 控制面板布局优化 */
+.control-panel {
+    padding: 10px;
+    overflow-y: auto;
+    max-height: calc(100vh - 120px);
+}
+
+.panel-section {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-dark);
+}
+
+/* Separator 样式优化 */
+.separator {
+    margin: 15px 0;
+    border: none;
+    border-top: 1px solid var(--border-dark);
+}
+
+/* 控制项容器更紧凑 */
+.control-item {
+    margin-bottom: 8px;
 } 
