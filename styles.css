@@ -692,6 +692,17 @@ input:checked + .slider:before {
 .focus-controls button {
     flex-grow: 1;
     height: 32px;
+    white-space: nowrap;
+    padding: 0 10px;
+    font-size: 13px;
+}
+
+.focus-controls .secondary-button {
+    background-color: #2C6E91;
+}
+
+.focus-controls .secondary-button:hover:not(:disabled) {
+    background-color: #3588B2;
 }
 
 .focus-status label {

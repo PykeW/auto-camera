@@ -378,6 +378,10 @@ function updateStatus(state) {
     if (stopFocusBtn) {
         stopFocusBtn.disabled = !state.isConnected || !state.isFocusing;
     }
+    
+    // 使用toggleFocusButtons更新按钮显示
+    toggleFocusButtons(state.isFocusing);
+    
     if (drawRoiFocusBtn) {
         drawRoiFocusBtn.disabled = !state.isConnected || state.isFocusing;
     }
@@ -534,6 +538,9 @@ async function startAutoFocus() {
         });
         const state = await response.json();
         updateStatus(state);
+        
+        // 切换按钮显示状态
+        toggleFocusButtons(true);
     } catch (error) {
         console.error('开始自动对焦失败:', error);
     }
@@ -545,8 +552,58 @@ async function stopAutoFocus() {
         const response = await fetch('/stop_focus', { method: 'POST' });
         const state = await response.json();
         updateStatus(state);
-        } catch (error) {
+        
+        // 切换按钮显示状态
+        toggleFocusButtons(false);
+    } catch (error) {
         console.error('停止自动对焦失败:', error);
+    }
+}
+
+// 切换对焦按钮显示状态
+function toggleFocusButtons(isFocusing) {
+    const startFocusBtn = document.getElementById('start-focus-btn');
+    const stopFocusBtn = document.getElementById('stop-focus-btn');
+    const saveFocusPositionBtn = document.getElementById('save-focus-position-btn');
+    
+    if (isFocusing) {
+        // 对焦中状态: 隐藏开始按钮，显示停止按钮
+        if (startFocusBtn) startFocusBtn.style.display = 'none';
+        if (stopFocusBtn) stopFocusBtn.style.display = 'block';
+        if (saveFocusPositionBtn) saveFocusPositionBtn.style.display = 'none';
+    } else {
+        // 非对焦状态: 显示开始按钮，隐藏停止按钮，显示保存位置按钮
+        if (startFocusBtn) startFocusBtn.style.display = 'block';
+        if (stopFocusBtn) stopFocusBtn.style.display = 'none';
+        if (saveFocusPositionBtn) saveFocusPositionBtn.style.display = 'block';
+    }
+}
+
+// 保存当前对焦位置
+async function saveFocusPosition() {
+    try {
+        // 获取当前选中的轴ID
+        const selectedAxisId = document.getElementById('focus-axis-select') ? 
+                               document.getElementById('focus-axis-select').value : '3'; // 默认Z轴
+        
+        const response = await fetch('/save_focus_position', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ axisId: selectedAxisId })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // 显示保存成功信息
+            alert(`保存成功: ${result.message}`);
+        } else {
+            // 显示错误信息
+            alert(`保存失败: ${result.message}`);
+        }
+    } catch (error) {
+        console.error('保存对焦位置失败:', error);
+        alert('保存对焦位置失败，请查看控制台了解详情');
     }
 }
 
@@ -2462,6 +2519,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // 更新连接按钮初始状态
     updateConnectButton();
     
+    // 初始化对焦按钮状态
+    toggleFocusButtons(false);
+    
     // 启动状态轮询
     startStatusPolling();
     
@@ -2487,6 +2547,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (stopFocusBtn) {
         stopFocusBtn.addEventListener('click', stopAutoFocus);
+    }
+    
+    // 添加保存对焦位置按钮事件监听
+    const saveFocusPositionBtn = document.getElementById('save-focus-position-btn');
+    if (saveFocusPositionBtn) {
+        saveFocusPositionBtn.addEventListener('click', saveFocusPosition);
     }
     
     // 添加当量校准按钮事件监听

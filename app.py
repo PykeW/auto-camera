@@ -95,7 +95,9 @@ camera_state = {
     "markDetected": False,
     "markCentered": False,
     "markPoints": [],
-    "lastCapturePosition": None  # 添加上次拍照位置记录
+    "lastCapturePosition": None,  # 添加上次拍照位置记录
+    "manualFocusPosition": None,
+    "manualFocusPositionEncoder": None
 }
 
 # --- 标定相关变量 ---
@@ -459,7 +461,9 @@ def disconnect_camera():
         "markDetected": False,
         "markCentered": False,
         "markPoints": [],
-        "lastCapturePosition": None  # 添加上次拍照位置
+        "lastCapturePosition": None,  # 添加上次拍照位置
+        "manualFocusPosition": None,
+        "manualFocusPositionEncoder": None
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -1244,6 +1248,47 @@ def generate_mark_image():
             "y": markY
         }
     })
+
+@app.route('/save_focus_position', methods=['POST'])
+def save_focus_position():
+    """保存当前Z轴位置作为手动对焦位置"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    try:
+        # 获取当前轴ID
+        data = request.json
+        axis_id = data.get('axisId', '3')  # 默认Z轴
+        axis_name = None
+        
+        # 查找轴名称
+        for key, value in axis_id_mapping.items():
+            if key == axis_id:
+                axis_name = value
+                break
+        
+        if not axis_name:
+            return jsonify({"success": False, "message": "无效的轴ID"}), 400
+            
+        # 保存当前位置
+        position = camera_state[f"{axis_name}Position"]
+        position_encoder = camera_state[f"{axis_name}PositionEncoder"]
+        
+        # 记录为手动对焦位置
+        camera_state["manualFocusPosition"] = position
+        camera_state["manualFocusPositionEncoder"] = position_encoder
+        
+        print(f"后端: 保存手动对焦位置 - {axis_name}轴 {position}mm ({position_encoder}编码器值)")
+        
+        return jsonify({
+            "success": True, 
+            "message": f"已保存{axis_name}轴位置作为手动对焦位置",
+            "position": position,
+            "positionEncoder": position_encoder
+        })
+    except Exception as e:
+        print(f"保存对焦位置出错: {str(e)}")
+        return jsonify({"success": False, "message": f"保存对焦位置出错: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义
