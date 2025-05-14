@@ -1906,4 +1906,44 @@ input:checked + .slider:before {
     flex: 1;
     min-width: 0;
     text-align: left;
+}
+
+/* 图像左上角对焦信息显示 */
+.camera-info-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    padding: 8px;
+    border: 1px solid var(--border-dark);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    pointer-events: none; /* 避免干扰图像交互 */
+}
+
+.focus-position-display {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    min-width: 150px;
+}
+
+.info-label {
+    color: var(--text-medium);
+    font-size: 12px;
+    margin-right: 8px;
+    min-width: 60px;
+}
+
+.info-value {
+    color: var(--text-light);
+    font-size: 13px;
+    font-weight: bold;
+    font-family: monospace;
 } 

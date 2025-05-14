@@ -29,6 +29,20 @@
 
                 <!-- Container for image/svg -->
                 <div id="camera-display-container">
+                    <!-- 添加对焦位和清晰度信息显示 -->
+                    <div class="camera-info-overlay">
+                        <div class="focus-position-display">
+                            <div class="info-item">
+                                <span class="info-label">当前位置:</span>
+                                <span id="focus-position-display" class="info-value">上料位</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">清晰度:</span>
+                                <span id="focus-clarity-display" class="info-value">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <img id="simulated-image" src="favicon.png" alt="模拟相机图像">
                     <div id="calibration-pattern-display" style="display: none; width: 100%; height: 100%;">
                         <!-- SVG will be injected here by JS -->
@@ -215,11 +229,7 @@
                         </select>
                     </div>
                     
-                    <!-- 对焦相关数据显示 -->
-                     <div class="control-item side-by-side">
-                        <label for="clarity-value">当前清晰度:</label>
-                        <input type="text" id="clarity-value" value="--" readonly disabled="" style="text-align: left;">
-                    </div>
+                    <!-- 对焦相关数据显示 - 已移除清晰度显示 -->
                     
                     <!-- 修改为搜索范围和对焦步进 -->
                     <div class="control-item side-by-side compact-row">

@@ -326,6 +326,21 @@ function updateStatus(state) {
         clarityInput.value = state.clarity ? state.clarity.toFixed(3) : '--';
     }
     
+    // 更新图像左上角的对焦位置和清晰度信息
+    const focusPositionDisplay = document.getElementById('focus-position-display');
+    const focusClarityDisplay = document.getElementById('focus-clarity-display');
+    
+    if (focusPositionDisplay) {
+        // 固定显示"上料位"
+        focusPositionDisplay.textContent = "上料位";
+    }
+    
+    if (focusClarityDisplay) {
+        // 显示实时清晰度值
+        focusClarityDisplay.textContent = state.clarity ? 
+            state.clarity.toFixed(3) : '--';
+    }
+    
     // 更新Z轴控制界面
     if (window.updateFocusAxisControls) {
         window.updateFocusAxisControls();
@@ -466,7 +481,7 @@ async function startAutoFocus() {
         }
         
         if (step <= 0) {
-            alert('搜索颗粒度必须大于0');
+            alert('对焦步进必须大于0');
             return;
         }
         

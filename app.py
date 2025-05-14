@@ -94,7 +94,8 @@ camera_state = {
     "isCalibrating": False,
     "markDetected": False,
     "markCentered": False,
-    "markPoints": []
+    "markPoints": [],
+    "lastCapturePosition": None  # 添加上次拍照位置记录
 }
 
 # --- 标定相关变量 ---
@@ -372,6 +373,10 @@ def connect_camera():
     camera_state["UPositionEncoder"] = round(camera_state["UPosition"] * 1000)
     camera_state["currentZEncoder"] = round(camera_state["currentZ"] * 1000)
     
+    # 初始化上次拍照位置为当前Z轴位置
+    camera_state["lastCapturePosition"] = camera_state["currentZEncoder"]
+    print(f"后端: 初始化上次拍照位置为 {camera_state['lastCapturePosition']}")
+    
     # 显式初始化对焦参数
     camera_state["focusParams"] = {
         "range": 5000,       # 搜索范围(编码器值)
@@ -453,7 +458,8 @@ def disconnect_camera():
         "isCalibrating": False,
         "markDetected": False,
         "markCentered": False,
-        "markPoints": []
+        "markPoints": [],
+        "lastCapturePosition": None  # 添加上次拍照位置
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -549,6 +555,11 @@ def stop_capture():
 def single_shot():
     if not camera_state["isConnected"] or camera_state["isFocusing"] or camera_state["isCapturing"] or camera_state["isRecording"]: return jsonify({"status": "error"}), 400
     print("后端: 执行单张拍照")
+    
+    # 记录当前Z轴位置作为上次拍照位置
+    camera_state["lastCapturePosition"] = camera_state["currentZEncoder"]
+    print(f"后端: 更新上次拍照位置为 {camera_state['lastCapturePosition']}")
+    
     # 可以在这里模拟保存文件等
     time.sleep(0.1) # 模拟耗时
     return jsonify({"status": "ok"})
