@@ -97,7 +97,10 @@ camera_state = {
     "markPoints": [],
     "lastCapturePosition": None,  # 添加上次拍照位置记录
     "manualFocusPosition": None,
-    "manualFocusPositionEncoder": None
+    "manualFocusPositionEncoder": None,
+    # 添加对焦图像相关状态
+    "focusImages": [],  # 存储对焦过程中的图像
+    "focusCompleted": False  # 标记对焦是否完成
 }
 
 # --- 标定相关变量 ---
@@ -161,6 +164,8 @@ def simulate_focus_process():
         stop_focus_flag.clear()
         camera_state["isFocusing"] = True
         camera_state["focusStatus"] = "对焦中"  # 简化状态显示
+        camera_state["focusImages"] = []  # 清空之前的对焦图像
+        camera_state["focusCompleted"] = False
         print("后端: 开始自动对焦")
         
         # 应用对焦参数
@@ -188,6 +193,7 @@ def simulate_focus_process():
         # 对焦过程 - 简化状态显示
         best_z = start_z
         max_clarity = -1
+        image_count = 0 # 图像计数
             
         # 从起点到终点进行线性扫描
         z = start_z
@@ -200,7 +206,19 @@ def simulate_focus_process():
             camera_state["ZPositionEncoder"] = camera_state["currentZEncoder"]
             camera_state["currentZ"] = round(z / 1000.0, 3)
             camera_state["ZPosition"] = camera_state["currentZ"]
-            camera_state["clarity"] = calculate_clarity(z, is_encoder=True)
+            clarity = calculate_clarity(z, is_encoder=True)
+            camera_state["clarity"] = clarity
+            
+            # 生成并保存当前位置的图像
+            image_data = generate_focus_image(z, clarity)
+            camera_state["focusImages"].append({
+                "zPosition": camera_state["currentZ"],
+                "zPositionEncoder": camera_state["currentZEncoder"],
+                "clarity": clarity,
+                "image": image_data,
+                "index": image_count
+            })
+            image_count += 1
             
             print(f"后端: 对焦 Z={camera_state['currentZEncoder']}, 清晰度={camera_state['clarity']}")
             
@@ -221,6 +239,7 @@ def simulate_focus_process():
             camera_state["bestZEncoder"] = best_z
             camera_state["bestZ"] = round(best_z / 1000.0, 3)
             camera_state["clarity"] = calculate_clarity(best_z, is_encoder=True)
+            camera_state["focusCompleted"] = True
             print(f"后端: 自动对焦完成, 最佳 Z = {best_z}(编码器值)")
                 
             camera_state["focusStatus"] = "空闲"
@@ -234,91 +253,120 @@ def simulate_focus_process():
         camera_state["focusStatus"] = "空闲"
         camera_state["isFocusing"] = False
 
-def simulate_calibration_process():
-    """模拟标定过程"""
-    global calibration_state, stop_calibration_flag
+def generate_focus_image(z_position, clarity):
+    """生成模拟的对焦图像"""
+    try:
+        # 创建图像大小
+        width = 640
+        height = 480
+        # 根据清晰度设置模糊程度
+        blur_level = max(0, 1 - clarity) * 10
+        
+        # 创建基本图像
+        image = Image.new('RGB', (width, height), color='white')
+        draw = ImageDraw.Draw(image)
+        
+        # 绘制网格线
+        for x in range(0, width, 40):
+            line_width = 1 if x % 120 == 0 else 1
+            draw.line([(x, 0), (x, height)], fill='#AAAAAA', width=line_width)
+        
+        for y in range(0, height, 40):
+            line_width = 1 if y % 120 == 0 else 1
+            draw.line([(0, y), (width, y)], fill='#AAAAAA', width=line_width)
+        
+        # 在中心区域绘制一些文本和形状
+        center_x = width // 2
+        center_y = height // 2
+        font_size = 40
+        # 模拟文本可用PIL的ImageFont，但简化实现
+        text = f"Z: {z_position/1000:.3f}mm"
+        # 简化：只绘制一个矩形代表文本
+        text_width = len(text) * font_size // 2
+        text_height = font_size
+        draw.rectangle([center_x - text_width//2, center_y - text_height//2, 
+                         center_x + text_width//2, center_y + text_height//2], 
+                        outline='black', fill='#EEEEEE')
+        
+        # 绘制一些形状
+        draw.rectangle([center_x - 100, center_y - 100, center_x + 100, center_y + 100], 
+                        outline='red', width=2)
+        draw.ellipse([center_x - 80, center_y - 80, center_x + 80, center_y + 80], 
+                      outline='blue', width=2)
+        
+        # 添加当前Z位置和清晰度信息
+        draw.text((10, 10), f"Z: {z_position/1000:.3f}mm", fill='black')
+        draw.text((10, 30), f"清晰度: {clarity:.3f}", fill='black')
+        
+        # 如果不是最清晰的，添加模糊效果
+        if blur_level > 0:
+            from PIL import ImageFilter
+            image = image.filter(ImageFilter.GaussianBlur(radius=blur_level))
+        
+        # 转换为二进制数据
+        buffer = io.BytesIO()
+        image.save(buffer, format='JPEG', quality=85)
+        buffer.seek(0)
+        
+        # 转换为base64字符串
+        img_str = base64.b64encode(buffer.getvalue()).decode()
+        return f"data:image/jpeg;base64,{img_str}"
+    except Exception as e:
+        print(f"生成对焦图像出错: {str(e)}")
+        return None
+
+@app.route('/get_focus_images', methods=['GET'])
+def get_focus_images():
+    """获取对焦过程中的图像列表"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
+    
+    # 返回缩略图版本的图像列表
+    return jsonify({
+        "success": True,
+        "focusCompleted": camera_state["focusCompleted"],
+        "images": camera_state["focusImages"]
+    })
+
+@app.route('/set_focus_position', methods=['POST'])
+def set_focus_position():
+    """将指定的Z轴位置设为对焦位置"""
+    if not camera_state["isConnected"]:
+        return jsonify({"success": False, "message": "相机未连接"}), 400
     
     try:
-        stop_calibration_flag.clear()
-        calibration_state["isCalibrating"] = True
-        print("后端: 开始标定过程，初始化完成")
+        data = request.json
+        z_position = data.get('zPosition')  # 毫米值
+        z_position_encoder = data.get('zPositionEncoder')  # 编码器值
         
-        # 执行标定过程
-        for i in range(calibration_state["totalPoints"]):
-            if stop_calibration_flag.is_set():
-                print("后端: 标定被中断")
-                break
-            
-            # 获取当前点位
-            point = calibration_state["calibrationMatrix"][i]
-            calibration_state["currentPoint"] = point
-            
-            print(f"后端: 标定点位 {i+1}/{calibration_state['totalPoints']} - 坐标: ({point['x']}, {point['y']})")
-            
-            # 模拟移动到点位
-            time.sleep(0.5)
-            
-            # 模拟拍照和检测过程
-            time.sleep(0.2)
-            
-            # 有95%的成功率
-            if random.random() < 0.95:
-                calibration_state["completedPoints"] += 1
-            else:
-                calibration_state["failedPoints"].append(i)
-                print(f"后端: 点位 {i+1} 检测失败")
-            
-            # 更新进度
-            print(f"后端: 标定进度 {calibration_state['completedPoints']}/{calibration_state['totalPoints']}")
+        if z_position is None or z_position_encoder is None:
+            return jsonify({"success": False, "message": "缺少必要的位置参数"}), 400
         
-        print(f"后端: 标定点位循环完成，总点数: {calibration_state['totalPoints']}，完成点数: {calibration_state['completedPoints']}")
+        # 更新相机位置
+        camera_state["currentZ"] = float(z_position)
+        camera_state["currentZEncoder"] = int(z_position_encoder)
+        camera_state["ZPosition"] = float(z_position)
+        camera_state["ZPositionEncoder"] = int(z_position_encoder)
         
-        # 如果未被中断，生成标定结果
-        if not stop_calibration_flag.is_set():
-            # 模拟计算结果
-            print("后端: 开始计算标定结果...")
-            time.sleep(1.0)
-            
-            # 生成随机标定矩阵
-            fx = 1200 + random.random() * 100
-            fy = 1200 + random.random() * 100
-            cx = calibration_state["centerX"] + random.random() * 10 - 5
-            cy = calibration_state["centerY"] + random.random() * 10 - 5
-            
-            k1 = random.random() * 0.1 - 0.05
-            k2 = random.random() * 0.05 - 0.025
-            p1 = random.random() * 0.01 - 0.005
-            p2 = random.random() * 0.01 - 0.005
-            k3 = random.random() * 0.01 - 0.005
-            
-            # 生成标定结果
-            calibration_state["calibrationResults"] = {
-                "intrinsic": [
-                    [fx, 0, cx],
-                    [0, fy, cy],
-                    [0, 0, 1]
-                ],
-                "distortion": [k1, k2, p1, p2, k3],
-                "reprojectionError": random.random() * 0.5,
-                "completedPoints": calibration_state["completedPoints"],
-                "totalPoints": calibration_state["totalPoints"],
-                "resolution": [calibration_state["imageWidth"], calibration_state["imageHeight"]],
-                "timestamp": time.time()
-            }
-            
-            print("后端: 标定完成，结果生成成功")
-        else:
-            print("后端: 标定被中断，不生成结果")
+        # 同时更新最佳对焦位置
+        camera_state["bestZ"] = float(z_position)
+        camera_state["bestZEncoder"] = int(z_position_encoder)
         
-        # 确保标定状态正确更新
-        calibration_state["isCalibrating"] = False
-        print("后端: 标定过程结束，isCalibrating设置为False")
+        # 计算新的清晰度
+        camera_state["clarity"] = calculate_clarity(z_position_encoder, is_encoder=True)
         
+        print(f"后端: 将Z轴位置设为: {z_position}mm ({z_position_encoder}编码器值)")
+        
+        return jsonify({
+            "success": True, 
+            "message": "已将Z轴位置设为对焦位置",
+            "position": z_position,
+            "positionEncoder": z_position_encoder,
+            "clarity": camera_state["clarity"]
+        })
     except Exception as e:
-        print(f"后端: 标定过程出错: {str(e)}")
-        # 确保出错时也更新状态
-        calibration_state["isCalibrating"] = False
-        print("后端: 标定出错，isCalibrating设置为False")
+        print(f"设置对焦位置出错: {str(e)}")
+        return jsonify({"success": False, "message": f"设置对焦位置出错: {str(e)}"}), 500
 
 # --- API Endpoints ---
 @app.route('/connect', methods=['POST'])
@@ -463,7 +511,10 @@ def disconnect_camera():
         "markPoints": [],
         "lastCapturePosition": None,  # 添加上次拍照位置
         "manualFocusPosition": None,
-        "manualFocusPositionEncoder": None
+        "manualFocusPositionEncoder": None,
+        # 添加对焦图像相关状态
+        "focusImages": [],  # 存储对焦过程中的图像
+        "focusCompleted": False  # 标记对焦是否完成
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -1289,6 +1340,92 @@ def save_focus_position():
     except Exception as e:
         print(f"保存对焦位置出错: {str(e)}")
         return jsonify({"success": False, "message": f"保存对焦位置出错: {str(e)}"}), 500
+
+def simulate_calibration_process():
+    """模拟标定过程"""
+    global calibration_state, stop_calibration_flag
+    
+    try:
+        stop_calibration_flag.clear()
+        calibration_state["isCalibrating"] = True
+        print("后端: 开始标定过程，初始化完成")
+        
+        # 执行标定过程
+        for i in range(calibration_state["totalPoints"]):
+            if stop_calibration_flag.is_set():
+                print("后端: 标定被中断")
+                break
+            
+            # 获取当前点位
+            point = calibration_state["calibrationMatrix"][i]
+            calibration_state["currentPoint"] = point
+            
+            print(f"后端: 标定点位 {i+1}/{calibration_state['totalPoints']} - 坐标: ({point['x']}, {point['y']})")
+            
+            # 模拟移动到点位
+            time.sleep(0.5)
+            
+            # 模拟拍照和检测过程
+            time.sleep(0.2)
+            
+            # 有95%的成功率
+            if random.random() < 0.95:
+                calibration_state["completedPoints"] += 1
+            else:
+                calibration_state["failedPoints"].append(i)
+                print(f"后端: 点位 {i+1} 检测失败")
+            
+            # 更新进度
+            print(f"后端: 标定进度 {calibration_state['completedPoints']}/{calibration_state['totalPoints']}")
+        
+        print(f"后端: 标定点位循环完成，总点数: {calibration_state['totalPoints']}，完成点数: {calibration_state['completedPoints']}")
+        
+        # 如果未被中断，生成标定结果
+        if not stop_calibration_flag.is_set():
+            # 模拟计算结果
+            print("后端: 开始计算标定结果...")
+            time.sleep(1.0)
+            
+            # 生成随机标定矩阵
+            fx = 1200 + random.random() * 100
+            fy = 1200 + random.random() * 100
+            cx = calibration_state["centerX"] + random.random() * 10 - 5
+            cy = calibration_state["centerY"] + random.random() * 10 - 5
+            
+            k1 = random.random() * 0.1 - 0.05
+            k2 = random.random() * 0.05 - 0.025
+            p1 = random.random() * 0.01 - 0.005
+            p2 = random.random() * 0.01 - 0.005
+            k3 = random.random() * 0.01 - 0.005
+            
+            # 生成标定结果
+            calibration_state["calibrationResults"] = {
+                "intrinsic": [
+                    [fx, 0, cx],
+                    [0, fy, cy],
+                    [0, 0, 1]
+                ],
+                "distortion": [k1, k2, p1, p2, k3],
+                "reprojectionError": random.random() * 0.5,
+                "completedPoints": calibration_state["completedPoints"],
+                "totalPoints": calibration_state["totalPoints"],
+                "resolution": [calibration_state["imageWidth"], calibration_state["imageHeight"]],
+                "timestamp": time.time()
+            }
+            
+            print("后端: 标定完成，结果生成成功")
+        else:
+            print("后端: 标定被中断，不生成结果")
+        
+        # 确保标定状态正确更新
+        calibration_state["isCalibrating"] = False
+        print("后端: 标定过程结束，isCalibrating设置为False")
+        
+    except Exception as e:
+        print(f"后端: 标定过程出错: {str(e)}")
+        # 确保出错时也更新状态
+        calibration_state["isCalibrating"] = False
+        print("后端: 标定出错，isCalibrating设置为False")
 
 if __name__ == '__main__':
     # 使用 0.0.0.0 允许外部访问，端口可以自定义

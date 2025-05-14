@@ -25,65 +25,20 @@
 
         <main class="main-content">
             <section class="camera-view">
-                <!-- 移除轴配置面板 -->
-
-                <!-- Container for image/svg -->
-                <div id="camera-display-container">
-                    <!-- 添加对焦位和清晰度信息显示 -->
-                    <div class="camera-info-overlay">
-                        <div class="focus-position-display">
-                            <div class="info-item">
-                                <span class="info-label">当前位置:</span>
-                                <span id="focus-position-display" class="info-value">上料位</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">清晰度:</span>
-                                <span id="focus-clarity-display" class="info-value">--</span>
-                            </div>
-                        </div>
+                <div class="camera-image">
+                    <img id="camera-feed" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" alt="相机画面">
+                    <div class="roi-overlay" style="display: none;">
+                        <div class="roi-box"></div>
                     </div>
-                    
-                    <img id="simulated-image" src="favicon.png" alt="模拟相机图像">
-                    <div id="calibration-pattern-display" style="display: none; width: 100%; height: 100%;">
-                        <!-- SVG will be injected here by JS -->
+                </div>
+                
+                <!-- 添加缩略图区域 -->
+                <div class="focus-thumbnails-container">
+                    <div class="thumbnails-header">
+                        <span>对焦图像预览</span>
+                        <button class="thumbnails-close-btn" title="关闭预览">&times;</button>
                     </div>
-                    <!-- Focus ROI Overlay (Original) -->
-                    <div class="focus-overlay" id="focus-roi-overlay" style="display: none;"></div>
-                    <!-- Calibration ROI Overlay (New) -->
-                    <div class="focus-overlay calibration-roi-overlay" id="calibration-roi-overlay" style="display: none;"></div>
-                    
-                    <!-- 新增ROI工具面板 -->
-                    <div id="roi-tools-panel" class="roi-tools-panel">
-                        <div class="roi-tools-header">
-                            <h5>ROI工具</h5>
-                            <button class="close-button" id="close-roi-tools">×</button>
-                        </div>
-                        <div class="roi-tools-content">
-                            <div class="roi-shape-tools">
-                                <button class="roi-tool-button active" id="rect-roi-tool" title="矩形工具">矩形</button>
-                                <button class="roi-tool-button" id="polygon-roi-tool" title="多边形工具">多边形</button>
-                                <button class="roi-tool-button" id="ellipse-roi-tool" title="椭圆工具">椭圆</button>
-                            </div>
-                            <div class="roi-draw-mode-group">
-                                <div class="radio-button-container active" id="draw-mode-container">
-                                    <div class="radio-circle"></div>
-                                    <label>绘画</label>
-                                </div>
-                                <div class="radio-button-container" id="edit-mode-container">
-                                    <div class="radio-circle"></div>
-                                    <label>编辑</label>
-                                </div>
-                                <div class="redraw-button-container">
-                                    <button class="roi-tool-button" id="redraw-roi-btn">重画</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 标定点位阵显示 -->
-                    <div id="calibration-matrix-display" class="calibration-matrix-display">
-                        <div id="matrix-grid" class="matrix-grid"></div>
-                    </div>
+                    <div class="focus-thumbnails"></div>
                 </div>
             </section>
 
@@ -436,5 +391,16 @@
             </div>
         </div>
     </div>
+
+    <!-- 添加右键菜单 -->
+    <div class="focus-thumbnail-menu" style="display: none;">
+        <div class="focus-thumbnail-menu-item" data-action="set-focus">
+            <i class="fas fa-crosshairs"></i>设为对焦位置
+        </div>
+        <div class="focus-thumbnail-menu-item" data-action="view-large">
+            <i class="fas fa-search-plus"></i>查看大图
+        </div>
+    </div>
+    <div class="context-menu-overlay"></div>
 </body>
 </html> 
