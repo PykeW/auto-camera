@@ -336,6 +336,12 @@ function updateStatus(state) {
         clarityDisplay.textContent = state.clarity ? state.clarity.toFixed(3) : '--';
     }
     
+    // 更新对焦位置显示
+    const cameraFocusPositionDisplay = document.getElementById('focus-position-display');
+    if (cameraFocusPositionDisplay && state.ZPosition !== null) {
+        cameraFocusPositionDisplay.textContent = state.ZPosition.toFixed(3);
+    }
+    
     // 更新按钮状态
     if (startFocusBtn) {
         startFocusBtn.disabled = !state.isConnected || state.isFocusing;
