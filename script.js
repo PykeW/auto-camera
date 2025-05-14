@@ -136,7 +136,7 @@ function initializeDOMReferences() {
     
     // ROI相关按钮
     const confirmRoiBtn = document.getElementById('confirm-roi-focus-btn');
-    const redrawRoiBtn = document.getElementById('redraw-roi-focus-btn');
+    const editRoiBtn = document.getElementById('edit-roi-focus-btn');
     const clearRoiBtn = document.getElementById('clear-roi-focus-btn');
     const toggleRoiVisibilityBtn = document.getElementById('toggle-focus-roi-visibility-btn');
 
@@ -173,8 +173,8 @@ function initializeDOMReferences() {
     if (confirmRoiBtn) {
         confirmRoiBtn.addEventListener('click', confirmRoi);
     }
-    if (redrawRoiBtn) {
-        redrawRoiBtn.addEventListener('click', redrawRoi);
+    if (editRoiBtn) {
+        editRoiBtn.addEventListener('click', editRoi);
     }
     if (clearRoiBtn) {
         clearRoiBtn.addEventListener('click', clearRoi);
@@ -1243,17 +1243,19 @@ function clearRoi() {
 }
 
 function toggleRoiVisibility() {
+    if (!cameraState.roiCoords) return;
+    
     const overlay = document.getElementById('focus-roi-overlay');
     if (overlay) {
         const isVisible = overlay.style.display !== 'none';
         overlay.style.display = isVisible ? 'none' : 'block';
         
-        // 更新按钮文本
-        const toggleBtn = document.getElementById('toggle-visibility-roi-btn');
+        // 更新按钮图标
+        const toggleBtn = document.getElementById('toggle-focus-roi-visibility-btn');
         if (toggleBtn) {
-            toggleBtn.innerHTML = isVisible ? 
-                '<i class="fas fa-eye-slash"></i> 隐藏' : 
-                '<i class="fas fa-eye"></i> 显示';
+            toggleBtn.querySelector('i').className = isVisible ? 
+                'fas fa-eye-slash' : 'fas fa-eye';
+            toggleBtn.title = isVisible ? '隐藏' : '显示';
         }
     }
 }
@@ -2254,8 +2256,7 @@ function initializeEventListeners() {
     
     // ROI绘制相关事件
     document.getElementById('draw-roi-focus-btn').addEventListener('click', toggleRoiDrawing);
-    document.getElementById('confirm-roi-focus-btn').addEventListener('click', confirmRoi);
-    document.getElementById('redraw-roi-focus-btn').addEventListener('click', redrawRoi);
+    document.getElementById('edit-roi-focus-btn').addEventListener('click', editRoi);
     document.getElementById('clear-roi-focus-btn').addEventListener('click', clearRoi);
     document.getElementById('toggle-focus-roi-visibility-btn').addEventListener('click', toggleRoiVisibility);
     
@@ -2504,3 +2505,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // 自动连接
     setTimeout(autoConnect, 500); // 延迟500ms后自动连接
 });
+
+// 编辑ROI函数
+function editRoi() {
+    if (!cameraState.isConnected || !cameraState.roiCoords) return;
+    
+    // 启用ROI绘制模式
+    cameraState.isDrawingROI = true;
+    drawRoiFocusBtn.classList.add('active');
+    
+    // 显示现有ROI并使其可编辑
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (overlay) {
+        overlay.style.display = 'block';
+        overlay.classList.add('drawing');
+        
+        // 如果有现有的ROI，显示出来供编辑
+        if (currentRoiRect) {
+            currentRoiRect.classList.add('editing');
+        } else {
+            // 从状态中恢复ROI
+            const coords = cameraState.roiCoords;
+            if (coords) {
+                currentRoiRect = document.createElement('div');
+                currentRoiRect.className = 'roi-rect editing';
+                currentRoiRect.style.left = `${coords.l}px`;
+                currentRoiRect.style.top = `${coords.t}px`;
+                currentRoiRect.style.width = `${coords.r - coords.l}px`;
+                currentRoiRect.style.height = `${coords.b - coords.t}px`;
+                overlay.appendChild(currentRoiRect);
+            }
+        }
+    }
+    
+    // 显示ROI工具面板
+    const roiToolsPanel = document.getElementById('roi-tools-panel');
+    if (roiToolsPanel) {
+        roiToolsPanel.classList.add('show');
+    }
+}

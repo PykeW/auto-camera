@@ -300,13 +300,13 @@
                     </div>
                     
                     <!-- 修改为搜索范围和搜索颗粒度 -->
-                    <div class="control-item side-by-side">
+                    <div class="control-item side-by-side compact-row">
                         <label for="focus-range">搜索范围:</label>
                         <div class="input-group">
                             <input type="number" id="focus-range" value="5000" step="100" min="100" class="compact-input">
                         </div>
                     </div>
-                    <div class="control-item side-by-side">
+                    <div class="control-item side-by-side compact-row">
                         <label for="focus-step">搜索颗粒度:</label>
                         <div class="input-group">
                             <input type="number" id="focus-step" value="500" step="10" min="1" class="compact-input">
@@ -321,11 +321,14 @@
                             <i class="fas fa-pencil-alt"></i> 绘制
                         </button>
                         <div id="focus-roi-button-group" class="roi-button-group">
-                            <button id="confirm-roi-focus-btn" class="roi-button">确认</button>
-                            <button id="redraw-roi-focus-btn" class="roi-button">重绘</button>
-                            <button id="clear-roi-focus-btn" class="roi-button danger-button">清除</button>
-                            <button id="toggle-focus-roi-visibility-btn" class="roi-button mini-button" title="切换对焦ROI可见性">
+                            <button id="toggle-focus-roi-visibility-btn" class="roi-button icon-button" title="显示/隐藏">
                                 <i class="fas fa-eye"></i>
+                            </button>
+                            <button id="edit-roi-focus-btn" class="roi-button icon-button" title="编辑">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button id="clear-roi-focus-btn" class="roi-button icon-button danger-icon" title="删除">
+                                <i class="fas fa-trash-alt"></i>
                             </button>
                         </div>
                     </div>

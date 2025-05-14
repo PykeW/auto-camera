@@ -1068,21 +1068,26 @@ input:checked + .slider:before {
     gap: 4px;
 }
 
+/* 轴控制按钮样式 */
 .jog-btn {
-    width: 28px;
+    width: 40px;
+    min-width: 40px;
+    flex: 0 0 40px;
     height: 28px;
-    min-width: 28px;
     padding: 0;
     border: 1px solid var(--border-medium);
     background-color: var(--bg-medium);
     color: var(--text-light);
     font-size: 16px;
+    font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     border-radius: 3px;
     transition: all 0.2s ease;
+    text-align: center;
+    box-sizing: border-box;
 }
 
 .jog-btn:hover:not(:disabled) {
@@ -1110,138 +1115,64 @@ input:checked + .slider:before {
     border-bottom-left-radius: 0;
 }
 
+/* 步进选择下拉框样式 */
 .step-select {
-    width: 70px;
-    background: #333;
-    color: #fff;
-    border: 1px solid #555;
-    padding: 2px;
-    border-radius: 3px;
-}
-
-.camera-view {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background: #222;
-}
-
-/* 状态样式 */
-.status-未连接 { color: #888; }
-.status-空闲 { color: #4CAF50; }
-.status-初始化\/检查 { color: #2196F3; }
-.status-对焦中 { color: #FF9800; }
-.status-移动到最佳位置 { color: #9C27B0; }
-.status-保存参数中 { color: #3F51B5; }
-.status-已对焦 { color: #4CAF50; }
-.status-已停止 { color: #F44336; }
-.status-错误 { color: #F44336; }
-
-/* === 弹窗样式 === */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.modal.show {
-    display: flex;
-    opacity: 1;
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-content {
-    background-color: var(--bg-dark);
-    border-radius: var(--border-radius);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    width: 90%;
-    max-width: 500px;
-    max-height: 90vh;
-    display: flex;
-    flex-direction: column;
-    transform: translateY(-20px);
-    transition: transform 0.3s ease;
-}
-
-.modal.show .modal-content {
-    transform: translateY(0);
-}
-
-.modal-header {
-    padding: var(--spacing-large);
-    border-bottom: 1px solid var(--border-dark);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.modal-header h3 {
-    margin: 0;
-    font-size: 1.2em;
-    font-weight: normal;
-}
-
-.close-button {
-    background: none;
-    border: none;
-    font-size: 1.5em;
-    cursor: pointer;
-    padding: 0;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-medium);
-}
-
-.close-button:hover {
+    width: 40px;
+    min-width: 40px;
+    flex: 0 0 40px;
+    height: 28px;
+    background: var(--bg-medium);
     color: var(--text-light);
+    border: 1px solid var(--border-medium);
+    padding: 2px 16px 2px 4px;
+    border-radius: 3px;
+    background-position: right 2px center;
+    text-align: center;
+    font-size: 12px;
+    box-sizing: border-box;
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-size: .65em auto;
 }
 
-.modal-body {
-    padding: var(--spacing-large);
-    overflow-y: auto;
-    max-height: calc(90vh - 130px);
+/* 确保步进值下拉选项正确显示 */
+.step-select option {
+    text-align: center;
+    padding: 3px;
 }
 
-.modal-footer {
-    padding: var(--spacing-large);
-    border-top: 1px solid var(--border-dark);
+/* 轴控制组保持对齐 */
+.axis-controls {
     display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-medium);
+    align-items: center;
+    gap: 4px;
+    height: 28px;
 }
 
-.config-section {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-large);
+/* 针对对焦功能的步进选择器保持更宽 */
+#focus-step-select {
+    width: 70px;
+    min-width: 70px;
+    flex: 0 0 70px;
+    padding-left: 8px;
 }
 
-.config-section .control-item {
-    margin-bottom: 0;
-}
-
-.config-section input[type="number"] {
-    text-align: right;
-}
-
-/* 添加一个配置按钮样式 */
+/* 配置按钮样式 */
 .config-button {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    flex: 0 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-left: 2px;
     background: none;
     border: none;
     color: var(--text-medium);
     cursor: pointer;
-    padding: 4px;
     border-radius: var(--border-radius);
 }
 
@@ -1586,15 +1517,17 @@ input:checked + .slider:before {
     animation: pulse 0.8s infinite;
 }
 
-/* 轴位置控制样式 */
+/* 轴位置控制样式优化 */
 .axis-position-control {
     display: flex;
     align-items: center;
     flex: 1;
     max-width: 100%;
     height: 28px;
+    width: 100%; /* 确保宽度占满 */
 }
 
+/* 让input占据更多空间 */
 .axis-position-control input {
     flex: 1;
     text-align: center;
@@ -1606,9 +1539,11 @@ input:checked + .slider:before {
     color: var(--text-light);
     border: 1px solid var(--border-medium);
     border-radius: 3px;
-    max-width: 100px;
+    width: auto; /* 允许自适应宽度 */
+    min-width: 0; /* 允许压缩 */
 }
 
+/* 添加轴位置控制按钮样式 */
 .axis-position-control .jog-btn {
     min-width: 30px;
     width: 30px;
@@ -1637,6 +1572,7 @@ input:checked + .slider:before {
     font-size: 22px;
 }
 
+/* 按钮悬停和活动状态样式 */
 .axis-position-control .jog-btn:hover:not(:disabled) {
     background-color: var(--accent-blue);
     border-color: var(--accent-blue);
@@ -1656,539 +1592,149 @@ input:checked + .slider:before {
     opacity: 0.7;
 }
 
-.fixed-step-value {
-    background-color: var(--bg-medium);
-    padding: 4px 8px;
-    border-radius: var(--border-radius);
-    display: inline-block;
-    color: var(--accent-blue);
-    font-weight: bold;
-    min-width: 70px;
-    text-align: center !important;
-    border: 1px solid var(--border-dark);
-}
-
-/* === 相机标定模块样式 === */
-.calibration-panel {
-    background-color: var(--bg-medium);
-    border-radius: var(--border-radius);
-    margin: var(--spacing-medium) 0;
-    overflow: hidden;
-    border: 1px solid var(--border-dark);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.calibration-header {
-    background-color: var(--bg-dark);
-    padding: var(--spacing-medium);
-    border-bottom: 1px solid var(--border-medium);
-}
-
-.calibration-header h4 {
-    margin: 0;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-medium);
-    color: var(--accent-blue);
-}
-
-.calibration-header h4 i {
-    font-size: 1.1em;
-}
-
-.calibration-config {
-    padding: var(--spacing-medium);
-    border-bottom: 1px solid var(--border-dark);
-    background-color: rgba(0, 0, 0, 0.1);
-}
-
-.calibration-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-small);
-    padding: var(--spacing-medium);
-    border-bottom: 1px solid var(--border-dark);
-}
-
-.calibration-button {
-    background-color: var(--accent-blue);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius);
-    padding: var(--spacing-medium);
-    cursor: pointer;
-    font-size: 0.9em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-small);
-    transition: all 0.2s ease;
-}
-
-.calibration-button:hover:not(:disabled) {
-    background-color: #0a7ddb;
-    transform: translateY(-1px);
-}
-
-.calibration-button:disabled {
-    background-color: #444;
-    color: #777;
-    cursor: not-allowed;
-}
-
-.calibration-button.danger {
-    background-color: var(--accent-red);
-}
-
-.calibration-button.danger:hover:not(:disabled) {
-    background-color: #d43b3e;
-}
-
-.calibration-button.secondary {
-    background-color: var(--bg-dark);
-    border: 1px solid var(--border-medium);
-    color: var(--text-light);
-}
-
-.calibration-button.secondary:hover:not(:disabled) {
-    background-color: var(--bg-medium);
-    color: var(--accent-blue);
-}
-
-.calibration-button i {
-    font-size: 1.1em;
-}
-
-.calibration-status-panel {
-    padding: var(--spacing-medium);
-    background-color: rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid var(--border-dark);
-}
-
-.calibration-status-item {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: var(--spacing-small);
-    align-items: center;
-}
-
-.status-label {
-    color: var(--text-medium);
-    font-weight: 500;
-}
-
-.status-value {
-    padding: 2px 8px;
-    border-radius: 10px;
-    background-color: var(--bg-dark);
-    font-size: 0.9em;
-}
-
-.calibration-progress-container {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-medium);
-    margin-top: var(--spacing-medium);
-}
-
-.calibration-progress-container .progress-bar {
+/* 步进选择下拉框样式优化 */
+#focus-step-select {
     flex: 1;
-    margin-left: var(--spacing-small);
+    width: 100%;
+    min-width: 0;
+    padding-right: 20px;
+    background-position: right 5px center;
 }
 
-.calibration-results {
-    padding: var(--spacing-medium);
-    background-color: rgba(0, 0, 0, 0.05);
+/* 轴控制相关 - 优化布局 */
+.axis-item label {
+    min-width: 20px;
+    margin-right: 4px;
 }
 
-.calibration-results h5 {
-    margin-top: 0;
-    margin-bottom: var(--spacing-medium);
-    font-weight: 500;
-    color: var(--accent-green);
+.axis-item input[type="number"] {
+    width: 60px;
+}
+
+/* 图标按钮样式 */
+.icon-button {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    padding: 0 !important;
+    margin: 0 2px !important;
+    border-radius: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: var(--bg-medium) !important;
+    border: 1px solid var(--border-medium) !important;
+}
+
+.icon-button i {
+    font-size: 14px;
+    margin: 0 !important;
+}
+
+.icon-button:hover {
+    background-color: var(--accent-blue) !important;
+    color: white !important;
+}
+
+.danger-icon {
+    color: var(--accent-red);
+}
+
+.danger-icon:hover {
+    background-color: var(--accent-red) !important;
+    color: white !important;
+}
+
+/* ROI按钮组优化 */
+.roi-button-group {
     display: flex;
-    align-items: center;
-    gap: var(--spacing-small);
+    gap: 2px; 
 }
 
-.calibration-results pre {
-    background-color: var(--bg-dark);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-medium);
-    font-family: monospace;
-    font-size: 0.85em;
-    overflow-x: auto;
-    color: var(--text-light);
-    border: 1px solid var(--border-medium);
-    max-height: 150px;
-    overflow-y: auto;
+/* 步进量选择优化 */
+.step-select {
+    padding-right: 15px !important;
+    background-position: right 4px center !important;
+    width: 50px !important;
+    min-width: 50px !important;
+    flex: 0 0 50px !important;
 }
 
-.calibration-result-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-small);
-    margin-top: var(--spacing-medium);
-    padding-top: var(--spacing-medium);
-    border-top: 1px dashed var(--border-dark);
+/* ROI编辑状态样式 */
+.roi-rect.editing {
+    border: 2px dashed #FF9800;
+    background-color: rgba(255, 152, 0, 0.2);
+    cursor: move;
 }
 
-/* 相机标定模块 - 简化版样式 */
-.section-title {
-    margin-bottom: var(--spacing-medium);
-    padding-bottom: var(--spacing-small);
-    font-size: 1.1em;
-    color: var(--accent-blue);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-small);
-    border-bottom: 1px solid var(--border-medium);
-}
-
-.section-title i {
-    font-size: 1.2em;
-}
-
-.control-group {
-    margin-bottom: var(--spacing-large);
-    padding: var(--spacing-small);
-    background-color: rgba(0, 0, 0, 0.1);
-    border-radius: var(--border-radius);
-}
-
-.calibration-buttons-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-small);
-    margin-bottom: var(--spacing-large);
-}
-
-.status-container {
-    margin-bottom: var(--spacing-medium);
-    padding: var(--spacing-medium);
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--border-dark);
-}
-
-.status-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-small);
-}
-
-.status-row label {
-    color: var(--text-medium);
-    margin-bottom: 0;
-}
-
-.status-chip {
-    padding: 2px 8px;
-    border-radius: 10px;
-    background-color: var(--bg-medium);
-    font-size: 0.9em;
-    min-width: 70px;
-    text-align: center;
-}
-
-.progress-row {
-    display: flex;
-    align-items: center;
-    margin-top: var(--spacing-medium);
-    gap: var(--spacing-medium);
-}
-
-.progress-row label {
-    min-width: 60px;
-    margin-bottom: 0;
-    color: var(--text-medium);
-}
-
-.result-actions-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-small);
-    margin-bottom: var(--spacing-medium);
-}
-
-.secondary-button {
-    background-color: var(--bg-medium);
-    border: 1px solid var(--border-medium);
-    color: var(--text-light);
-    padding: var(--spacing-small) var(--spacing-medium);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-small);
-    transition: all 0.2s ease;
-    height: auto;
-    min-height: 32px;
-}
-
-.secondary-button:hover:not(:disabled) {
-    background-color: var(--bg-dark);
-    color: var(--accent-blue);
-    transform: translateY(-1px);
-}
-
-.secondary-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.secondary-button i {
-    font-size: 1.1em;
-}
-
-/* 覆盖进度条样式 */
-.status-container .progress-bar {
-    flex: 1;
-    height: 16px;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.status-container .progress {
-    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
-    height: 100%;
-    transition: width 0.3s ease;
-}
-
-/* === ROI工具样式 === */
-.roi-tools-panel {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: rgba(0, 0, 0, 0.8);
-    border-radius: 2px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-    z-index: 20;
-    display: none;
-    flex-direction: column;
-    padding: 0;
-    width: 160px;
-    transition: all 0.3s ease;
-    border: 1px solid var(--border-medium);
-}
-
-.roi-tools-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: white;
-    padding: 3px 6px;
-    border-bottom: 1px solid var(--border-dark);
-    background-color: #333;
-}
-
-.roi-tools-header h5 {
-    margin: 0;
-    font-size: 0.9em;
-    font-weight: normal;
-    color: #fff;
-}
-
-.roi-tools-header .close-button {
-    font-size: 0.9em;
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    line-height: 1;
-    color: #fff;
-    background: none;
-    border: none;
-}
-
-.roi-tools-content {
-    display: flex;
-    flex-direction: column;
-    padding: 5px;
-}
-
-.roi-shape-tools {
-    display: flex;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--border-dark);
-    padding-bottom: 5px;
-}
-
-.roi-tool-button {
-    background-color: transparent;
-    color: var(--text-light);
-    border: none;
-    border-radius: 0;
-    padding: 3px 5px;
-    font-size: 0.9em;
-    cursor: pointer;
-    flex: 1;
-    text-align: center;
-    transition: all 0.2s ease;
-}
-
-.roi-tool-button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-.roi-tool-button.active {
-    background-color: #1e90ff;
-    color: white;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
-}
-
-.roi-draw-mode-group {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 5px;
-}
-
-.roi-draw-mode-group .roi-tool-button {
-    border-radius: 0;
-    margin-bottom: 2px;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    padding: 5px;
-}
-
-.roi-draw-mode-group .roi-tool-button i {
-    margin-right: 5px;
-}
-
-.roi-draw-mode-group input[type="radio"] {
-    margin-right: 5px;
-}
-
-/* 模拟单选按钮外观 */
-.radio-button-container {
-    display: flex;
-    align-items: center;
-    margin-bottom: 2px;
-}
-
-.radio-circle {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 2px solid #999;
-    margin-right: 5px;
-    position: relative;
-    display: inline-block;
-}
-
-.radio-button-container.active .radio-circle {
-    border-color: #1e90ff;
-}
-
-.radio-button-container.active .radio-circle::after {
-    content: '';
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #1e90ff;
-    top: 3px;
-    left: 3px;
-}
-
-.radio-button-container label {
-    font-size: 0.9em;
-    color: white;
-}
-
-.roi-option-group {
-    margin-top: 5px;
-}
-
-.roi-option-group .roi-tool-button {
-    padding: 4px 6px;
-    font-size: 0.85em;
-    background-color: #1e90ff;
-    border-radius: 2px;
-    margin-bottom: 3px;
-}
-
-.roi-option-group .roi-tool-button:hover {
-    background-color: #0078e7;
-}
-
-/* 修改原始ROI按钮组样式 */
-#focus-roi-button-group {
-    display: none; /* 默认隐藏，由JavaScript控制显示 */
-}
-
-/* ROI工具栏显示/隐藏动画 */
-@keyframes fadeIn {
-    0% { opacity: 0; transform: translateY(-10px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-
-.roi-tools-panel.show {
-    display: flex;
-    animation: fadeIn 0.3s ease forwards;
-}
-
-/* 优化侧边布局 */
-.side-by-side {
-    display: flex;
-    align-items: center;
-    margin-bottom: 8px;
-    flex-wrap: wrap;
+/* Z轴/对焦控制样式优化 */
+.control-item.side-by-side {
+    margin-bottom: 6px;
 }
 
 .side-by-side label {
-    width: 80px;
-    min-width: 80px;
+    min-width: 75px;
     font-size: 0.9em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-right: 8px;
 }
 
-.side-by-side input,
-.side-by-side select {
+/* 搜索范围和颗粒度输入框 */
+.compact-input {
+    height: 28px;
+    padding: 4px 8px;
+    width: 100%;
+}
+
+/* 轴选择和位置控制 */
+#focus-axis-select, 
+#focus-step-select {
+    height: 28px;
+    padding: 2px 20px 2px 8px;
+}
+
+/* 修复轴位置控制和步进量选择器不铺满整行的问题 */
+.axis-position-control {
+    display: flex;
+    align-items: center;
     flex: 1;
+    max-width: 100%;
+    height: 28px;
+    width: 100%; /* 确保宽度占满 */
+}
+
+/* 让input占据更多空间 */
+.axis-position-control input {
+    flex: 1;
+    text-align: center;
+    margin: 0 4px;
+    height: 28px;
+    padding: 4px;
+    box-sizing: border-box;
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    border: 1px solid var(--border-medium);
+    border-radius: 3px;
+    width: auto; /* 允许自适应宽度 */
+    min-width: 0; /* 允许压缩 */
+}
+
+/* 步进选择器铺满剩余空间 */
+#focus-step-select {
+    flex: 1;
+    width: auto;
     min-width: 0;
 }
 
-/* 紧凑输入框样式优化 */
-.compact-input {
-    width: 100%;
-    max-width: 100%;
-    padding: 4px 8px;
-    border: 1px solid var(--border-medium);
-    border-radius: 3px;
-    background-color: var(--bg-medium);
-    color: var(--text-light);
-    font-size: 0.9em;
-    height: 28px;
-    box-sizing: border-box;
+/* 通用的side-by-side布局修正 */
+.side-by-side label {
+    min-width: 80px;
+    flex-shrink: 0; /* 防止标签压缩 */
 }
 
-/* 控制面板布局优化 */
-.control-panel {
-    padding: 10px;
-    overflow-y: auto;
-    max-height: calc(100vh - 120px);
-}
-
-.panel-section {
-    margin-bottom: 15px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--border-dark);
-}
-
-/* Separator 样式优化 */
-.separator {
-    margin: 15px 0;
-    border: none;
-    border-top: 1px solid var(--border-dark);
-}
-
-/* 控制项容器更紧凑 */
-.control-item {
-    margin-bottom: 8px;
+.side-by-side select,
+.side-by-side input,
+.side-by-side .input-group,
+.side-by-side .axis-position-control {
+    flex: 1;
+    min-width: 0; /* 允许压缩 */
+    width: auto; /* 允许扩展 */
 } 
