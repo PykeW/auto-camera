@@ -27,8 +27,11 @@ camera_state = {
     "isRecording": False,
     "roiEnabled": False,
     "currentZ": 10.0,
+    "currentZEncoder": 10000,  # 添加编码器值
     "bestZ": 15.5, # 模拟最佳对焦点
+    "bestZEncoder": 15500,  # 添加编码器值
     "zRange": {"min": 5.0, "max": 25.0},
+    "zRangeEncoder": {"min": 5000, "max": 25000},  # 添加编码器值范围
     "clarity": 0.0,
     "focusStatus": "未连接",
     "serialNumber": None,
@@ -43,11 +46,21 @@ camera_state = {
     "YPosition": 0.0,
     "ZPosition": 0.0,
     "UPosition": 0.0,
+    "XPositionEncoder": 0,  # 添加编码器值
+    "YPositionEncoder": 0,  # 添加编码器值
+    "ZPositionEncoder": 0,  # 添加编码器值
+    "UPositionEncoder": 0,  # 添加编码器值
     "axisLimits": {
         "X": {"min": -100.0, "max": 100.0},
         "Y": {"min": -100.0, "max": 100.0},
         "Z": {"min": 0.0, "max": 50.0},
         "U": {"min": -180.0, "max": 180.0}
+    },
+    "axisLimitsEncoder": {  # 添加编码器值范围
+        "X": {"min": -100000, "max": 100000},
+        "Y": {"min": -100000, "max": 100000},
+        "Z": {"min": 0, "max": 50000},
+        "U": {"min": -180000, "max": 180000}
     },
     # 添加自动对焦参数
     "focusParams": {
@@ -110,12 +123,18 @@ axis_id_mapping = {
 }
 
 # --- 辅助函数 ---
-def calculate_clarity(z):
-    diff = z - camera_state["bestZ"]
-    focus_sharpness = 2.0
-    clarity = max(0.0, min(1.0, random.gauss(1.0, 0.05) * (1 - abs(diff) / (camera_state["zRange"]["max"] - camera_state["zRange"]["min"]) * 1.5))) # 添加随机性并确保在0-1之间
-    # 指数衰减模型 - 可以替代上面的线性衰减
-    # clarity = max(0.0, min(1.0, random.gauss(1.0, 0.02) * math.exp(-(diff * diff) / (2 * focus_sharpness * focus_sharpness))))
+def calculate_clarity(z, is_encoder=False):
+    """计算清晰度，支持编码器值"""
+    if is_encoder:
+        z_mm = z / 1000.0  # 将编码器值转换为毫米
+        best_z_mm = camera_state["bestZ"]
+        diff = z_mm - best_z_mm
+        range_mm = camera_state["zRange"]["max"] - camera_state["zRange"]["min"]
+    else:
+        diff = z - camera_state["bestZ"]
+        range_mm = camera_state["zRange"]["max"] - camera_state["zRange"]["min"]
+        
+    clarity = max(0.0, min(1.0, random.gauss(1.0, 0.05) * (1 - abs(diff) / range_mm * 1.5)))
     return round(clarity, 3)
 
 def simulate_focus_process():
@@ -129,16 +148,23 @@ def simulate_focus_process():
         # 应用对焦参数
         focus_params = camera_state["focusParams"]
         
-        # 使用起点和终点进行对焦
+        # 检查是否使用编码器值
+        is_encoder = focus_params.get("isEncoder", False)
+        
+        # 获取起点和终点
         start_z = focus_params["start"]
         end_z = focus_params["end"]
         step_size = focus_params["step"]
         
         # 记录当前搜索范围信息
         search_range = (end_z - start_z) / 2
-        current_z = camera_state["currentZ"]
         
-        print(f"后端: 对焦参数 - 当前Z位置: {current_z}, 搜索范围: ±{search_range}mm, 起点: {start_z}, 终点: {end_z}, 步进: {step_size}")
+        if is_encoder:
+            current_z_encoder = start_z  # 直接使用编码器值
+            print(f"后端: 对焦参数(编码器值) - 当前Z位置: {camera_state['currentZEncoder']}, 搜索范围: ±{search_range}, 起点: {start_z}, 终点: {end_z}, 步进: {step_size}")
+        else:
+            current_z = camera_state["currentZ"]
+            print(f"后端: 对焦参数(毫米) - 当前Z位置: {current_z}, 搜索范围: ±{search_range}mm, 起点: {start_z}, 终点: {end_z}, 步进: {step_size}")
         
         time.sleep(0.2) # 模拟初始化
 
@@ -157,30 +183,56 @@ def simulate_focus_process():
         while z <= end_z:
             if stop_focus_flag.is_set():
                 break
-                
-            camera_state["currentZ"] = round(z, 3)
-            # 同步更新ZPosition与currentZ保持一致
-            camera_state["ZPosition"] = camera_state["currentZ"]
-            camera_state["clarity"] = calculate_clarity(z)
-            print(f"后端: 对焦 Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
+
+            # 根据是否使用编码器值更新状态
+            if is_encoder:
+                # 使用编码器值
+                camera_state["currentZEncoder"] = round(z)
+                camera_state["ZPositionEncoder"] = camera_state["currentZEncoder"]
+                # 同时更新毫米值
+                camera_state["currentZ"] = round(z / 1000.0, 3)
+                camera_state["ZPosition"] = camera_state["currentZ"]
+                camera_state["clarity"] = calculate_clarity(z, is_encoder=True)
+                print(f"后端: 对焦(编码器值) Z={camera_state['currentZEncoder']}, 清晰度={camera_state['clarity']}")
+            else:
+                # 使用毫米值
+                camera_state["currentZ"] = round(z, 3)
+                camera_state["ZPosition"] = camera_state["currentZ"]
+                # 同时更新编码器值
+                camera_state["currentZEncoder"] = round(z * 1000)
+                camera_state["ZPositionEncoder"] = camera_state["currentZEncoder"]
+                camera_state["clarity"] = calculate_clarity(z)
+                print(f"后端: 对焦(毫米) Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
             
             if camera_state["clarity"] > max_clarity:
                 max_clarity = camera_state["clarity"]
-                best_z = camera_state["currentZ"]
+                best_z = z
                 
             time.sleep(0.1) # 模拟移动和测量时间
             z += step_size
-            z = round(z, 3)
+            z = round(z, 3) if not is_encoder else round(z)
         
         if not stop_focus_flag.is_set():
             # 移动到最佳位置
-            camera_state["currentZ"] = best_z
-            # 同步更新ZPosition与currentZ保持一致
-            camera_state["ZPosition"] = best_z
-            camera_state["clarity"] = calculate_clarity(best_z)
-            camera_state["bestZ"] = best_z
-            
-            print(f"后端: 自动对焦完成, 最佳 Z = {best_z}")
+            if is_encoder:
+                camera_state["currentZEncoder"] = best_z
+                camera_state["ZPositionEncoder"] = best_z
+                camera_state["currentZ"] = round(best_z / 1000.0, 3)
+                camera_state["ZPosition"] = camera_state["currentZ"]
+                camera_state["bestZEncoder"] = best_z
+                camera_state["bestZ"] = round(best_z / 1000.0, 3)
+                camera_state["clarity"] = calculate_clarity(best_z, is_encoder=True)
+                print(f"后端: 自动对焦完成, 最佳 Z = {best_z}(编码器值)")
+            else:
+                camera_state["currentZ"] = best_z
+                camera_state["ZPosition"] = best_z
+                camera_state["currentZEncoder"] = round(best_z * 1000)
+                camera_state["ZPositionEncoder"] = camera_state["currentZEncoder"]
+                camera_state["bestZ"] = best_z
+                camera_state["bestZEncoder"] = round(best_z * 1000)
+                camera_state["clarity"] = calculate_clarity(best_z)
+                print(f"后端: 自动对焦完成, 最佳 Z = {best_z}mm")
+                
             camera_state["focusStatus"] = "空闲"  # 简化状态显示
         else:
             camera_state["focusStatus"] = "空闲"  # 简化状态显示
@@ -310,6 +362,7 @@ def connect_camera():
         '增益': {'type': 'number', 'value': round(random.uniform(1.0, 3.0), 1), 'min': 0, 'max': 16, 'step': 0.1},
         '触发模式': {'type': 'select', 'options': ['连续采集', '软件触发'], 'value': '连续采集'},
     }
+    # 初始化毫米值位置
     camera_state["currentZ"] = round(random.uniform(camera_state["zRange"]["min"], camera_state["zRange"]["max"]), 2) 
     camera_state["clarity"] = calculate_clarity(camera_state["currentZ"])
     camera_state["focusStatus"] = "空闲"
@@ -319,11 +372,18 @@ def connect_camera():
     camera_state["roiEnabled"] = False
     camera_state["selectedAxisId"] = None # Reset axis selection on connect
     
-    # 初始化轴位置
+    # 初始化轴位置（毫米值）
     camera_state["XPosition"] = round(random.uniform(-100.0, 100.0), 3)
     camera_state["YPosition"] = round(random.uniform(-100.0, 100.0), 3)
     camera_state["ZPosition"] = round(random.uniform(0.0, 50.0), 3)
     camera_state["UPosition"] = round(random.uniform(-180.0, 180.0), 3)
+    
+    # 初始化轴位置（编码器值）
+    camera_state["XPositionEncoder"] = round(camera_state["XPosition"] * 1000)
+    camera_state["YPositionEncoder"] = round(camera_state["YPosition"] * 1000)
+    camera_state["ZPositionEncoder"] = round(camera_state["ZPosition"] * 1000)
+    camera_state["UPositionEncoder"] = round(camera_state["UPosition"] * 1000)
+    camera_state["currentZEncoder"] = round(camera_state["currentZ"] * 1000)
     
     # 显式初始化对焦参数
     camera_state["focusParams"] = {
@@ -375,11 +435,21 @@ def disconnect_camera():
         "YPosition": 0.0,
         "ZPosition": 0.0,
         "UPosition": 0.0,
+        "XPositionEncoder": 0,  # 添加编码器值
+        "YPositionEncoder": 0,  # 添加编码器值
+        "ZPositionEncoder": 0,  # 添加编码器值
+        "UPositionEncoder": 0,  # 添加编码器值
         "axisLimits": {
             "X": {"min": -100.0, "max": 100.0},
             "Y": {"min": -100.0, "max": 100.0},
             "Z": {"min": 0.0, "max": 50.0},
             "U": {"min": -180.0, "max": 180.0}
+        },
+        "axisLimitsEncoder": {  # 添加编码器值范围
+            "X": {"min": -100000, "max": 100000},
+            "Y": {"min": -100000, "max": 100000},
+            "Z": {"min": 0, "max": 50000},
+            "U": {"min": -180000, "max": 180000}
         },
         # 添加自动对焦参数
         "focusParams": {
@@ -610,6 +680,7 @@ def jog_axis():
     data = request.json
     axis_id = data.get('axis')
     step = data.get('step')
+    is_encoder = data.get('isEncoder', False)  # 确认是否使用编码器值
     
     if not axis_id or step is None:
         return jsonify({"status": "error", "message": "缺少必要参数"}), 400
@@ -617,19 +688,33 @@ def jog_axis():
     # 如果是数字ID，转换为原始轴名称
     axis_name = axis_id_mapping.get(axis_id, axis_id)
     
-    # 获取当前位置和限制
-    current_pos = camera_state[f"{axis_name}Position"]
-    
-    # 根据不同轴确定限制范围
-    if axis_name in ['X', 'Y']:
-        min_limit = -100.0
-        max_limit = 100.0
-    elif axis_name == 'Z':
-        min_limit = 0.0
-        max_limit = 50.0
-    else:  # U轴
-        min_limit = -180.0
-        max_limit = 180.0
+    # 获取当前位置
+    if is_encoder:
+        current_pos = camera_state[f"{axis_name}PositionEncoder"]
+        
+        # 根据不同轴确定限制范围
+        if axis_name in ['X', 'Y']:
+            min_limit = -100000
+            max_limit = 100000
+        elif axis_name == 'Z':
+            min_limit = 0
+            max_limit = 50000
+        else:  # U轴
+            min_limit = -180000
+            max_limit = 180000
+    else:
+        current_pos = camera_state[f"{axis_name}Position"]
+        
+        # 根据不同轴确定限制范围
+        if axis_name in ['X', 'Y']:
+            min_limit = -100.0
+            max_limit = 100.0
+        elif axis_name == 'Z':
+            min_limit = 0.0
+            max_limit = 50.0
+        else:  # U轴
+            min_limit = -180.0
+            max_limit = 180.0
     
     # 计算新位置
     new_pos = current_pos + step
@@ -639,14 +724,33 @@ def jog_axis():
         return jsonify({"status": "error", "message": f"轴{axis_id}超出范围限制"}), 400
     
     # 更新位置
-    camera_state[f"{axis_name}Position"] = round(new_pos, 3)
+    if is_encoder:
+        camera_state[f"{axis_name}PositionEncoder"] = round(new_pos)
+        # 同时更新毫米值
+        camera_state[f"{axis_name}Position"] = round(new_pos / 1000.0, 3)
+        
+        # 如果是Z轴移动，同时更新currentZ和清晰度
+        if axis_name == 'Z':
+            camera_state["currentZEncoder"] = round(new_pos)
+            camera_state["currentZ"] = round(new_pos / 1000.0, 3)
+            camera_state["clarity"] = calculate_clarity(new_pos, is_encoder=True)
+    else:
+        camera_state[f"{axis_name}Position"] = round(new_pos, 3)
+        # 同时更新编码器值
+        camera_state[f"{axis_name}PositionEncoder"] = round(new_pos * 1000)
+        
+        # 如果是Z轴移动，同时更新currentZ和清晰度
+        if axis_name == 'Z':
+            camera_state["currentZ"] = new_pos
+            camera_state["currentZEncoder"] = round(new_pos * 1000)
+            camera_state["clarity"] = calculate_clarity(new_pos)
     
-    # 如果是Z轴移动，同时更新currentZ和清晰度
-    if axis_name == 'Z':
-        camera_state["currentZ"] = new_pos
-        camera_state["clarity"] = calculate_clarity(new_pos)
-    
-    print(f"后端: 轴{axis_id}点动 {step:+.3f}, 新位置: {new_pos:.3f}")
+    # 输出日志，标明是使用编码器值还是毫米值
+    if is_encoder:
+        print(f"后端: 轴{axis_id}点动 {step:+} 编码器单位, 新位置: {new_pos}(编码器值)")
+    else:
+        print(f"后端: 轴{axis_id}点动 {step:+.3f}mm, 新位置: {new_pos:.3f}mm")
+        
     return jsonify(camera_state)
 
 @app.route('/save_axis_config', methods=['POST'])
@@ -779,24 +883,35 @@ def update_focus_params():
     
     data = request.json
     try:
+        # 检查是否使用编码器值
+        is_encoder = data.get('isEncoder', False)
+        
         # 检查是否有搜索范围或起点终点
         if 'range' in data:
             # 使用新的搜索范围计算
-            search_range = float(data.get('range', 5.0))
-            step = float(data.get('step', 0.5))
-            current_z = camera_state["currentZ"] or camera_state["ZPosition"]
+            search_range = float(data.get('range', 5.0 if not is_encoder else 5000))
+            step = float(data.get('step', 0.5 if not is_encoder else 500))
+            
+            if is_encoder:
+                current_z = camera_state["currentZEncoder"] or camera_state["ZPositionEncoder"]
+            else:
+                current_z = camera_state["currentZ"] or camera_state["ZPosition"]
             
             # 计算起点和终点
-            start = max(0, current_z - search_range)
-            end = current_z + search_range
+            if is_encoder:
+                start = max(0, current_z - search_range)
+                end = current_z + search_range
+            else:
+                start = max(0.0, current_z - search_range)
+                end = current_z + search_range
             
             # 计算步数
             steps = ceil((end - start) / step)
         else:
             # 向后兼容，使用老的起点终点方式
-            start = float(data.get('start', 5.0))  # 起点
-            end = float(data.get('end', 15.0))    # 终点
-            step = float(data.get('step', 0.5))   # 步进
+            start = float(data.get('start', 5.0 if not is_encoder else 5000))  # 起点
+            end = float(data.get('end', 15.0 if not is_encoder else 15000))    # 终点
+            step = float(data.get('step', 0.5 if not is_encoder else 500))   # 步进
             
             # 从data获取以下参数，如果没有则使用默认值
             steps = int(data.get('steps', ceil((end - start) / step)))
@@ -825,9 +940,16 @@ def update_focus_params():
             "steps": steps,
             "exposure": exposure,
             "gain": gain,
-            "times": 1  # 固定为1轮
+            "times": 1,  # 固定为1轮
+            "isEncoder": is_encoder  # 记录是否使用编码器值
         })
         
+        # 记录日志
+        if is_encoder:
+            print(f"后端: 更新对焦参数(编码器值) - 起点: {start}, 终点: {end}, 步进: {step}, 步数: {steps}")
+        else:
+            print(f"后端: 更新对焦参数(毫米值) - 起点: {start}mm, 终点: {end}mm, 步进: {step}mm, 步数: {steps}")
+            
         return jsonify({"success": True})
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)}), 400

@@ -273,23 +273,23 @@
                     
                     <!-- 当前轴位置显示和点动控制 -->
                     <div class="control-item side-by-side">
-                        <label for="focus-axis-position">轴位置控制(mm):</label>
+                        <label for="focus-axis-position">轴位置控制(编码器值):</label>
                         <div class="axis-position-control">
                             <button class="jog-btn minus" id="focus-jog-minus">-</button>
-                            <input type="text" id="focus-axis-position" value="0.000" readonly>
+                            <input type="text" id="focus-axis-position" value="0" readonly>
                             <button class="jog-btn plus" id="focus-jog-plus">+</button>
                         </div>
                     </div>
                     
                     <!-- 新增步进控制下拉列表 -->
                     <div class="control-item side-by-side">
-                        <label for="focus-step-select">步进量(mm):</label>
+                        <label for="focus-step-select">步进量(编码器值):</label>
                         <select id="focus-step-select" class="compact-select">
-                            <option value="0.001">0.001</option>
-                            <option value="0.01">0.01</option>
-                            <option value="0.1" selected>0.1</option>
-                            <option value="0.5">0.5</option>
-                            <option value="1.0">1.0</option>
+                            <option value="1">1</option>
+                            <option value="10">10</option>
+                            <option value="100" selected>100</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
                         </select>
                     </div>
                     
@@ -301,23 +301,15 @@
                     
                     <!-- 修改为搜索范围和搜索颗粒度 -->
                     <div class="control-item side-by-side">
-                        <label for="focus-range">搜索范围:</label>
+                        <label for="focus-range">搜索范围(编码器值):</label>
                         <div class="input-group">
-                            <input type="number" id="focus-range" value="5.0" step="0.1" min="0.1" class="compact-input" style="width: 70%;">
-                            <div style="display: flex; flex-direction: column; margin-left: 5px; width: 70px;">
-                                <span style="font-size: 0.8em; color: var(--text-light);">mm</span>
-                                <span style="font-size: 0.8em; color: var(--text-medium);" id="focus-range-encoder">5000</span>
-                            </div>
+                            <input type="number" id="focus-range" value="5000" step="100" min="100" class="compact-input">
                         </div>
                     </div>
                     <div class="control-item side-by-side">
-                        <label for="focus-step">搜索颗粒度:</label>
+                        <label for="focus-step">搜索颗粒度(编码器值):</label>
                         <div class="input-group">
-                            <input type="number" id="focus-step" value="0.5" step="0.1" min="0.1" class="compact-input" style="width: 70%;">
-                            <div style="display: flex; flex-direction: column; margin-left: 5px; width: 70px;">
-                                <span style="font-size: 0.8em; color: var(--text-light);">mm</span>
-                                <span style="font-size: 0.8em; color: var(--text-medium);" id="focus-step-encoder">500</span>
-                            </div>
+                            <input type="number" id="focus-step" value="500" step="10" min="1" class="compact-input">
                         </div>
                     </div>
 

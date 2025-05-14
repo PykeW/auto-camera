@@ -88,9 +88,7 @@ function initializeDOMReferences() {
 
     // 对焦控制
     focusRange = document.getElementById('focus-range');
-    focusRangeEncoder = document.getElementById('focus-range-encoder'); 
     focusStep = document.getElementById('focus-step');
-    focusStepEncoder = document.getElementById('focus-step-encoder');
 
     // 轴控件
     axisInputs = {
@@ -320,7 +318,8 @@ function updateStatus(state) {
     
     // 更新其他状态显示
     if (currentZInput) {
-        currentZInput.value = state.currentZ ? state.currentZ.toFixed(2) : '--';
+        // 显示Z轴位置的编码器值
+        currentZInput.value = state.currentZEncoder ? state.currentZEncoder : (state.currentZ ? Math.round(state.currentZ * 1000) : '--');
     }
     
     if (clarityInput) {
@@ -451,12 +450,12 @@ async function autoConnect() {
 // 开始自动对焦
 async function startAutoFocus() {
     try {
-        // 使用搜索范围计算起点和终点
-        const currentZ = cameraState.currentZ || cameraState.ZPosition;
-        const range = parseFloat(document.getElementById('focus-range').value);
-        const step = parseFloat(document.getElementById('focus-step').value);
+        // 使用搜索范围计算起点和终点 - 现在使用编码器值
+        const currentZ = Math.round(cameraState.currentZEncoder || cameraState.ZPositionEncoder || cameraState.currentZ * 1000 || cameraState.ZPosition * 1000);
+        const range = parseInt(document.getElementById('focus-range').value);
+        const step = parseInt(document.getElementById('focus-step').value);
         
-        // 计算起点和终点
+        // 计算起点和终点（编码器值）
         const start = Math.max(0, currentZ - range);
         const end = currentZ + range;
         
@@ -481,7 +480,8 @@ async function startAutoFocus() {
             steps: steps,
             exposure: cameraState.focusParams.exposure || 5000,
             gain: cameraState.focusParams.gain || 1.0,
-            times: 1
+            times: 1,
+            isEncoder: true // 添加标识，表明使用的是编码器值
         };
         
         // 更新状态
@@ -2100,8 +2100,12 @@ function initFocusAxisControls() {
             focusAxisPosition.value = '--';
             return;
         }
-        const position = cameraState[`${axisName}Position`];
-        focusAxisPosition.value = (typeof position === 'number') ? position.toFixed(3) : '--';
+        
+        // 使用编码器值，假设Z轴位置已经是编码器值
+        // 如果实际上是mm值，则需要在此处使用一个比例因子将其转换为编码器值
+        // 这里为了简单，假设ZPositionEncoder是实际的编码器值
+        const position = Math.round(cameraState[`${axisName}PositionEncoder`] || cameraState[`${axisName}Position`] * 1000);
+        focusAxisPosition.value = (typeof position === 'number') ? position : '--';
     }
     
     // 处理轴选择变化
@@ -2145,8 +2149,8 @@ function initFocusAxisControls() {
         const axisId = selectedAxisId;
         if (!axisId) return;
         
-        // 从步进选择下拉列表获取步进值
-        const stepValue = parseFloat(focusStepSelect.value);
+        // 从步进选择下拉列表获取步进值 - 现在是编码器值
+        const stepValue = parseInt(focusStepSelect.value);
         const step = stepValue * direction;
         
         try {
@@ -2155,7 +2159,8 @@ function initFocusAxisControls() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     axis: axisId,
-                    step: step
+                    step: step,
+                    isEncoder: true // 添加标识，表明使用的是编码器值
                 })
             });
             const state = await response.json();
@@ -2351,16 +2356,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 启动状态轮询
     startStatusPolling();
     
-    // 添加编码值更新事件
-    if (focusRange) {
-        focusRange.addEventListener('input', updateEncoderValues);
-    }
-    if (focusStep) {
-        focusStep.addEventListener('input', updateEncoderValues);
-    }
+    // 移除不再需要的编码值更新事件
+    // if (focusRange) {
+    //     focusRange.addEventListener('input', updateEncoderValues);
+    // }
+    // if (focusStep) {
+    //     focusStep.addEventListener('input', updateEncoderValues);
+    // }
     
-    // 初始化更新一次编码值
-    updateEncoderValues();
+    // 移除初始化更新编码值
+    // updateEncoderValues();
 
     // 连接按钮点击事件
     if (connectBtn) {
