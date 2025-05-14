@@ -699,8 +699,7 @@ input:checked + .slider:before {
 .status-初始化-检查,
 .status-请求Z轴控制权,
 .status-保存参数中 { background-color: var(--accent-blue); color: var(--text-light); }
-.status-粗对焦中,
-.status-精细对焦中,
+.status-对焦中,
 .status-移动到最佳位置,
 .status-当量计算-模拟- { background-color: var(--accent-yellow); color: var(--text-dark); }
 .status-已对焦 { background-color: var(--accent-green); color: var(--text-dark); }
@@ -1104,8 +1103,7 @@ input:checked + .slider:before {
 .status-未连接 { color: #888; }
 .status-空闲 { color: #4CAF50; }
 .status-初始化\/检查 { color: #2196F3; }
-.status-粗对焦中 { color: #FF9800; }
-.status-精细对焦中 { color: #FF5722; }
+.status-对焦中 { color: #FF9800; }
 .status-移动到最佳位置 { color: #9C27B0; }
 .status-保存参数中 { color: #3F51B5; }
 .status-已对焦 { color: #4CAF50; }
@@ -1639,4 +1637,293 @@ input:checked + .slider:before {
     min-width: 70px;
     text-align: center !important;
     border: 1px solid var(--border-dark);
+}
+
+/* === 相机标定模块样式 === */
+.calibration-panel {
+    background-color: var(--bg-medium);
+    border-radius: var(--border-radius);
+    margin: var(--spacing-medium) 0;
+    overflow: hidden;
+    border: 1px solid var(--border-dark);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.calibration-header {
+    background-color: var(--bg-dark);
+    padding: var(--spacing-medium);
+    border-bottom: 1px solid var(--border-medium);
+}
+
+.calibration-header h4 {
+    margin: 0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-medium);
+    color: var(--accent-blue);
+}
+
+.calibration-header h4 i {
+    font-size: 1.1em;
+}
+
+.calibration-config {
+    padding: var(--spacing-medium);
+    border-bottom: 1px solid var(--border-dark);
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.calibration-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-small);
+    padding: var(--spacing-medium);
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.calibration-button {
+    background-color: var(--accent-blue);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    padding: var(--spacing-medium);
+    cursor: pointer;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-small);
+    transition: all 0.2s ease;
+}
+
+.calibration-button:hover:not(:disabled) {
+    background-color: #0a7ddb;
+    transform: translateY(-1px);
+}
+
+.calibration-button:disabled {
+    background-color: #444;
+    color: #777;
+    cursor: not-allowed;
+}
+
+.calibration-button.danger {
+    background-color: var(--accent-red);
+}
+
+.calibration-button.danger:hover:not(:disabled) {
+    background-color: #d43b3e;
+}
+
+.calibration-button.secondary {
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-medium);
+    color: var(--text-light);
+}
+
+.calibration-button.secondary:hover:not(:disabled) {
+    background-color: var(--bg-medium);
+    color: var(--accent-blue);
+}
+
+.calibration-button i {
+    font-size: 1.1em;
+}
+
+.calibration-status-panel {
+    padding: var(--spacing-medium);
+    background-color: rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid var(--border-dark);
+}
+
+.calibration-status-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-small);
+    align-items: center;
+}
+
+.status-label {
+    color: var(--text-medium);
+    font-weight: 500;
+}
+
+.status-value {
+    padding: 2px 8px;
+    border-radius: 10px;
+    background-color: var(--bg-dark);
+    font-size: 0.9em;
+}
+
+.calibration-progress-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-medium);
+    margin-top: var(--spacing-medium);
+}
+
+.calibration-progress-container .progress-bar {
+    flex: 1;
+    margin-left: var(--spacing-small);
+}
+
+.calibration-results {
+    padding: var(--spacing-medium);
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.calibration-results h5 {
+    margin-top: 0;
+    margin-bottom: var(--spacing-medium);
+    font-weight: 500;
+    color: var(--accent-green);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+}
+
+.calibration-results pre {
+    background-color: var(--bg-dark);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-medium);
+    font-family: monospace;
+    font-size: 0.85em;
+    overflow-x: auto;
+    color: var(--text-light);
+    border: 1px solid var(--border-medium);
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.calibration-result-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-small);
+    margin-top: var(--spacing-medium);
+    padding-top: var(--spacing-medium);
+    border-top: 1px dashed var(--border-dark);
+}
+
+/* 相机标定模块 - 简化版样式 */
+.section-title {
+    margin-bottom: var(--spacing-medium);
+    padding-bottom: var(--spacing-small);
+    font-size: 1.1em;
+    color: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-small);
+    border-bottom: 1px solid var(--border-medium);
+}
+
+.section-title i {
+    font-size: 1.2em;
+}
+
+.control-group {
+    margin-bottom: var(--spacing-large);
+    padding: var(--spacing-small);
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: var(--border-radius);
+}
+
+.calibration-buttons-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-small);
+    margin-bottom: var(--spacing-large);
+}
+
+.status-container {
+    margin-bottom: var(--spacing-medium);
+    padding: var(--spacing-medium);
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-dark);
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-small);
+}
+
+.status-row label {
+    color: var(--text-medium);
+    margin-bottom: 0;
+}
+
+.status-chip {
+    padding: 2px 8px;
+    border-radius: 10px;
+    background-color: var(--bg-medium);
+    font-size: 0.9em;
+    min-width: 70px;
+    text-align: center;
+}
+
+.progress-row {
+    display: flex;
+    align-items: center;
+    margin-top: var(--spacing-medium);
+    gap: var(--spacing-medium);
+}
+
+.progress-row label {
+    min-width: 60px;
+    margin-bottom: 0;
+    color: var(--text-medium);
+}
+
+.result-actions-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-small);
+    margin-bottom: var(--spacing-medium);
+}
+
+.secondary-button {
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-medium);
+    color: var(--text-light);
+    padding: var(--spacing-small) var(--spacing-medium);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-small);
+    transition: all 0.2s ease;
+    height: auto;
+    min-height: 32px;
+}
+
+.secondary-button:hover:not(:disabled) {
+    background-color: var(--bg-dark);
+    color: var(--accent-blue);
+    transform: translateY(-1px);
+}
+
+.secondary-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.secondary-button i {
+    font-size: 1.1em;
+}
+
+/* 覆盖进度条样式 */
+.status-container .progress-bar {
+    flex: 1;
+    height: 16px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.status-container .progress {
+    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+    height: 100%;
+    transition: width 0.3s ease;
 } 

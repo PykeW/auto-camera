@@ -142,8 +142,8 @@ def simulate_focus_process():
             camera_state["isFocusing"] = False
             return
 
-        # 单轮对焦过程
-        camera_state["focusStatus"] = "粗对焦中"
+        # 对焦过程
+        camera_state["focusStatus"] = "对焦中"
         
         best_z = start_z
         max_clarity = -1
@@ -155,6 +155,8 @@ def simulate_focus_process():
                 break
                 
             camera_state["currentZ"] = round(z, 3)
+            # 同步更新ZPosition与currentZ保持一致
+            camera_state["ZPosition"] = camera_state["currentZ"]
             camera_state["clarity"] = calculate_clarity(z)
             print(f"后端: 对焦 Z={camera_state['currentZ']}, 清晰度={camera_state['clarity']}")
             
@@ -169,9 +171,10 @@ def simulate_focus_process():
         if not stop_focus_flag.is_set():
             # 移动到最佳位置
             camera_state["currentZ"] = best_z
+            # 同步更新ZPosition与currentZ保持一致
+            camera_state["ZPosition"] = best_z
             camera_state["clarity"] = calculate_clarity(best_z)
             camera_state["bestZ"] = best_z
-            camera_state["ZPosition"] = best_z
             
             camera_state["focusStatus"] = "移动到最佳位置"
             time.sleep(0.1)

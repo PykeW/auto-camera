@@ -304,28 +304,32 @@
 
                     <hr class="separator">
 
-                    <!-- Calibration Controls -->
-                    <h4>相机标定</h4>
-                    <!-- 标定矩阵设置 -->
-                    <div class="control-item side-by-side">
-                        <label for="matrix-size">矩阵大小:</label>
-                        <select id="matrix-size" class="compact-select">
-                            <option value="3" selected>3×3</option>
-                            <option value="5" >5×5</option>
-                            <option value="7">7×7</option>
-                            <option value="9">9×9</option>
-                        </select>
+                    <!-- 相机标定模块 - 简化版 -->
+                    <h4 class="section-title"><i class="fas fa-camera-retro"></i> 相机标定</h4>
+                    
+                    <!-- 标定参数配置区域 -->
+                    <div class="control-group">
+                        <div class="control-item side-by-side">
+                            <label for="matrix-size">矩阵大小:</label>
+                            <select id="matrix-size" class="compact-select">
+                                <option value="3" selected>3×3</option>
+                                <option value="5">5×5</option>
+                                <option value="7">7×7</option>
+                                <option value="9">9×9</option>
+                            </select>
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label for="point-offset">点位偏移(mm):</label>
+                            <input type="number" id="point-offset" value="10.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label for="mark-size">Mark点尺寸(mm):</label>
+                            <input type="number" id="mark-size" value="2.0" step="0.1" min="0.1">
+                        </div>
                     </div>
-                    <div class="control-item side-by-side">
-                        <label for="point-offset">点位偏移(mm):</label>
-                        <input type="number" id="point-offset" value="10.0" step="0.1" min="0.1">
-                    </div>
-                    <div class="control-item side-by-side">
-                        <label for="mark-size">Mark点尺寸(mm):</label>
-                        <input type="number" id="mark-size" value="2.0" step="0.1" min="0.1">
-                    </div>
-                    <!-- 标定控制按钮 -->
-                    <div class="control-item calibration-controls">
+                    
+                    <!-- 标定操作按钮区域 -->
+                    <div class="calibration-buttons-group">
                         <button id="detect-mark-btn" class="primary-button">
                             <i class="fas fa-crosshairs"></i> 检测Mark点
                         </button>
@@ -339,17 +343,18 @@
                             <i class="fas fa-stop-circle"></i> 停止标定
                         </button>
                     </div>
-                    <!-- 标定状态显示 -->
-                    <div class="calibration-status">
-                        <div class="control-item side-by-side">
+                    
+                    <!-- 标定进度与状态区域 -->
+                    <div class="status-container">
+                        <div class="status-row">
                             <label>标定状态:</label>
-                            <span id="calibration-status" class="status-text">未开始</span>
+                            <span id="calibration-status" class="status-chip">未开始</span>
                         </div>
-                        <div class="control-item side-by-side">
+                        <div class="status-row">
                             <label>当前点位:</label>
-                            <span id="current-point" class="status-text">--</span>
+                            <span id="current-point" class="status-chip">--</span>
                         </div>
-                        <div class="control-item side-by-side">
+                        <div class="progress-row">
                             <label>进度:</label>
                             <div class="progress-bar">
                                 <div id="calibration-progress" class="progress" style="width: 0%">0%</div>
@@ -357,10 +362,14 @@
                         </div>
                     </div>
                     
-                    <!-- 标定结果显示 -->
-                    <div id="calibration-results" class="calibration-results">
-                        <h5>标定结果</h5>
-                        <pre id="calibration-results-content"></pre>
+                    <!-- 结果操作按钮 -->
+                    <div class="result-actions-row">
+                        <button id="export-matrix-btn" class="secondary-button" disabled>
+                            <i class="fas fa-file-export"></i> 导出矩阵
+                        </button>
+                        <button id="view-results-btn" class="secondary-button" disabled>
+                            <i class="fas fa-search"></i> 查看详细结果
+                        </button>
                     </div>
 
                     <hr class="separator">
