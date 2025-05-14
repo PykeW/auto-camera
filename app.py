@@ -123,28 +123,32 @@ def simulate_focus_process():
     try:
         stop_focus_flag.clear()
         camera_state["isFocusing"] = True
-        camera_state["focusStatus"] = "初始化/检查"
+        camera_state["focusStatus"] = "空闲"  # 简化状态显示
         print("后端: 开始自动对焦")
         
         # 应用对焦参数
         focus_params = camera_state["focusParams"]
         
-        # 直接使用参数中的起点、终点和步进
+        # 使用起点和终点进行对焦
         start_z = focus_params["start"]
         end_z = focus_params["end"]
         step_size = focus_params["step"]
+        
+        # 记录当前搜索范围信息
+        search_range = (end_z - start_z) / 2
+        current_z = camera_state["currentZ"]
+        
+        print(f"后端: 对焦参数 - 当前Z位置: {current_z}, 搜索范围: ±{search_range}mm, 起点: {start_z}, 终点: {end_z}, 步进: {step_size}")
         
         time.sleep(0.2) # 模拟初始化
 
         if stop_focus_flag.is_set():
             print("后端: 对焦在初始化阶段被停止")
-            camera_state["focusStatus"] = "已停止"
+            camera_state["focusStatus"] = "空闲"  # 简化状态显示
             camera_state["isFocusing"] = False
             return
 
-        # 对焦过程
-        camera_state["focusStatus"] = "对焦中"
-        
+        # 对焦过程 - 简化状态显示
         best_z = start_z
         max_clarity = -1
             
@@ -176,21 +180,16 @@ def simulate_focus_process():
             camera_state["clarity"] = calculate_clarity(best_z)
             camera_state["bestZ"] = best_z
             
-            camera_state["focusStatus"] = "移动到最佳位置"
-            time.sleep(0.1)
-            camera_state["focusStatus"] = "保存参数中"
-            time.sleep(0.1)
-            camera_state["focusStatus"] = "已对焦"
             print(f"后端: 自动对焦完成, 最佳 Z = {best_z}")
-            
-            time.sleep(2)
-            camera_state["focusStatus"] = "空闲"
+            camera_state["focusStatus"] = "空闲"  # 简化状态显示
+        else:
+            camera_state["focusStatus"] = "空闲"  # 简化状态显示
         
         camera_state["isFocusing"] = False
         
     except Exception as e:
         print(f"后端: 对焦过程出错: {str(e)}")
-        camera_state["focusStatus"] = "错误"
+        camera_state["focusStatus"] = "空闲"  # 简化状态显示，错误时也显示为空闲
         camera_state["isFocusing"] = False
 
 def simulate_calibration_process():
@@ -439,7 +438,7 @@ def start_focus():
     print("后端: 收到开始对焦请求")
     stop_focus_flag.clear()  # 重置停止标志
     camera_state["isFocusing"] = True  # 立即更新状态
-    camera_state["focusStatus"] = "初始化/检查"
+    camera_state["focusStatus"] = "空闲"  # 简化状态显示
     focus_thread = threading.Thread(target=simulate_focus_process, daemon=True)
     focus_thread.start()
     return jsonify(camera_state)  # 返回完整状态
@@ -780,13 +779,29 @@ def update_focus_params():
     
     data = request.json
     try:
-        # 验证参数
-        start = float(data.get('start', 5.0))  # 起点
-        end = float(data.get('end', 15.0))    # 终点
-        step = float(data.get('step', 0.5))   # 步进
+        # 检查是否有搜索范围或起点终点
+        if 'range' in data:
+            # 使用新的搜索范围计算
+            search_range = float(data.get('range', 5.0))
+            step = float(data.get('step', 0.5))
+            current_z = camera_state["currentZ"] or camera_state["ZPosition"]
+            
+            # 计算起点和终点
+            start = max(0, current_z - search_range)
+            end = current_z + search_range
+            
+            # 计算步数
+            steps = ceil((end - start) / step)
+        else:
+            # 向后兼容，使用老的起点终点方式
+            start = float(data.get('start', 5.0))  # 起点
+            end = float(data.get('end', 15.0))    # 终点
+            step = float(data.get('step', 0.5))   # 步进
+            
+            # 从data获取以下参数，如果没有则使用默认值
+            steps = int(data.get('steps', ceil((end - start) / step)))
         
-        # 从data获取以下参数，如果没有则使用默认值
-        steps = int(data.get('steps', ceil((end - start) / step)))
+        # 通用参数
         exposure = int(data.get('exposure', 5000))
         gain = float(data.get('gain', 1.0))
         

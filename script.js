@@ -86,6 +86,12 @@ function initializeDOMReferences() {
     startFocusBtn = document.getElementById('start-focus-btn');
     stopFocusBtn = document.getElementById('stop-focus-btn');
 
+    // 对焦控制
+    focusRange = document.getElementById('focus-range');
+    focusRangeEncoder = document.getElementById('focus-range-encoder'); 
+    focusStep = document.getElementById('focus-step');
+    focusStepEncoder = document.getElementById('focus-step-encoder');
+
     // 轴控件
     axisInputs = {
         x: document.getElementById('x-axis'),
@@ -128,6 +134,7 @@ function initializeDOMReferences() {
     focusAxisPosition = document.getElementById('focus-axis-position');
     focusJogMinus = document.getElementById('focus-jog-minus');
     focusJogPlus = document.getElementById('focus-jog-plus');
+    focusStepSelect = document.getElementById('focus-step-select'); // 新增步进选择引用
     
     // ROI相关按钮
     const confirmRoiBtn = document.getElementById('confirm-roi-focus-btn');
@@ -312,11 +319,6 @@ function updateStatus(state) {
     updateAxisDisplay(cameraState);
     
     // 更新其他状态显示
-    if (focusStatusText) {
-        focusStatusText.textContent = state.focusStatus || '未连接';
-        focusStatusText.className = `status-${state.focusStatus || '未连接'}`;
-    }
-    
     if (currentZInput) {
         currentZInput.value = state.currentZ ? state.currentZ.toFixed(2) : '--';
     }
@@ -449,19 +451,23 @@ async function autoConnect() {
 // 开始自动对焦
 async function startAutoFocus() {
     try {
-        // 直接从界面获取对焦参数
-        const start = parseFloat(document.getElementById('focus-start').value);
-        const end = parseFloat(document.getElementById('focus-end').value);
+        // 使用搜索范围计算起点和终点
+        const currentZ = cameraState.currentZ || cameraState.ZPosition;
+        const range = parseFloat(document.getElementById('focus-range').value);
         const step = parseFloat(document.getElementById('focus-step').value);
         
+        // 计算起点和终点
+        const start = Math.max(0, currentZ - range);
+        const end = currentZ + range;
+        
         // 验证参数
-        if (end <= start) {
-            alert('终点必须大于起点');
+        if (range <= 0) {
+            alert('搜索范围必须大于0');
             return;
         }
         
         if (step <= 0) {
-            alert('步进必须大于0');
+            alert('搜索颗粒度必须大于0');
             return;
         }
         
@@ -796,15 +802,27 @@ function toggleRoiDrawing() {
     console.log('切换ROI绘制模式:', cameraState.isDrawingROI ? '开启' : '关闭');
     
     if (cameraState.isDrawingROI) {
-        // 开始绘制
+        // 开始绘制 - 显示ROI工具面板
         drawRoiFocusBtn.classList.add('active');
-        focusRoiButtonGroup.style.display = 'flex';
+        
+        // 显示工具面板而不是按钮组
+        const roiToolsPanel = document.getElementById('roi-tools-panel');
+        if (roiToolsPanel) {
+            roiToolsPanel.classList.add('show');
+        }
+        
         // 启用ROI绘制模式
         enableRoiDrawing();
     } else {
         // 取消绘制
         drawRoiFocusBtn.classList.remove('active');
-        focusRoiButtonGroup.style.display = 'none';
+        
+        // 隐藏工具面板
+        const roiToolsPanel = document.getElementById('roi-tools-panel');
+        if (roiToolsPanel) {
+            roiToolsPanel.classList.remove('show');
+        }
+        
         // 禁用ROI绘制模式
         disableRoiDrawing();
     }
@@ -816,10 +834,18 @@ let startX = 0;
 let startY = 0;
 let currentRoiRect = null;
 let roiInfoDisplay = null;
+let activeShapeTool = 'rect'; // 默认使用矩形工具
+let activeDrawMode = 'draw'; // 默认绘制模式
+
+// 多边形绘制点
+let polygonPoints = [];
 
 function enableRoiDrawing() {
     const overlay = document.getElementById('focus-roi-overlay');
     if (!overlay) return;
+    
+    // 先清除现有事件，避免重复绑定
+    disableRoiDrawing();
     
     // 清除之前的内容
     overlay.innerHTML = '';
@@ -837,6 +863,11 @@ function enableRoiDrawing() {
     overlay.addEventListener('mousemove', updateRoiDraw);
     overlay.addEventListener('mouseup', endRoiDraw);
     overlay.addEventListener('mouseleave', endRoiDraw);
+    
+    // 重置状态变量
+    currentRoiRect = null;
+    isDrawing = false;
+    polygonPoints = [];
 }
 
 function disableRoiDrawing() {
@@ -861,90 +892,279 @@ function disableRoiDrawing() {
 }
 
 function startRoiDraw(event) {
-    console.log('开始ROI绘制，坐标:', event.clientX, event.clientY);
-    isDrawing = true;
+    if (isDrawing) return; // 防止重复触发
     
-    // 获取相对于overlay的坐标
     const overlay = document.getElementById('focus-roi-overlay');
+    if (!overlay) return;
+    
     const rect = overlay.getBoundingClientRect();
     startX = event.clientX - rect.left;
     startY = event.clientY - rect.top;
     
-    // 创建新的矩形
-    if (currentRoiRect) {
-        overlay.removeChild(currentRoiRect);
+    // 根据当前工具执行不同的绘制逻辑
+    if (activeShapeTool === 'rect') {
+        // 矩形绘制
+        isDrawing = true;
+        
+        // 创建ROI矩形元素
+        if (!currentRoiRect) {
+            currentRoiRect = document.createElement('div');
+            currentRoiRect.className = 'roi-rect drawing';
+            overlay.appendChild(currentRoiRect);
+        }
+        
+        // 设置初始位置
+        currentRoiRect.style.left = `${startX}px`;
+        currentRoiRect.style.top = `${startY}px`;
+        currentRoiRect.style.width = '0';
+        currentRoiRect.style.height = '0';
+        
+        // 显示ROI信息
+        updateRoiInfo(startX, startY, startX, startY);
+        roiInfoDisplay.style.display = 'block';
+    } 
+    else if (activeShapeTool === 'polygon') {
+        // 多边形绘制
+        if (!currentRoiRect) {
+            // 创建一个SVG元素作为多边形容器
+            currentRoiRect = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            currentRoiRect.style.position = 'absolute';
+            currentRoiRect.style.left = '0';
+            currentRoiRect.style.top = '0';
+            currentRoiRect.style.width = '100%';
+            currentRoiRect.style.height = '100%';
+            currentRoiRect.style.pointerEvents = 'none';
+            overlay.appendChild(currentRoiRect);
+            
+            // 创建一个多边形元素
+            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            polygon.setAttribute('fill', 'rgba(255, 87, 34, 0.2)');
+            polygon.setAttribute('stroke', '#FF5722');
+            polygon.setAttribute('stroke-width', '2');
+            polygon.setAttribute('stroke-dasharray', '5,5');
+            polygon.id = 'roi-polygon';
+            currentRoiRect.appendChild(polygon);
+            
+            // 重置点数组
+            polygonPoints = [];
+        }
+        
+        // 添加新点
+        polygonPoints.push({ x: startX, y: startY });
+        
+        // 更新多边形
+        updatePolygon();
+        
+        // 显示ROI信息
+        if (polygonPoints.length > 1) {
+            const minX = Math.min(...polygonPoints.map(p => p.x));
+            const minY = Math.min(...polygonPoints.map(p => p.y));
+            const maxX = Math.max(...polygonPoints.map(p => p.x));
+            const maxY = Math.max(...polygonPoints.map(p => p.y));
+            updateRoiInfo(minX, minY, maxX, maxY);
+            roiInfoDisplay.style.display = 'block';
+        }
     }
-    
-    currentRoiRect = document.createElement('div');
-    currentRoiRect.className = 'roi-rect drawing';
-    currentRoiRect.style.left = startX + 'px';
-    currentRoiRect.style.top = startY + 'px';
-    currentRoiRect.style.width = '0';
-    currentRoiRect.style.height = '0';
-    
-    overlay.appendChild(currentRoiRect);
-    
-    // 显示坐标信息
-    updateRoiInfo(startX, startY, startX, startY);
-    roiInfoDisplay.style.display = 'block';
+    else if (activeShapeTool === 'ellipse') {
+        // 椭圆绘制
+        isDrawing = true;
+        
+        if (!currentRoiRect) {
+            // 创建一个SVG元素作为椭圆容器
+            currentRoiRect = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            currentRoiRect.style.position = 'absolute';
+            currentRoiRect.style.left = '0';
+            currentRoiRect.style.top = '0';
+            currentRoiRect.style.width = '100%';
+            currentRoiRect.style.height = '100%';
+            currentRoiRect.style.pointerEvents = 'none';
+            overlay.appendChild(currentRoiRect);
+            
+            // 创建一个椭圆元素
+            const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+            ellipse.setAttribute('fill', 'rgba(255, 87, 34, 0.2)');
+            ellipse.setAttribute('stroke', '#FF5722');
+            ellipse.setAttribute('stroke-width', '2');
+            ellipse.id = 'roi-ellipse';
+            currentRoiRect.appendChild(ellipse);
+        }
+        
+        // 初始化椭圆
+        const ellipse = document.getElementById('roi-ellipse');
+        ellipse.setAttribute('cx', startX);
+        ellipse.setAttribute('cy', startY);
+        ellipse.setAttribute('rx', 0);
+        ellipse.setAttribute('ry', 0);
+        
+        // 显示ROI信息
+        updateRoiInfo(startX, startY, startX, startY);
+        roiInfoDisplay.style.display = 'block';
+    }
 }
 
 function updateRoiDraw(event) {
-    if (!isDrawing) return;
+    if (!currentRoiRect) return;
     
     const overlay = document.getElementById('focus-roi-overlay');
+    if (!overlay) return;
+    
     const rect = overlay.getBoundingClientRect();
     const currentX = event.clientX - rect.left;
     const currentY = event.clientY - rect.top;
     
-    // 计算宽度和高度（处理反向绘制的情况）
-    const width = Math.abs(currentX - startX);
-    const height = Math.abs(currentY - startY);
-    
-    // 计算左上角坐标（处理反向绘制的情况）
-    const left = Math.min(startX, currentX);
-    const top = Math.min(startY, currentY);
-    
-    // 更新矩形位置和大小
-    currentRoiRect.style.left = left + 'px';
-    currentRoiRect.style.top = top + 'px';
-    currentRoiRect.style.width = width + 'px';
-    currentRoiRect.style.height = height + 'px';
-    
-    // 更新坐标信息
-    updateRoiInfo(left, top, left + width, top + height);
+    if (activeShapeTool === 'rect' && isDrawing) {
+        // 矩形绘制更新
+        const width = Math.abs(currentX - startX);
+        const height = Math.abs(currentY - startY);
+        const left = Math.min(startX, currentX);
+        const top = Math.min(startY, currentY);
+        
+        currentRoiRect.style.width = `${width}px`;
+        currentRoiRect.style.height = `${height}px`;
+        currentRoiRect.style.left = `${left}px`;
+        currentRoiRect.style.top = `${top}px`;
+        
+        // 更新ROI坐标信息
+        updateRoiInfo(left, top, left + width, top + height);
+    }
+    else if (activeShapeTool === 'polygon') {
+        // 对于多边形，仅在鼠标移动时更新提示
+        if (roiInfoDisplay) {
+            roiInfoDisplay.style.left = `${currentX + 10}px`;
+            roiInfoDisplay.style.top = `${currentY + 10}px`;
+        }
+    }
+    else if (activeShapeTool === 'ellipse' && isDrawing) {
+        // 椭圆绘制更新
+        const rx = Math.abs(currentX - startX) / 2;
+        const ry = Math.abs(currentY - startY) / 2;
+        const cx = (startX + currentX) / 2;
+        const cy = (startY + currentY) / 2;
+        
+        const ellipse = document.getElementById('roi-ellipse');
+        if (ellipse) {
+            ellipse.setAttribute('cx', cx);
+            ellipse.setAttribute('cy', cy);
+            ellipse.setAttribute('rx', rx);
+            ellipse.setAttribute('ry', ry);
+            
+            // 更新ROI坐标信息
+            const left = cx - rx;
+            const top = cy - ry;
+            const right = cx + rx;
+            const bottom = cy + ry;
+            updateRoiInfo(left, top, right, bottom);
+        }
+    }
 }
 
 function endRoiDraw(event) {
-    if (!isDrawing) return;
-    
-    isDrawing = false;
-    
-    // 完成绘制，更新样式
-    if (currentRoiRect) {
-        currentRoiRect.classList.remove('drawing');
+    if (activeShapeTool === 'rect' && isDrawing) {
+        isDrawing = false;
+        
+        // 移除绘制中的样式
+        if (currentRoiRect) {
+            currentRoiRect.classList.remove('drawing');
+            
+            // 获取最终的ROI坐标
+            const left = parseInt(currentRoiRect.style.left);
+            const top = parseInt(currentRoiRect.style.top);
+            const width = parseInt(currentRoiRect.style.width);
+            const height = parseInt(currentRoiRect.style.height);
+            
+            // 保存ROI坐标到状态
+            cameraState.roiCoords = {
+                l: left,
+                t: top,
+                r: left + width,
+                b: top + height
+            };
+            
+            console.log('保存矩形ROI坐标:', cameraState.roiCoords);
+        }
     }
-    
-    // 保存坐标到状态
-    updateRoiCoordinates();
+    else if (activeShapeTool === 'ellipse' && isDrawing) {
+        isDrawing = false;
+        
+        const ellipse = document.getElementById('roi-ellipse');
+        if (ellipse) {
+            const cx = parseFloat(ellipse.getAttribute('cx'));
+            const cy = parseFloat(ellipse.getAttribute('cy'));
+            const rx = parseFloat(ellipse.getAttribute('rx'));
+            const ry = parseFloat(ellipse.getAttribute('ry'));
+            
+            // 保存椭圆ROI坐标到状态（保存为矩形包围盒）
+            cameraState.roiCoords = {
+                l: cx - rx,
+                t: cy - ry,
+                r: cx + rx,
+                b: cy + ry,
+                type: 'ellipse',
+                center: { x: cx, y: cy },
+                radius: { x: rx, y: ry }
+            };
+            
+            console.log('保存椭圆ROI坐标:', cameraState.roiCoords);
+        }
+    }
+    // 多边形在点击时不需结束绘制
 }
 
-function updateRoiCoordinates() {
-    if (!currentRoiRect) return;
+// 更新多边形绘制
+function updatePolygon() {
+    const polygon = document.getElementById('roi-polygon');
+    if (!polygon) return;
     
-    // 从样式中提取坐标
-    const left = parseInt(currentRoiRect.style.left, 10);
-    const top = parseInt(currentRoiRect.style.top, 10);
-    const width = parseInt(currentRoiRect.style.width, 10);
-    const height = parseInt(currentRoiRect.style.height, 10);
+    // 构建点集合字符串
+    const pointsStr = polygonPoints.map(p => `${p.x},${p.y}`).join(' ');
+    polygon.setAttribute('points', pointsStr);
     
-    // 更新状态
-    cameraState.roiCoords = {
-        l: left,
-        t: top,
-        r: left + width,
-        b: top + height
-    };
+    // 如果有三个或更多点，则可以完成多边形
+    if (polygonPoints.length >= 3) {
+        // 计算多边形的边界框
+        const minX = Math.min(...polygonPoints.map(p => p.x));
+        const minY = Math.min(...polygonPoints.map(p => p.y));
+        const maxX = Math.max(...polygonPoints.map(p => p.x));
+        const maxY = Math.max(...polygonPoints.map(p => p.y));
+        
+        // 保存多边形ROI坐标到状态
+        cameraState.roiCoords = {
+            l: minX,
+            t: minY,
+            r: maxX,
+            b: maxY,
+            type: 'polygon',
+            points: [...polygonPoints] // 保存所有点
+        };
+        
+        console.log('多边形点数:', polygonPoints.length);
+    }
+}
+
+// 完成多边形绘制 (双击时调用)
+function finishPolygon() {
+    if (activeShapeTool === 'polygon' && polygonPoints.length >= 3) {
+        const polygon = document.getElementById('roi-polygon');
+        if (polygon) {
+            // 移除虚线样式，改为实线
+            polygon.setAttribute('stroke-dasharray', '');
+            
+            console.log('完成多边形ROI绘制:', cameraState.roiCoords);
+        }
+    }
+}
+
+// 添加双击事件监听器完成多边形
+function setupPolygonEvents() {
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (overlay) {
+        overlay.addEventListener('dblclick', (e) => {
+            if (activeShapeTool === 'polygon' && polygonPoints.length >= 3) {
+                finishPolygon();
+                e.stopPropagation(); // 防止事件冒泡
+            }
+        });
+    }
 }
 
 function updateRoiInfo(left, top, right, bottom) {
@@ -961,18 +1181,21 @@ function confirmRoi() {
     
     // 确认当前ROI
     cameraState.roiEnabled = true;
-    cameraState.isDrawingROI = false;
-    drawRoiFocusBtn.classList.remove('active');
-    focusRoiButtonGroup.style.display = 'none';
     
-    // 禁用绘制模式但保留显示
+    // 保持绘制模式开启，但更新UI状态
     disableRoiDrawing();
     
     // 显示确认后的ROI
     document.getElementById('focus-roi-overlay').style.display = 'block';
     
+    // 更新按钮状态
+    document.getElementById('toggle-visibility-roi-btn').innerHTML = '<i class="fas fa-eye"></i> 显示';
+    
     // 发送ROI数据到后端
     updateRoiOnServer();
+    
+    // 显示确认消息
+    console.log('ROI已确认');
 }
 
 function redrawRoi() {
@@ -991,9 +1214,6 @@ function redrawRoi() {
 
 function clearRoi() {
     cameraState.roiEnabled = false;
-    cameraState.isDrawingROI = false;
-    drawRoiFocusBtn.classList.remove('active');
-    focusRoiButtonGroup.style.display = 'none';
     
     // 清除ROI显示
     const overlay = document.getElementById('focus-roi-overlay');
@@ -1011,16 +1231,30 @@ function clearRoi() {
     isDrawing = false;
     currentRoiRect = null;
     
+    // 更新按钮状态
+    document.getElementById('toggle-visibility-roi-btn').innerHTML = '<i class="fas fa-eye"></i> 显示';
+    
     // 通知后端清除ROI
     fetch('/clear_roi', { method: 'POST' })
         .then(response => response.json())
         .catch(error => console.error('清除ROI失败:', error));
+        
+    console.log('ROI已删除');
 }
 
 function toggleRoiVisibility() {
     const overlay = document.getElementById('focus-roi-overlay');
     if (overlay) {
-        overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+        const isVisible = overlay.style.display !== 'none';
+        overlay.style.display = isVisible ? 'none' : 'block';
+        
+        // 更新按钮文本
+        const toggleBtn = document.getElementById('toggle-visibility-roi-btn');
+        if (toggleBtn) {
+            toggleBtn.innerHTML = isVisible ? 
+                '<i class="fas fa-eye-slash"></i> 隐藏' : 
+                '<i class="fas fa-eye"></i> 显示';
+        }
     }
 }
 
@@ -1838,9 +2072,10 @@ function initFocusAxisControls() {
     focusAxisPosition = document.getElementById('focus-axis-position');
     focusJogMinus = document.getElementById('focus-jog-minus');
     focusJogPlus = document.getElementById('focus-jog-plus');
+    focusStepSelect = document.getElementById('focus-step-select'); // 新增步进选择引用
     
     // 检查元素是否存在
-    if (!focusAxisSelect || !focusAxisPosition || !focusJogMinus || !focusJogPlus) {
+    if (!focusAxisSelect || !focusAxisPosition || !focusJogMinus || !focusJogPlus || !focusStepSelect) {
         console.error('缺少必要的DOM元素。');
         return;
     }
@@ -1866,7 +2101,7 @@ function initFocusAxisControls() {
             return;
         }
         const position = cameraState[`${axisName}Position`];
-        focusAxisPosition.value = (typeof position === 'number') ? position.toFixed(2) : '--';
+        focusAxisPosition.value = (typeof position === 'number') ? position.toFixed(3) : '--';
     }
     
     // 处理轴选择变化
@@ -1893,8 +2128,8 @@ function initFocusAxisControls() {
             return;
         }
         
-        // 使用固定的0.01步进替代从选择框获取
-        const step = 0.01; // 固定步进值
+        // 从步进选择下拉列表获取步进值
+        const step = parseFloat(focusStepSelect.value);
         const limits = cameraState.axisLimits[selectedAxis];
         
         // 检查是否会超出限制
@@ -1910,8 +2145,9 @@ function initFocusAxisControls() {
         const axisId = selectedAxisId;
         if (!axisId) return;
         
-        // 使用固定的0.01步进值
-        const step = 0.01 * direction;
+        // 从步进选择下拉列表获取步进值
+        const stepValue = parseFloat(focusStepSelect.value);
+        const step = stepValue * direction;
         
         try {
             const response = await fetch('/jog_axis', {
@@ -1954,6 +2190,9 @@ function initFocusAxisControls() {
         }, 200); // 200ms间隔
     });
     
+    // 步进下拉列表变化时更新按钮状态
+    focusStepSelect.addEventListener('change', updateJogButtonState);
+    
     // 停止点动
     function stopJogging() {
         if (jogInterval) {
@@ -1991,7 +2230,100 @@ function initializeEventListeners() {
     document.getElementById('clear-roi-focus-btn').addEventListener('click', clearRoi);
     document.getElementById('toggle-focus-roi-visibility-btn').addEventListener('click', toggleRoiVisibility);
     
+    // 初始化ROI工具相关事件
+    initializeRoiTools();
+    
     // ... existing code ...
+}
+
+// 在初始化DOM引用中添加工具面板的引用
+function initializeRoiTools() {
+    // 首先初始化选项卡切换
+    document.getElementById('rect-roi-tool').addEventListener('click', () => switchRoiTool('rect'));
+    document.getElementById('polygon-roi-tool').addEventListener('click', () => switchRoiTool('polygon'));
+    document.getElementById('ellipse-roi-tool').addEventListener('click', () => switchRoiTool('ellipse'));
+    
+    // 改为使用新的单选按钮容器
+    document.getElementById('draw-mode-container').addEventListener('click', () => switchDrawMode('draw'));
+    document.getElementById('edit-mode-container').addEventListener('click', () => switchDrawMode('edit'));
+    
+    // 操作按钮
+    document.getElementById('confirm-roi-tool-btn').addEventListener('click', confirmRoi);
+    document.getElementById('cancel-roi-tool-btn').addEventListener('click', cancelRoi);
+    document.getElementById('toggle-visibility-roi-btn').addEventListener('click', toggleRoiVisibility);
+    document.getElementById('delete-roi-btn').addEventListener('click', clearRoi);
+    document.getElementById('close-roi-tools').addEventListener('click', closeRoiTools);
+}
+
+// 关闭ROI工具面板
+function closeRoiTools() {
+    cameraState.isDrawingROI = false;
+    drawRoiFocusBtn.classList.remove('active');
+    
+    // 隐藏工具面板
+    const roiToolsPanel = document.getElementById('roi-tools-panel');
+    if (roiToolsPanel) {
+        roiToolsPanel.classList.remove('show');
+    }
+    
+    // 禁用ROI绘制模式
+    disableRoiDrawing();
+}
+
+// 切换ROI形状工具
+function switchRoiTool(tool) {
+    activeShapeTool = tool;
+    
+    // 更新按钮状态
+    document.getElementById('rect-roi-tool').classList.toggle('active', tool === 'rect');
+    document.getElementById('polygon-roi-tool').classList.toggle('active', tool === 'polygon');
+    document.getElementById('ellipse-roi-tool').classList.toggle('active', tool === 'ellipse');
+    
+    console.log(`已切换到${tool}工具`);
+}
+
+// 切换绘制/编辑模式
+function switchDrawMode(mode) {
+    activeDrawMode = mode;
+    
+    // 更新单选按钮状态
+    document.getElementById('draw-mode-container').classList.toggle('active', mode === 'draw');
+    document.getElementById('edit-mode-container').classList.toggle('active', mode === 'edit');
+    
+    console.log(`已切换到${mode === 'draw' ? '绘制' : '编辑'}模式`);
+}
+
+// 取消当前ROI绘制
+function cancelRoi() {
+    // 清除当前ROI但不退出绘制模式
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (currentRoiRect && overlay.contains(currentRoiRect)) {
+        overlay.removeChild(currentRoiRect);
+    }
+    currentRoiRect = null;
+    
+    // 重置绘制状态
+    isDrawing = false;
+    
+    if (roiInfoDisplay) {
+        roiInfoDisplay.style.display = 'none';
+    }
+}
+
+// 更新编码值显示
+function updateEncoderValues() {
+    if(focusRange && focusRangeEncoder) {
+        // 假设1mm = 1000编码器值，这个比例应该根据实际情况调整
+        const rangeValue = parseFloat(focusRange.value);
+        const encoderValue = Math.round(rangeValue * 1000);
+        focusRangeEncoder.textContent = encoderValue;
+    }
+    
+    if(focusStep && focusStepEncoder) {
+        const stepValue = parseFloat(focusStep.value);
+        const encoderValue = Math.round(stepValue * 1000);
+        focusStepEncoder.textContent = encoderValue;
+    }
 }
 
 // 事件监听器
@@ -2004,12 +2336,32 @@ document.addEventListener('DOMContentLoaded', () => {
         focusRoiButtonGroup.style.display = 'none';
     }
     
+    // 初始化ROI工具面板
+    const roiToolsPanel = document.getElementById('roi-tools-panel');
+    if (roiToolsPanel) {
+        roiToolsPanel.classList.remove('show');
+    }
+    
+    // 设置多边形绘制的双击事件
+    setupPolygonEvents();
+    
     // 更新连接按钮初始状态
     updateConnectButton();
     
     // 启动状态轮询
     startStatusPolling();
     
+    // 添加编码值更新事件
+    if (focusRange) {
+        focusRange.addEventListener('input', updateEncoderValues);
+    }
+    if (focusStep) {
+        focusStep.addEventListener('input', updateEncoderValues);
+    }
+    
+    // 初始化更新一次编码值
+    updateEncoderValues();
+
     // 连接按钮点击事件
     if (connectBtn) {
         connectBtn.addEventListener('click', toggleConnection);

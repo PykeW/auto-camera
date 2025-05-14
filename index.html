@@ -109,6 +109,37 @@
                     <!-- Calibration ROI Overlay (New) -->
                     <div class="focus-overlay calibration-roi-overlay" id="calibration-roi-overlay" style="display: none;"></div>
                     
+                    <!-- 新增ROI工具面板 -->
+                    <div id="roi-tools-panel" class="roi-tools-panel">
+                        <div class="roi-tools-header">
+                            <h5>ROI工具</h5>
+                            <button class="close-button" id="close-roi-tools">×</button>
+                        </div>
+                        <div class="roi-tools-content">
+                            <div class="roi-shape-tools">
+                                <button class="roi-tool-button active" id="rect-roi-tool" title="矩形工具">矩形</button>
+                                <button class="roi-tool-button" id="polygon-roi-tool" title="多边形工具">多边形</button>
+                                <button class="roi-tool-button" id="ellipse-roi-tool" title="椭圆工具">椭圆</button>
+                            </div>
+                            <div class="roi-draw-mode-group">
+                                <div class="radio-button-container active" id="draw-mode-container">
+                                    <div class="radio-circle"></div>
+                                    <label>绘画</label>
+                                </div>
+                                <div class="radio-button-container" id="edit-mode-container">
+                                    <div class="radio-circle"></div>
+                                    <label>编辑</label>
+                                </div>
+                            </div>
+                            <div class="roi-option-group">
+                                <button class="roi-tool-button" id="confirm-roi-tool-btn" title="确认">确认</button>
+                                <button class="roi-tool-button" id="cancel-roi-tool-btn" title="取消">取消</button>
+                                <button class="roi-tool-button" id="toggle-visibility-roi-btn" title="显示/隐藏">显示</button>
+                                <button class="roi-tool-button" id="delete-roi-btn" title="删除">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- 标定点位阵显示 -->
                     <div id="calibration-matrix-display" class="calibration-matrix-display">
                         <div id="matrix-grid" class="matrix-grid"></div>
@@ -250,30 +281,44 @@
                         </div>
                     </div>
                     
+                    <!-- 新增步进控制下拉列表 -->
+                    <div class="control-item side-by-side">
+                        <label for="focus-step-select">步进量(mm):</label>
+                        <select id="focus-step-select" class="compact-select">
+                            <option value="0.001">0.001</option>
+                            <option value="0.01">0.01</option>
+                            <option value="0.1" selected>0.1</option>
+                            <option value="0.5">0.5</option>
+                            <option value="1.0">1.0</option>
+                        </select>
+                    </div>
+                    
                     <!-- 对焦相关数据显示 -->
-                     <!-- Apply side-by-side layout -->
                      <div class="control-item side-by-side">
                         <label for="clarity-value">当前清晰度:</label>
                         <input type="text" id="clarity-value" value="--" readonly disabled="">
                     </div>
-                     <!-- Apply side-by-side layout -->
-                     <div class="control-item focus-status side-by-side">
-                        <label>对焦状态:</label>
-                        <span id="focus-status-text" class="status-未连接">未连接</span>
-                    </div>
                     
-                    <!-- 对焦参数设置 - 直接在界面上显示 -->
+                    <!-- 修改为搜索范围和搜索颗粒度 -->
                     <div class="control-item side-by-side">
-                        <label for="focus-start">起点(mm):</label>
-                        <input type="number" id="focus-start" value="5.0" step="0.1" min="0.0" class="compact-input">
+                        <label for="focus-range">搜索范围:</label>
+                        <div class="input-group">
+                            <input type="number" id="focus-range" value="5.0" step="0.1" min="0.1" class="compact-input" style="width: 70%;">
+                            <div style="display: flex; flex-direction: column; margin-left: 5px; width: 70px;">
+                                <span style="font-size: 0.8em; color: var(--text-light);">mm</span>
+                                <span style="font-size: 0.8em; color: var(--text-medium);" id="focus-range-encoder">5000</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="control-item side-by-side">
-                        <label for="focus-end">终点(mm):</label>
-                        <input type="number" id="focus-end" value="15.0" step="0.1" min="0.0" class="compact-input">
-                    </div>
-                    <div class="control-item side-by-side">
-                        <label for="focus-step">步进(mm):</label>
-                        <input type="number" id="focus-step" value="0.5" step="0.1" min="0.1" class="compact-input">
+                        <label for="focus-step">搜索颗粒度:</label>
+                        <div class="input-group">
+                            <input type="number" id="focus-step" value="0.5" step="0.1" min="0.1" class="compact-input" style="width: 70%;">
+                            <div style="display: flex; flex-direction: column; margin-left: 5px; width: 70px;">
+                                <span style="font-size: 0.8em; color: var(--text-light);">mm</span>
+                                <span style="font-size: 0.8em; color: var(--text-medium);" id="focus-step-encoder">500</span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Focus ROI Controls (Moved Here) -->
