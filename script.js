@@ -333,8 +333,31 @@ function updateStatus(state) {
     const focusClarityDisplay = document.getElementById('focus-clarity-display');
     
     if (focusPositionDisplay) {
-        // 固定显示"上料位"
-        focusPositionDisplay.textContent = "上料位";
+        // 修改为显示与控制面板中相同的轴位置数据
+        if (cameraState.isConnected) {
+            // 获取当前选中的轴
+            const selectedAxisId = document.getElementById('focus-axis-select') ? 
+                                  document.getElementById('focus-axis-select').value : '3'; // 默认为Z轴
+            const axisName = getAxisNameById(selectedAxisId);
+            
+            if (axisName) {
+                // 根据当前单位设置显示内容
+                if (cameraState.displayUnit === 'mm') {
+                    // 毫米显示
+                    const position = cameraState[`${axisName}Position`] || 0;
+                    focusPositionDisplay.textContent = `${position.toFixed(5)} mm`;
+                } else {
+                    // 微米显示，与控制面板一致
+                    const positionEncoder = cameraState[`${axisName}PositionEncoder`] || 
+                                         (cameraState[`${axisName}Position`] * 1000) || 0;
+                    focusPositionDisplay.textContent = `${Math.round(positionEncoder)} um`;
+                }
+            } else {
+                focusPositionDisplay.textContent = "--";
+            }
+        } else {
+            focusPositionDisplay.textContent = "--";
+        }
     }
     
     if (focusClarityDisplay) {
@@ -2105,8 +2128,11 @@ function initFocusAxisControls() {
     let selectedAxis = 'Z';  // 默认Z轴
     let selectedAxisId = '3'; // 默认Z轴ID
     
-    // 初始化单位设置
-    cameraState.displayUnit = 'um'; // 默认单位为微米
+    // 初始化单位设置 - 确保默认单位一致
+    // 检查当前状态中是否已有设置
+    if (!cameraState.displayUnit) {
+        cameraState.displayUnit = 'mm'; // 默认使用毫米作为单位
+    }
     unitDisplay.textContent = cameraState.displayUnit;
     
     // 填充轴选择下拉列表（调用公共函数）
