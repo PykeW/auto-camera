@@ -1,12 +1,15 @@
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import time
-import threading
 import random
 import io
 import base64
 from PIL import Image, ImageDraw
 from math import ceil
+import os
+import json
+from threading import Thread, Event
+import logging
 
 app = Flask(__name__)
 CORS(app)  # 允许所有来源的跨域请求
@@ -100,10 +103,10 @@ calibration_state = {
 
 # 新增标定用的线程
 calibration_thread = None
-stop_calibration_flag = threading.Event()
+stop_calibration_flag = Event()
 
 focus_thread = None
-stop_focus_flag = threading.Event()
+stop_focus_flag = Event()
 
 # --- 模拟 PLC 提供的轴数据 ---
 simulated_plc_axes = [
@@ -1109,7 +1112,7 @@ def start_calibration():
     
     # 启动标定线程
     stop_calibration_flag.clear()
-    calibration_thread = threading.Thread(target=simulate_calibration_process, daemon=True)
+    calibration_thread = Thread(target=simulate_calibration_process, daemon=True)
     calibration_thread.start()
     
     return jsonify({

@@ -214,6 +214,7 @@ label {
     font-size: 0.9em;
 }
 
+/* 输入框样式 */
 input[type="text"],
 input[type="number"],
 select {
@@ -225,6 +226,7 @@ select {
     border-radius: var(--border-radius);
     font-size: inherit;
     height: 28px;
+    text-align: left; /* 确保所有输入框内容默认左对齐 */
 }
 
 /* 数字输入框 */
@@ -1877,4 +1879,31 @@ input:checked + .slider:before {
     font-size: 0.95em;
     padding: 5px 0;
     border-radius: 2px;
+}
+
+/* 控制项样式 */
+.control-item.side-by-side {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-medium);
+    flex-wrap: nowrap;
+    width: 100%;
+    margin-bottom: 6px;
+    justify-content: flex-start; /* 确保左对齐 */
+    text-align: left;
+}
+
+.control-item.side-by-side label {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+    margin-right: 5px;
+    min-width: 70px;
+    text-align: left;
+}
+
+.control-item.side-by-side select,
+.control-item.side-by-side input {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
 } 
