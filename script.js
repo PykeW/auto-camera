@@ -37,7 +37,9 @@ let cameraState = {
         "2": "Y", 
         "3": "Z",
         "4": "U"
-    }
+    },
+    // 添加单位显示设置
+    displayUnit: 'mm' // 默认单位为mm
 };
 
 // 相机标定相关状态
@@ -2090,9 +2092,10 @@ function initFocusAxisControls() {
     focusJogMinus = document.getElementById('focus-jog-minus');
     focusJogPlus = document.getElementById('focus-jog-plus');
     focusStepSelect = document.getElementById('focus-step-select');
+    const unitDisplay = document.getElementById('unit-display');
     
     // 检查元素是否存在
-    if (!focusAxisSelect || !focusAxisPosition || !focusJogMinus || !focusJogPlus || !focusStepSelect) {
+    if (!focusAxisSelect || !focusAxisPosition || !focusJogMinus || !focusJogPlus || !focusStepSelect || !unitDisplay) {
         console.error('缺少必要的DOM元素。');
         return;
     }
@@ -2101,6 +2104,10 @@ function initFocusAxisControls() {
     let jogInterval = null;
     let selectedAxis = 'Z';  // 默认Z轴
     let selectedAxisId = '3'; // 默认Z轴ID
+    
+    // 初始化单位设置
+    cameraState.displayUnit = 'um'; // 默认单位为微米
+    unitDisplay.textContent = cameraState.displayUnit;
     
     // 填充轴选择下拉列表（调用公共函数）
     populateFocusAxisSelect();
@@ -2118,9 +2125,73 @@ function initFocusAxisControls() {
             return;
         }
         
-        // 使用编码器值
-        const position = Math.round(cameraState[`${axisName}PositionEncoder`] || cameraState[`${axisName}Position`] * 1000);
-        focusAxisPosition.value = (typeof position === 'number') ? position : '--';
+        // 根据当前显示单位转换值
+        if (cameraState.displayUnit === 'mm') {
+            // 使用毫米显示，保留3位小数
+            const position = cameraState[`${axisName}Position`] || 0;
+            focusAxisPosition.value = position.toFixed(3);
+        } else {
+            // 使用微米显示，整数
+            const positionEncoder = cameraState[`${axisName}PositionEncoder`] || 
+                                   (cameraState[`${axisName}Position`] * 1000) || 0;
+            focusAxisPosition.value = Math.round(positionEncoder);
+        }
+    }
+    
+    // 单位切换功能
+    unitDisplay.addEventListener('click', () => {
+        // 切换单位
+        cameraState.displayUnit = cameraState.displayUnit === 'mm' ? 'um' : 'mm';
+        
+        // 更新显示
+        unitDisplay.textContent = cameraState.displayUnit;
+        
+        // 添加视觉效果
+        unitDisplay.classList.add('active');
+        setTimeout(() => {
+            unitDisplay.classList.remove('active');
+        }, 300);
+        
+        // 更新位置显示和步进值下拉框
+        updatePositionDisplay();
+        updateStepSelectOptions();
+        
+        console.log(`单位切换为: ${cameraState.displayUnit}`);
+    });
+    
+    // 更新步进选择下拉框的选项
+    function updateStepSelectOptions() {
+        // 清空现有选项
+        focusStepSelect.innerHTML = '';
+        
+        // 根据当前单位添加新选项
+        if (cameraState.displayUnit === 'mm') {
+            // mm模式下的步进值
+            addOption(focusStepSelect, '0.001', '0.001');
+            addOption(focusStepSelect, '0.01', '0.01');
+            addOption(focusStepSelect, '0.1', '0.1', true);
+            addOption(focusStepSelect, '0.5', '0.5');
+            addOption(focusStepSelect, '1', '1');
+        } else {
+            // um模式下的步进值
+            addOption(focusStepSelect, '1', '1');
+            addOption(focusStepSelect, '10', '10');
+            addOption(focusStepSelect, '100', '100', true);
+            addOption(focusStepSelect, '500', '500');
+            addOption(focusStepSelect, '1000', '1000');
+        }
+        
+        // 更新按钮状态
+        updateJogButtonState();
+    }
+    
+    // 辅助函数，添加下拉选项
+    function addOption(selectElement, value, text, selected = false) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        if (selected) option.selected = true;
+        selectElement.appendChild(option);
     }
     
     // 更新点动按钮状态
@@ -2148,7 +2219,13 @@ function initFocusAxisControls() {
         }
         
         // 从步进选择下拉列表获取步进值
-        const step = parseInt(focusStepSelect.value);
+        let step = parseFloat(focusStepSelect.value);
+        
+        // 如果当前单位是mm，需要将步进值转换为编码器值（微米）
+        if (cameraState.displayUnit === 'mm') {
+            step = step * 1000; // 转换为微米
+        }
+        
         const limits = cameraState.axisLimitsEncoder[axisName];
         
         // 检查是否会超出限制
@@ -2166,8 +2243,14 @@ function initFocusAxisControls() {
         
         console.log(`执行点动: 轴=${axisId}, 方向=${direction}, 步进=${focusStepSelect.value}`);
         
-        // 从步进选择下拉列表获取步进值 - 现在是编码器值
-        const stepValue = parseInt(focusStepSelect.value);
+        // 从步进选择下拉列表获取步进值
+        let stepValue = parseFloat(focusStepSelect.value);
+        
+        // 如果当前单位是mm，需要将步进值转换为编码器值（微米）
+        if (cameraState.displayUnit === 'mm') {
+            stepValue = stepValue * 1000; // 转换为微米
+        }
+        
         const step = stepValue * direction;
         
         try {
@@ -2201,47 +2284,7 @@ function initFocusAxisControls() {
         performJog(1);
     });
     
-    // 禁用持续点动，改为单次点击
-    // 保留旧的代码作为注释，可以在后期恢复持续点动功能
-    /*
-    focusJogMinus.addEventListener('mousedown', function() {
-        if (isJogging || focusJogMinus.disabled) return;
-        isJogging = true;
-        performJog(-1);
-        
-        // 持续点动
-        jogInterval = setInterval(() => {
-            performJog(-1);
-        }, 200); // 200ms间隔
-    });
-    
-    focusJogPlus.addEventListener('mousedown', function() {
-        if (isJogging || focusJogPlus.disabled) return;
-        isJogging = true;
-        performJog(1);
-        
-        // 持续点动
-        jogInterval = setInterval(() => {
-            performJog(1);
-        }, 200); // 200ms间隔
-    });
-    
-    // 停止点动
-    function stopJogging() {
-        if (jogInterval) {
-            clearInterval(jogInterval);
-            jogInterval = null;
-        }
-        isJogging = false;
-    }
-    
-    // 鼠标抬起或离开时停止点动
-    focusJogMinus.addEventListener('mouseup', stopJogging);
-    focusJogMinus.addEventListener('mouseleave', stopJogging);
-    focusJogPlus.addEventListener('mouseup', stopJogging);
-    focusJogPlus.addEventListener('mouseleave', stopJogging);
-    */
-    
+ 
     // 步进下拉列表变化时更新按钮状态
     focusStepSelect.addEventListener('change', updateJogButtonState);
     
@@ -2255,6 +2298,7 @@ function initFocusAxisControls() {
     });
     
     // 初始状态更新
+    updateStepSelectOptions(); // 初始化步进选项
     updatePositionDisplay();
     updateJogButtonState();
     
@@ -2267,8 +2311,6 @@ function initFocusAxisControls() {
 
 // 初始化事件监听器
 function initializeEventListeners() {
-    // ... existing code ...
-    
     // ROI绘制相关事件
     document.getElementById('draw-roi-focus-btn').addEventListener('click', toggleRoiDrawing);
     document.getElementById('edit-roi-focus-btn').addEventListener('click', editRoi);
