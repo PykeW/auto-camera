@@ -2072,7 +2072,7 @@ function initFocusAxisControls() {
     focusAxisPosition = document.getElementById('focus-axis-position');
     focusJogMinus = document.getElementById('focus-jog-minus');
     focusJogPlus = document.getElementById('focus-jog-plus');
-    focusStepSelect = document.getElementById('focus-step-select'); // 新增步进选择引用
+    focusStepSelect = document.getElementById('focus-step-select');
     
     // 检查元素是否存在
     if (!focusAxisSelect || !focusAxisPosition || !focusJogMinus || !focusJogPlus || !focusStepSelect) {
@@ -2101,20 +2101,10 @@ function initFocusAxisControls() {
             return;
         }
         
-        // 使用编码器值，假设Z轴位置已经是编码器值
-        // 如果实际上是mm值，则需要在此处使用一个比例因子将其转换为编码器值
-        // 这里为了简单，假设ZPositionEncoder是实际的编码器值
+        // 使用编码器值
         const position = Math.round(cameraState[`${axisName}PositionEncoder`] || cameraState[`${axisName}Position`] * 1000);
         focusAxisPosition.value = (typeof position === 'number') ? position : '--';
     }
-    
-    // 处理轴选择变化
-    focusAxisSelect.addEventListener('change', () => {
-        selectedAxisId = focusAxisSelect.value;
-        selectedAxis = getAxisNameById(selectedAxisId) || 'Z'; // 根据ID获取名称，默认Z
-        updatePositionDisplay();
-        updateJogButtonState();
-    });
     
     // 更新点动按钮状态
     function updateJogButtonState() {
@@ -2125,20 +2115,28 @@ function initFocusAxisControls() {
         }
         
         // 使用selectedAxis来获取位置和限制值
-        const position = cameraState[`${selectedAxis}Position`];
-        if (typeof position !== 'number') {
+        const axisName = getAxisNameById(selectedAxisId || selectedAxis);
+        if (!axisName) {
+            focusJogMinus.disabled = true;
+            focusJogPlus.disabled = true;
+            return;
+        }
+        
+        // 获取编码器位置和限制
+        const positionEncoder = cameraState[`${axisName}PositionEncoder`];
+        if (typeof positionEncoder !== 'number') {
             focusJogMinus.disabled = true;
             focusJogPlus.disabled = true;
             return;
         }
         
         // 从步进选择下拉列表获取步进值
-        const step = parseFloat(focusStepSelect.value);
-        const limits = cameraState.axisLimits[selectedAxis];
+        const step = parseInt(focusStepSelect.value);
+        const limits = cameraState.axisLimitsEncoder[axisName];
         
         // 检查是否会超出限制
-        focusJogMinus.disabled = position - step < limits.min;
-        focusJogPlus.disabled = position + step > limits.max;
+        focusJogMinus.disabled = positionEncoder - step < limits.min;
+        focusJogPlus.disabled = positionEncoder + step > limits.max;
     }
     
     // 执行点动操作
@@ -2148,6 +2146,8 @@ function initFocusAxisControls() {
         // 使用selectedAxisId而不是调用getAxisIdByName
         const axisId = selectedAxisId;
         if (!axisId) return;
+        
+        console.log(`执行点动: 轴=${axisId}, 方向=${direction}, 步进=${focusStepSelect.value}`);
         
         // 从步进选择下拉列表获取步进值 - 现在是编码器值
         const stepValue = parseInt(focusStepSelect.value);
@@ -2172,7 +2172,21 @@ function initFocusAxisControls() {
         }
     }
     
-    // 点动按钮按下事件
+    // 点动按钮事件处理器
+    // 移除现有的mousedown事件处理，改为click事件
+    focusJogMinus.addEventListener('click', function() {
+        if (focusJogMinus.disabled) return;
+        performJog(-1);
+    });
+    
+    focusJogPlus.addEventListener('click', function() {
+        if (focusJogPlus.disabled) return;
+        performJog(1);
+    });
+    
+    // 禁用持续点动，改为单次点击
+    // 保留旧的代码作为注释，可以在后期恢复持续点动功能
+    /*
     focusJogMinus.addEventListener('mousedown', function() {
         if (isJogging || focusJogMinus.disabled) return;
         isJogging = true;
@@ -2195,9 +2209,6 @@ function initFocusAxisControls() {
         }, 200); // 200ms间隔
     });
     
-    // 步进下拉列表变化时更新按钮状态
-    focusStepSelect.addEventListener('change', updateJogButtonState);
-    
     // 停止点动
     function stopJogging() {
         if (jogInterval) {
@@ -2212,6 +2223,19 @@ function initFocusAxisControls() {
     focusJogMinus.addEventListener('mouseleave', stopJogging);
     focusJogPlus.addEventListener('mouseup', stopJogging);
     focusJogPlus.addEventListener('mouseleave', stopJogging);
+    */
+    
+    // 步进下拉列表变化时更新按钮状态
+    focusStepSelect.addEventListener('change', updateJogButtonState);
+    
+    // 处理轴选择变化
+    focusAxisSelect.addEventListener('change', () => {
+        selectedAxisId = focusAxisSelect.value;
+        selectedAxis = getAxisNameById(selectedAxisId) || 'Z'; // 根据ID获取名称，默认Z
+        console.log(`选择轴变更: ID=${selectedAxisId}, 名称=${selectedAxis}`);
+        updatePositionDisplay();
+        updateJogButtonState();
+    });
     
     // 初始状态更新
     updatePositionDisplay();
