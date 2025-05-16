@@ -14,10 +14,10 @@ let cameraState = {
     isShowingCalibration: false,
     calibrationResult: null,
     axisLimits: {
-        X: { min: -100.0, max: 100.0 },
-        Y: { min: -100.0, max: 100.0 },
+        X: { min: 0.0, max: 200.0 },
+        Y: { min: 0.0, max: 200.0 },
         Z: { min: 0.0, max: 50.0 },
-        U: { min: -180.0, max: 180.0 }
+        U: { min: 0.0, max: 360.0 }
     },
     focusParams: {
         start: 5.0,
@@ -44,7 +44,10 @@ let cameraState = {
     // 添加相机图像URL
     cameraImageUrl: null,
     viewingThumbnail: false,
-    currentDisplayedImageIndex: null
+    currentDisplayedImageIndex: null,
+    cachedImageUrl: null,
+    clarity: null,
+    cachedTimestamp: null
 };
 
 // 相机标定相关状态
@@ -195,7 +198,7 @@ function initializeDOMReferences() {
         toggleViewBtn.addEventListener('click', toggleCalibrationView);
     }
     if (calibrateBtn) {
-        calibrateBtn.addEventListener('click', calculateRatio);
+        calibrateBtn.addEventListener('click', calibrateRatio);
     }
 
     // 标定相关事件监听
@@ -214,6 +217,9 @@ function initializeDOMReferences() {
     
     // 初始化Z轴控制相关事件监听
     initFocusAxisControls();
+    
+    // 初始化ROI按钮
+    initializeRoiButtons();
 }
 
 // 轴配置相关
@@ -315,7 +321,37 @@ function updateConnectButton() {
 
 // 更新状态显示
 function updateStatus(state) {
+    // 保存旧状态的连接状态和清晰度
+    const wasConnected = cameraState.isConnected;
+    const oldClarity = cameraState.clarity;
+    
+    // 更新状态
     cameraState = { ...cameraState, ...state };
+    
+    // 连接状态变化时，清除图片缓存
+    if (wasConnected !== cameraState.isConnected) {
+        cameraState.cachedImageUrl = null;
+        cameraState.cachedTimestamp = null;
+    }
+    
+    // 清晰度变化超过阈值时，更新模糊效果
+    if (Math.abs((oldClarity || 0) - (cameraState.clarity || 0)) > 0.05) {
+        if (cameraState.cachedImageUrl) {
+            applyBlurToImage(cameraState.cachedImageUrl, cameraState.clarity || 0);
+        }
+    }
+    
+    // 仅在特定条件下获取相机图像
+    const shouldFetchImage = 
+        cameraState.isConnected && 
+        !cameraState.viewingThumbnail && 
+        (!cameraState.cachedTimestamp || 
+         Date.now() - cameraState.cachedTimestamp > 2000); // 最多2秒一次
+    
+    if (shouldFetchImage) {
+        fetchCameraImage();
+        cameraState.cachedTimestamp = Date.now();
+    }
     
     // 保留当前显示的图片索引
     const currentDisplayedImageIndex = cameraState.currentDisplayedImageIndex;
@@ -382,20 +418,6 @@ function updateStatus(state) {
     }
     if (savePathInput && state.savePath) {
         savePathInput.value = state.savePath;
-    }
-    
-    // 只在未显示对焦结果缩略图时获取相机图像
-    if (state.isConnected && !viewingThumbnail) {
-        fetchCameraImage();
-    } else if (viewingThumbnail && currentDisplayedImageIndex !== undefined && 
-              Array.isArray(cameraState.focusImages) && 
-              cameraState.focusImages[currentDisplayedImageIndex]) {
-        // 如果正在查看缩略图，确保显示选中的图像
-        const image = cameraState.focusImages[currentDisplayedImageIndex];
-        const cameraFeed = document.getElementById('camera-feed');
-        if (cameraFeed && image) {
-            cameraFeed.src = image.imageData || image.image || '';
-        }
     }
     
     // 更新对焦参数设置按钮状态
@@ -1032,37 +1054,45 @@ async function saveFocusParams() {
     }
 }
 
-// ROI绘制相关函数
-function toggleRoiDrawing() {
+// ROI绘制相关函数 - 重写后的代码
+function editRoi() {
     if (!cameraState.isConnected) return;
     
-    // 切换ROI绘制状态
-    cameraState.isDrawingROI = !cameraState.isDrawingROI;
-    console.log('切换ROI绘制模式:', cameraState.isDrawingROI ? '开启' : '关闭');
+    // 启用绘制模式
+    cameraState.isDrawingROI = true;
     
-    // 如果当前是绘制ROI状态
-    if (cameraState.isDrawingROI) {
-        enableRoiDrawing();
-        drawRoiFocusBtn.classList.add('active');
-        
-        // 显示ROI工具面板
-        const roiToolsPanel = document.getElementById('roi-tools-panel');
-        if (roiToolsPanel) {
-            roiToolsPanel.style.display = 'flex';
-            // 确保工具面板位置在相机视图的右上角
-            roiToolsPanel.style.top = '10px';
-            roiToolsPanel.style.right = '10px';
-        }
-    } else {
-        disableRoiDrawing();
-        drawRoiFocusBtn.classList.remove('active');
-        
-        // 隐藏ROI工具面板
-        const roiToolsPanel = document.getElementById('roi-tools-panel');
-        if (roiToolsPanel) {
-            roiToolsPanel.style.display = 'none';
-        }
+    // 准备绘制区域
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (!overlay) return;
+    
+    // 清除之前的内容，准备绘制新的ROI
+    overlay.innerHTML = '';
+    overlay.style.display = 'block';
+    overlay.classList.add('drawing');
+    
+    // 添加ROI信息显示元素
+    if (!roiInfoDisplay) {
+        roiInfoDisplay = document.createElement('div');
+        roiInfoDisplay.className = 'roi-info';
+        document.getElementById('camera-display-container').appendChild(roiInfoDisplay);
     }
+    roiInfoDisplay.style.display = 'none';
+    
+    // 添加绘制事件监听器
+    overlay.addEventListener('mousedown', startRoiDraw);
+    overlay.addEventListener('mousemove', updateRoiDraw);
+    overlay.addEventListener('mouseup', endRoiDraw);
+    overlay.addEventListener('mouseleave', endRoiDraw);
+    
+    // 重置绘制状态变量
+    isDrawing = false;
+    currentRoiRect = null;
+    polygonPoints = [];
+    
+    // 更新按钮状态
+    document.getElementById('edit-roi-focus-btn').classList.add('active');
+    
+    console.log('已进入ROI绘制模式');
 }
 
 // ROI绘制变量
@@ -1413,1202 +1443,104 @@ function updateRoiInfo(left, top, right, bottom) {
     roiInfoDisplay.textContent = `L:${Math.round(left)} T:${Math.round(top)} W:${Math.round(width)} H:${Math.round(height)}`;
 }
 
-function confirmRoi() {
-    if (!cameraState.isDrawingROI || !currentRoiRect) return;
+// 原来的toggleRoiDrawing和editRoi函数会被替换
+
+// 2. 编辑/绘制ROI
+function editRoi() {
+    if (!cameraState.isConnected) return;
     
-    // 确认当前ROI
-    cameraState.roiEnabled = true;
+    // 启用绘制模式
+    cameraState.isDrawingROI = true;
     
-    // 保持绘制模式开启，但更新UI状态
-    disableRoiDrawing();
+    // 准备绘制区域
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (!overlay) return;
     
-    // 显示确认后的ROI
-    document.getElementById('focus-roi-overlay').style.display = 'block';
+    // 清除之前的内容，准备绘制新的ROI
+    overlay.innerHTML = '';
+    overlay.style.display = 'block';
+    overlay.classList.add('drawing');
+    
+    // 添加ROI信息显示元素
+    if (!roiInfoDisplay) {
+        roiInfoDisplay = document.createElement('div');
+        roiInfoDisplay.className = 'roi-info';
+        document.getElementById('camera-display-container').appendChild(roiInfoDisplay);
+    }
+    roiInfoDisplay.style.display = 'none';
+    
+    // 添加绘制事件监听器
+    overlay.addEventListener('mousedown', startRoiDraw);
+    overlay.addEventListener('mousemove', updateRoiDraw);
+    overlay.addEventListener('mouseup', endRoiDraw);
+    overlay.addEventListener('mouseleave', endRoiDraw);
+    
+    // 重置绘制状态变量
+    isDrawing = false;
+    currentRoiRect = null;
+    polygonPoints = [];
     
     // 更新按钮状态
-    document.getElementById('toggle-visibility-roi-btn').innerHTML = '<i class="fas fa-eye"></i> 显示';
+    document.getElementById('edit-roi-focus-btn').classList.add('active');
     
-    // 发送ROI数据到后端
-    updateRoiOnServer();
-    
-    // 显示确认消息
-    console.log('ROI已确认');
+    console.log('已进入ROI绘制模式');
 }
 
-function redrawRoi() {
-    if (!cameraState.isDrawingROI) return;
+// 确认当前绘制的ROI
+function confirmRoi() {
+    if (!currentRoiRect) return;
     
-    // 清除当前ROI
-    const overlay = document.getElementById('focus-roi-overlay');
-    if (currentRoiRect && overlay.contains(currentRoiRect)) {
-        overlay.removeChild(currentRoiRect);
-    }
-    currentRoiRect = null;
+    // 设置ROI已启用
+    cameraState.roiEnabled = true;
     
-    // 重置绘制状态
-    isDrawing = false;
-}
-
-function clearRoi() {
-    cameraState.roiEnabled = false;
+    // 禁用绘制模式
+    cameraState.isDrawingROI = false;
     
-    // 清除ROI显示
+    // 移除绘制事件监听器
     const overlay = document.getElementById('focus-roi-overlay');
     if (overlay) {
-        overlay.style.display = 'none';
-        overlay.innerHTML = '';
+        overlay.removeEventListener('mousedown', startRoiDraw);
+        overlay.removeEventListener('mousemove', updateRoiDraw);
+        overlay.removeEventListener('mouseup', endRoiDraw);
+        overlay.removeEventListener('mouseleave', endRoiDraw);
+        overlay.classList.remove('drawing');
     }
     
-    // 移除ROI信息显示
+    // 隐藏ROI信息显示
     if (roiInfoDisplay) {
         roiInfoDisplay.style.display = 'none';
     }
     
-    // 重置绘制状态和变量
-    isDrawing = false;
-    currentRoiRect = null;
+    // 重置按钮状态
+    document.getElementById('edit-roi-focus-btn').classList.remove('active');
     
-    // 更新按钮状态
-    document.getElementById('toggle-visibility-roi-btn').innerHTML = '<i class="fas fa-eye"></i> 显示';
+    // 发送ROI数据到后端
+    updateRoiOnServer();
     
-    // 通知后端清除ROI
-    fetch('/clear_roi', { method: 'POST' })
-        .then(response => response.json())
-        .catch(error => console.error('清除ROI失败:', error));
-        
-    console.log('ROI已删除');
+    // 显示操作成功的消息
+    showMessage('ROI区域已确认', 'success');
+    
+    console.log('ROI已确认');
 }
 
-// 切换ROI可见性
-function toggleRoiVisibility() {
-    if (!cameraState.roiCoords) return;
-    
-    const overlay = document.getElementById('focus-roi-overlay');
-    if (overlay) {
-        const isVisible = overlay.style.display !== 'none';
-        overlay.style.display = isVisible ? 'none' : 'block';
-        
-        // 更新按钮图标
-        const toggleBtn = document.getElementById('toggle-focus-roi-visibility-btn');
-        if (toggleBtn) {
-            toggleBtn.querySelector('i').className = isVisible ? 
-                'fas fa-eye-slash' : 'fas fa-eye';
-            toggleBtn.title = isVisible ? '隐藏' : '显示';
-        }
-    }
-}
-
-// 向后端发送ROI坐标
-function updateRoiOnServer() {
-    if (!cameraState.roiCoords) return;
-    
-    const coords = cameraState.roiCoords;
-    
-    fetch('/update_roi', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(coords)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            console.log('ROI已更新');
-        } else {
-            console.error('ROI更新失败:', data.message);
-        }
-    })
-    .catch(error => console.error('ROI更新请求失败:', error));
-}
-
-// 更新获取ROI坐标的函数
-function getRoiCoordinates() {
-    return cameraState.roiCoords || { l: 0, t: 0, r: 0, b: 0 };
-}
-
-// 当量计算相关功能
-// 切换显示校准图案/相机图像
-async function toggleCalibrationView() {
-    if (!cameraState.isConnected) return;
-
-    try {
-        if (!cameraState.isShowingCalibration) {
-            // 获取当前的方格大小
-            const squareSize = parseInt(calibSquareSize.value || 50);
-            
-            // 获取校准图案
-            const response = await fetch(`/generate_calibration_image?square_size=${squareSize}`);
-            const result = await response.json();
-            
-            if (result.success) {
-                // 更新状态
-                cameraState.isShowingCalibration = true;
-                
-                // 显示校准图案
-                if (simulatedImage) {
-                    simulatedImage.style.display = 'none';
-                }
-                if (calibrationPattern) {
-                    calibrationPattern.style.display = 'block';
-                    calibrationPattern.innerHTML = `<img src="${result.image}" alt="校准图案" style="width:100%;height:100%;">`;
-                }
-                toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示相机图像';
-                
-                // 启用计算按钮
-                if (calibrateBtn) {
-                    calibrateBtn.disabled = false;
-                }
-                
-                console.log('已切换到校准图案视图');
-            }
-        } else {
-            // 隐藏校准图案，显示相机图像
-            const response = await fetch('/hide_calibration_image', { method: 'POST' });
-            const result = await response.json();
-            
-            if (result.success) {
-                // 更新状态
-                cameraState.isShowingCalibration = false;
-                
-                if (simulatedImage) {
-                    simulatedImage.style.display = 'block';
-                }
-                if (calibrationPattern) {
-                    calibrationPattern.style.display = 'none';
-                    calibrationPattern.innerHTML = '';
-                }
-                toggleViewBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 显示标定板';
-                
-                // 禁用计算按钮
-                if (calibrateBtn) {
-                    calibrateBtn.disabled = true;
-                }
-                
-                console.log('已切换到相机图像视图');
-            }
-        }
-    } catch (error) {
-        console.error('切换视图失败:', error);
-    }
-}
-
-// 计算当量
-async function calculateRatio() {
-    if (!cameraState.isConnected) {
-        alert('请先连接相机');
-        return;
-    }
-    
-    try {
-        // 获取方格实际尺寸
-        const squareSizeMm = parseFloat(calibSquareSize.value || 1.0);
-        console.log(`当量计算: 使用方格尺寸 ${squareSizeMm}mm`);
-        
-        // 获取校准图案
-        const response1 = await fetch(`/generate_calibration_image?square_size=50`);
-        const result1 = await response1.json();
-        
-        if (result1.success) {
-            // 更新状态
-            cameraState.isShowingCalibration = true;
-            
-            // 显示校准图案
-            if (simulatedImage) {
-                simulatedImage.style.display = 'none';
-            }
-            if (calibrationPattern) {
-                calibrationPattern.style.display = 'block';
-                calibrationPattern.innerHTML = `<img src="${result1.image}" alt="校准图案" style="width:100%;height:100%;">`;
-            }
-            
-            // 给服务器一点时间处理
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // 发送计算请求
-            const response2 = await fetch('/calculate_ratio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ squareSizeMm })
-            });
-            const result2 = await response2.json();
-            
-            if (result2.success) {
-                // 更新显示结果
-                const ratio = result2.ratio.toFixed(2);
-                console.log(`当量计算结果: ${ratio} ${result2.unit}`);
-                if (calibResultValue) {
-                    calibResultValue.textContent = `${ratio} ${result2.unit}`;
-                }
-                
-                // 可以添加视觉反馈
-                calibrateBtn.classList.add('success');
-                setTimeout(() => {
-                    calibrateBtn.classList.remove('success');
-                }, 1000);
-                
-                // 自动切换回相机视图
-                setTimeout(async () => {
-                    if (simulatedImage) {
-                        simulatedImage.style.display = 'block';
-                    }
-                    if (calibrationPattern) {
-                        calibrationPattern.style.display = 'none';
-                        calibrationPattern.innerHTML = '';
-                    }
-                    cameraState.isShowingCalibration = false;
-                }, 2000);
-            } else {
-                console.error('当量计算失败:', result2.message);
-                alert('当量计算失败: ' + (result2.message || '未知错误'));
-            }
-        } else {
-            console.error('获取校准图像失败:', result1.message);
-            alert('获取校准图像失败: ' + (result1.message || '未知错误'));
-        }
-    } catch (error) {
-        console.error('计算当量失败:', error);
-        alert('当量计算发生错误，请查看控制台日志');
-    }
-}
-
-// 显示Mark点
-function showMarkPoints(points, className = 'detected') {
-    // 清除现有的Mark点显示
-    document.querySelectorAll('.mark-point').forEach(el => el.remove());
-    
-    // 显示新的Mark点
-    const container = document.getElementById('camera-display-container');
-    points.forEach(point => {
-        const markEl = document.createElement('div');
-        markEl.className = `mark-point ${className}`;
-        markEl.style.left = `${point.x}px`;
-        markEl.style.top = `${point.y}px`;
-        container.appendChild(markEl);
-    });
-}
-
-// 检测Mark点函数修改，确保没有多余绿点
-async function detectMarkPoint() {
-    if (!cameraState.isConnected) {
-        alert('请先连接相机');
-        return;
-    }
-
-    try {
-        // 确保清除所有已有Mark点
-        document.querySelectorAll('.mark-point').forEach(el => el.remove());
-        
-        // 更新状态显示
-        calibrationStatus.textContent = '正在检测Mark点...';
-        calibrationStatus.className = 'status-text active';
-        
-        // 调用后端API
-        const response = await fetch('/detect_mark', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // 更新标定状态
-            calibrationState.markDetected = true;
-            calibrationState.markPoints = result.markPoints;
-            calibrationState.markPosition = result.markPoints[0];
-            
-            // 获取带有标记点的图像
-            const imageResponse = await fetch(`/generate_mark_image?markX=${calibrationState.markPosition.x}&markY=${calibrationState.markPosition.y}&markSize=8`);
-            const imageResult = await imageResponse.json();
-            
-            if (imageResult.success) {
-                simulatedImage.src = imageResult.image;
-                simulatedImage.style.maxWidth = '640px';
-                simulatedImage.style.maxHeight = '480px';
-                simulatedImage.style.margin = 'auto';
-                simulatedImage.style.border = '1px solid #ccc';
-                
-                // 显示检测到的Mark点 (红色)
-                showMarkPoints(calibrationState.markPoints);
-                
-                // 启用居中按钮
-                centerMarkBtn.disabled = false;
-                
-                // 更新状态
-                calibrationStatus.textContent = result.message;
-                calibrationStatus.className = 'status-text active';
-                
-                // 添加图例
-                const container = document.getElementById('camera-display-container');
-                const markLegend = document.createElement('div');
-                markLegend.className = 'mark-legend';
-                markLegend.innerHTML = `
-                    <div class="legend-item">
-                        <span class="legend-dot red"></span> <span>检测到的Mark点</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-dot green"></span> <span>已对齐的Mark点</span>
-                    </div>
-                `;
-                
-                // 移除之前的图例
-                const oldLegend = document.querySelector('.mark-legend');
-                if (oldLegend) {
-                    oldLegend.remove();
-                }
-                
-                container.appendChild(markLegend);
-                
-                console.log('Mark点检测结果:', calibrationState.markPoints);
-            } else {
-                console.error('生成标记图像失败:', imageResult.message);
-                calibrationStatus.textContent = '检测错误: 无法生成图像';
-                calibrationStatus.className = 'status-text error';
-            }
-        } else {
-            console.error('Mark点检测失败:', result.message);
-            calibrationStatus.textContent = `检测错误: ${result.message}`;
-            calibrationStatus.className = 'status-text error';
-        }
-    } catch (error) {
-        console.error('Mark点检测失败:', error);
-        calibrationStatus.textContent = '检测过程出错';
-        calibrationStatus.className = 'status-text error';
-    }
-}
-
-// 居中Mark点
-async function centerMarkPoint() {
-    if (!calibrationState.markDetected) return;
-
-    try {
-        // 清除所有已有Mark点
-        document.querySelectorAll('.mark-point').forEach(el => el.remove());
-        
-        calibrationStatus.textContent = '正在居中Mark点...';
-        calibrationStatus.className = 'status-text active';
-        
-        // 添加移动动画效果
-        const markElement = document.querySelector('.mark-point');
-        if (markElement) {
-            markElement.classList.add('moving');
-        }
-        
-        // 调用后端API
-        const response = await fetch('/center_mark', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            // 更新标定状态
-            calibrationState.markCentered = true;
-            calibrationState.markPosition = result.position;
-            
-            // 获取更新后的图像
-            const imageResponse = await fetch(`/generate_mark_image?markX=${calibrationState.markPosition.x}&markY=${calibrationState.markPosition.y}&markSize=8`);
-            const imageResult = await imageResponse.json();
-            
-            if (imageResult.success) {
-                simulatedImage.src = imageResult.image;
-                
-                // 移除动画
-                if (markElement) {
-                    markElement.classList.remove('moving');
-                }
-                
-                // 清除旧的点，显示新的居中的Mark点（绿色）
-                document.querySelectorAll('.mark-point').forEach(el => el.remove());
-                showMarkPoints([calibrationState.markPosition], 'center');
-                
-                // 启用开始标定按钮
-                startCalibBtn.disabled = false;
-                
-                // 更新状态显示
-                calibrationStatus.textContent = result.message;
-                calibrationStatus.className = 'status-text active';
-                
-                console.log('Mark点已居中:', calibrationState.markPosition);
-            } else {
-                console.error('获取居中图像失败:', imageResult.message);
-                calibrationStatus.textContent = '居中错误: 无法获取图像';
-                calibrationStatus.className = 'status-text error';
-            }
-        } else {
-            console.error('Mark点居中失败:', result.message);
-            calibrationStatus.textContent = `居中错误: ${result.message}`;
-            calibrationStatus.className = 'status-text error';
-        }
-    } catch (error) {
-        console.error('Mark点居中失败:', error);
-        calibrationStatus.textContent = '居中过程出错';
-        calibrationStatus.className = 'status-text error';
-    }
-}
-
-// 开始标定
-async function startCalibration() {
-    if (!calibrationState.markCentered) return;
-
-    try {
-        // 获取标定矩阵参数
-        const size = parseInt(matrixSize.value);
-        const offset = parseFloat(pointOffset.value);
-        
-        // 创建矩阵显示
-        createMatrixDisplay(size);
-        
-        // 更新UI状态
-        updateCalibrationUI(true);
-        
-        // 调用后端API开始标定
-        const response = await fetch('/start_calibration', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ size, offset })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            calibrationState.isCalibrating = true;
-            calibrationState.totalPoints = result.totalPoints;
-            calibrationState.completedPoints = 0;
-            
-            // 开始轮询状态
-            await pollCalibrationStatus();
-        } else {
-            console.error('开始标定失败:', result.message);
-            calibrationStatus.textContent = `标定错误: ${result.message}`;
-            calibrationStatus.className = 'status-text error';
-            updateCalibrationUI(false);
-        }
-    } catch (error) {
-        console.error('标定过程失败:', error);
-        calibrationState.isCalibrating = false;
-        updateCalibrationUI(false);
-        calibrationStatus.textContent = '标定错误';
-        calibrationStatus.className = 'status-text error';
-    }
-}
-
-// 轮询标定状态
-async function pollCalibrationStatus() {
-    const checkInterval = 500; // 每0.5秒检查一次
-    
-    while (calibrationState.isCalibrating) {
-        try {
-            console.log("前端: 轮询标定状态...");
-            const response = await fetch('/calibration_status');
-            const status = await response.json();
-            
-            console.log("前端: 收到标定状态:", status);
-            
-            // 更新状态
-            calibrationState.isCalibrating = status.isCalibrating;
-            calibrationState.completedPoints = status.completedPoints;
-            calibrationState.totalPoints = status.totalPoints;
-            calibrationState.currentPoint = status.currentPoint;
-            calibrationState.failedPoints = status.failedPoints;
-            
-            // 更新UI
-            updateProgress();
-            
-            if (status.currentPoint) {
-                const pointIndex = status.currentPoint.index;
-                updateMatrixDisplay(pointIndex);
-                currentPoint.textContent = `X: ${status.currentPoint.x.toFixed(3)}mm, Y: ${status.currentPoint.y.toFixed(3)}mm (${status.currentPoint.row+1},${status.currentPoint.col+1})`;
-            }
-            
-            // 如果标定完成
-            if (!status.isCalibrating && status.calibrationResults) {
-                console.log("前端: 标定已完成，显示结果");
-                // 显示标定结果
-                showCalibrationResults(status.calibrationResults);
-                break;
-            }
-            
-            // 如果标定已经停止但没有结果
-            if (!status.isCalibrating) {
-                console.log("前端: 标定已停止，无结果");
-                calibrationStatus.textContent = '标定已停止';
-                calibrationStatus.className = 'status-text warning';
-                updateCalibrationUI(false);
-                break;
-            }
-            
-            // 等待下一次检查
-            await new Promise(resolve => setTimeout(resolve, checkInterval));
-        } catch (error) {
-            console.error('前端: 获取标定状态失败:', error);
-            // 发生错误时，尝试再次轮询，但增加等待时间
-            await new Promise(resolve => setTimeout(resolve, checkInterval * 2));
-            
-            // 如果连续多次失败，可以考虑中断轮询
-            // 这里简化处理，继续尝试
-        }
-    }
-    
-    console.log("前端: 轮询结束，更新UI");
-    // 标定结束，更新UI
-    updateCalibrationUI(false);
-}
-
-// 显示标定结果
-function showCalibrationResults(results) {
-    const resultsContainer = document.getElementById('calibration-results');
-    const resultsContent = document.getElementById('calibration-results-content');
-    
-    if (!resultsContainer || !resultsContent) return;
-    
-    // 计算平均重投影误差
-    const avgError = results.reprojectionError;
-    
-    // 创建内参矩阵显示
-    const intrinsic = results.intrinsic;
-    const matrixHtml = `
-        <h5>相机标定矩阵 (${results.completedPoints}/${results.totalPoints}点)</h5>
-        <div class="calib-matrix">
-            <table>
-                <tr><td>${intrinsic[0][0].toFixed(2)}</td><td>${intrinsic[0][1].toFixed(2)}</td><td>${intrinsic[0][2].toFixed(2)}</td><td>0</td></tr>
-                <tr><td>${intrinsic[1][0].toFixed(2)}</td><td>${intrinsic[1][1].toFixed(2)}</td><td>${intrinsic[1][2].toFixed(2)}</td><td>0</td></tr>
-                <tr><td>${intrinsic[2][0].toFixed(2)}</td><td>${intrinsic[2][1].toFixed(2)}</td><td>${intrinsic[2][2].toFixed(2)}</td><td>0</td></tr>
-                <tr><td>0</td><td>0</td><td>0</td><td>1</td></tr>
-            </table>
-        </div>
-        <div class="matrix-info">
-            <p>标定精度: ${avgError.toFixed(5)}mm</p>
-            <p>像素分辨率: ${results.resolution[0]}×${results.resolution[1]}</p>
-            <p>完成点数: ${results.completedPoints}/${results.totalPoints}</p>
-        </div>
-    `;
-    
-    // 添加详细结果按钮
-    resultsContent.innerHTML = matrixHtml;
-    resultsContainer.style.display = 'block';
-    
-    // 添加按钮事件
-    const viewFullResultsBtn = document.createElement('button');
-    viewFullResultsBtn.id = 'view-full-results';
-    viewFullResultsBtn.className = 'primary-button';
-    viewFullResultsBtn.textContent = '查看详细结果';
-    viewFullResultsBtn.addEventListener('click', () => {
-        resultsContent.innerHTML = `<pre>${JSON.stringify(results, null, 2)}</pre>`;
-    });
-    
-    const exportMatrixBtn = document.createElement('button');
-    exportMatrixBtn.id = 'export-matrix';
-    exportMatrixBtn.className = 'primary-button';
-    exportMatrixBtn.textContent = '导出矩阵';
-    exportMatrixBtn.addEventListener('click', () => {
-        const matrixText = JSON.stringify(intrinsic, null, 2);
-        const blob = new Blob([matrixText], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'calibration_matrix.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    });
-    
-    const buttonContainer = document.createElement('div');
-    buttonContainer.className = 'matrix-controls';
-    buttonContainer.appendChild(viewFullResultsBtn);
-    buttonContainer.appendChild(exportMatrixBtn);
-    resultsContent.appendChild(buttonContainer);
-    
-    calibrationStatus.textContent = `标定完成 (精度: ${avgError.toFixed(5)}mm)`;
-    calibrationStatus.className = 'status-text active';
-}
-
-// 停止标定
-async function stopCalibration() {
-    if (!calibrationState.isCalibrating) return;
-    
-    try {
-        // 调用后端API停止标定
-        const response = await fetch('/stop_calibration', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            calibrationState.isCalibrating = false;
-            updateCalibrationUI(false);
-            calibrationStatus.textContent = '已停止标定';
-            calibrationStatus.className = 'status-text warning';
-        } else {
-            console.error('停止标定失败:', result.message);
-            calibrationStatus.textContent = `停止错误: ${result.message}`;
-            calibrationStatus.className = 'status-text error';
-        }
-    } catch (error) {
-        console.error('停止标定失败:', error);
-        calibrationStatus.textContent = '停止过程出错';
-        calibrationStatus.className = 'status-text error';
-    }
-}
-
-// 更新标定进度
-function updateProgress() {
-    const progress = (calibrationState.completedPoints / calibrationState.totalPoints * 100).toFixed(1);
-    const progressBar = document.getElementById('calibration-progress');
-    if (progressBar) {
-        progressBar.style.width = `${progress}%`;
-        progressBar.textContent = `${progress}%`;
-    }
-}
-
-// 更新标定UI状态
-function updateCalibrationUI(isCalibrating) {
-    detectMarkBtn.disabled = isCalibrating;
-    centerMarkBtn.disabled = isCalibrating;
-    startCalibBtn.disabled = isCalibrating;
-    stopCalibBtn.disabled = !isCalibrating;
-    matrixSize.disabled = isCalibrating;
-    pointOffset.disabled = isCalibrating;
-    markSize.disabled = isCalibrating;
-    
-    if (isCalibrating) {
-        calibrationStatus.textContent = '标定中...';
-        calibrationStatus.className = 'status-text active';
-    }
-}
-
-// 为标定功能添加生成模拟图像的函数
-function generateCalibrationImage(markX, markY, markSize) {
-    const canvas = document.createElement('canvas');
-    // 减小图像大小，不铺满整个界面
-    canvas.width = 640;  // 原来是1920
-    canvas.height = 480; // 原来是1080
-    const ctx = canvas.getContext('2d');
-    
-    // 图像中心点
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    
-    // 绘制白色背景
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // 绘制红色十字线标记中心点
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.2)';
-    ctx.lineWidth = 1;
-    
-    // 水平中心线
-    ctx.beginPath();
-    ctx.moveTo(0, centerY);
-    ctx.lineTo(canvas.width, centerY);
-    ctx.stroke();
-    
-    // 垂直中心线
-    ctx.beginPath();
-    ctx.moveTo(centerX, 0);
-    ctx.lineTo(centerX, canvas.height);
-    ctx.stroke();
-    
-    // 添加水平与垂直网格线
-    ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
-    ctx.lineWidth = 0.5;
-    
-    // 水平网格线
-    for (let y = 0; y < canvas.height; y += 50) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-    
-    // 垂直网格线
-    for (let x = 0; x < canvas.width; x += 50) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-    
-    // 绘制黑色Mark点
-    ctx.fillStyle = 'black';
-    ctx.beginPath();
-    ctx.arc(markX, markY, markSize, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // 添加十字线辅助
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.lineWidth = 1;
-    
-    // 水平线
-    ctx.beginPath();
-    ctx.moveTo(0, markY);
-    ctx.lineTo(canvas.width, markY);
-    ctx.stroke();
-    
-    // 垂直线
-    ctx.beginPath();
-    ctx.moveTo(markX, 0);
-    ctx.lineTo(markX, canvas.height);
-    ctx.stroke();
-    
-    return canvas.toDataURL('image/png');
-}
-
-// 创建标定矩阵点位显示
-function createMatrixDisplay(size) {
-    const matrixDisplay = document.getElementById('calibration-matrix-display');
-    const matrixGrid = document.getElementById('matrix-grid');
-    
-    // 清空现有内容
-    matrixGrid.innerHTML = '';
-    
-    // 设置网格大小
-    matrixGrid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
-    matrixGrid.style.gridTemplateRows = `repeat(${size}, 1fr)`;
-    
-    // 创建单元格
-    calibrationState.matrixCells = [];
-    for (let i = 0; i < size * size; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'matrix-cell';
-        cell.dataset.index = i;
-        matrixGrid.appendChild(cell);
-        calibrationState.matrixCells.push(cell);
-    }
-    
-    // 显示矩阵
-    matrixDisplay.style.display = 'block';
-}
-
-// 更新矩阵显示
-function updateMatrixDisplay(currentIndex) {
-    calibrationState.matrixCells.forEach((cell, index) => {
-        // 移除当前点位标记
-        cell.classList.remove('current');
-        
-        // 标记已访问的点位
-        if (index < calibrationState.completedPoints) {
-            cell.classList.add('visited');
-        }
-        
-        // 标记失败的点位
-        if (calibrationState.failedPoints.includes(index)) {
-            cell.classList.add('failed');
-        }
-    });
-    
-    // 标记当前点位
-    if (currentIndex >= 0 && currentIndex < calibrationState.matrixCells.length) {
-        calibrationState.matrixCells[currentIndex].classList.add('current');
-    }
-}
-
-// 当量校准功能
-async function calibrateRatio() {
-    if (!cameraState.isConnected) {
-        alert('请先连接相机');
-        return;
-    }
-    
-    try {
-        console.log('当量校准: 当前状态', cameraState);
-        
-        // 1. 获取校准图像
-        console.log('当量校准: 发送获取校准图像请求...');
-        const response1 = await fetch('/generate_calibration_image?square_size=50');
-        
-        if (!response1.ok) {
-            console.error('当量校准: 获取校准图像请求失败', response1.status);
-            alert('获取校准图像失败: 服务器返回错误代码 ' + response1.status);
-            return;
-        }
-        
-        const result1 = await response1.json();
-        console.log('当量校准: 校准图像响应', result1);
-        
-        if (result1 && result1.success) {
-            // 显示校准图案
-            console.log('当量校准: 更新状态和显示');
-            cameraState.isShowingCalibration = true;
-            
-            if (simulatedImage) {
-                simulatedImage.style.display = 'none';
-            }
-            if (calibrationPattern) {
-                calibrationPattern.style.display = 'block';
-                calibrationPattern.innerHTML = `<img src="${result1.image}" alt="校准图案" style="width:100%;height:100%;">`;
-            }
-            
-            // 2. 计算当量
-            console.log('当量校准: 发送计算当量请求...');
-            const squareSizeMm = parseFloat(calibSquareSize.value || 1.0);
-            const response2 = await fetch('/calculate_ratio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ squareSizeMm })
-            });
-            
-            if (!response2.ok) {
-                console.error('当量校准: 计算当量请求失败', response2.status);
-                alert('计算当量失败: 服务器返回错误代码 ' + response2.status);
-                return;
-            }
-            
-            const result2 = await response2.json();
-            console.log('当量校准: 当量计算响应', result2);
-            
-            if (result2 && result2.success) {
-                const ratio = result2.ratio.toFixed(2);
-                if (calibResultValue) {
-                    calibResultValue.textContent = `${ratio} ${result2.unit}`;
-                }
-                
-                // 自动切换回相机视图
-                setTimeout(async () => {
-                    if (simulatedImage) {
-                        simulatedImage.style.display = 'block';
-                    }
-                    if (calibrationPattern) {
-                        calibrationPattern.style.display = 'none';
-                        calibrationPattern.innerHTML = '';
-                    }
-                    cameraState.isShowingCalibration = false;
-                }, 2000);
-            } else {
-                console.error('当量计算失败:', result2 ? result2.message : '无响应数据');
-                alert('当量计算失败: ' + (result2 && result2.message ? result2.message : '未知错误'));
-            }
-        } else {
-            console.error('获取校准图像失败:', result1 ? result1.message : '无响应数据');
-            alert('获取校准图像失败: ' + (result1 && result1.message ? result1.message : '未知错误'));
-        }
-    } catch (error) {
-        console.error('当量校准出错:', error);
-        alert('当量校准失败: ' + (error.message || '未知错误'));
-    }
-}
-
-// 生成标定矩阵点位
-function generateCalibrationMatrix(size, offset) {
-    const matrix = [];
-    const center = Math.floor(size / 2);
-    
-    // 确保网格是按照顺序生成的，以便于在点阵显示中正确显示
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const xPos = (x - center) * offset;
-            const yPos = (y - center) * offset;
-            const pointIndex = y * size + x;
-            
-            matrix.push({ 
-                x: xPos, 
-                y: yPos,
-                index: pointIndex,
-                row: y,
-                col: x
-            });
-        }
-    }
-    
-    console.log(`生成了${size}×${size}的标定矩阵，共${matrix.length}个点`);
-    return matrix;
-}
-
-// 初始化Z轴控制相关功能
-function initFocusAxisControls() {
-    // 获取DOM引用
-    focusAxisSelect = document.getElementById('focus-axis-select');
-    focusAxisPosition = document.getElementById('focus-axis-position');
-    focusJogMinus = document.getElementById('focus-jog-minus');
-    focusJogPlus = document.getElementById('focus-jog-plus');
-    focusStepSelect = document.getElementById('focus-step-select');
-    const unitDisplay = document.getElementById('unit-display');
-    
-    // 检查元素是否存在
-    if (!focusAxisSelect || !focusAxisPosition || !focusJogMinus || !focusJogPlus || !focusStepSelect || !unitDisplay) {
-        console.error('缺少必要的DOM元素。');
-        return;
-    }
-
-    let isJogging = false;
-    let jogInterval = null;
-    let selectedAxis = 'Z';  // 默认Z轴
-    let selectedAxisId = '3'; // 默认Z轴ID
-    
-    // 初始化单位设置 - 确保默认单位一致
-    // 检查当前状态中是否已有设置
-    if (!cameraState.displayUnit) {
-        cameraState.displayUnit = 'mm'; // 默认使用毫米作为单位
-    }
-    unitDisplay.textContent = cameraState.displayUnit;
-    
-    // 填充轴选择下拉列表（调用公共函数）
-    populateFocusAxisSelect();
-    
-    // 更新当前位置显示
-    function updatePositionDisplay() {
-        if (!cameraState.isConnected) {
-            focusAxisPosition.value = '--';
-            return;
-        }
-        // 通过id查找轴名称
-        const axisName = getAxisNameById(selectedAxisId || selectedAxis);
-        if (!axisName) {
-            focusAxisPosition.value = '--';
-            return;
-        }
-        
-        // 根据当前显示单位转换值
-        if (cameraState.displayUnit === 'mm') {
-            // 使用毫米显示，保留3位小数，并确保为正值
-            const position = cameraState[`${axisName}Position`] || 0;
-            focusAxisPosition.value = Math.abs(position).toFixed(3);
-        } else {
-            // 使用微米显示，整数，并确保为正值
-            const positionEncoder = cameraState[`${axisName}PositionEncoder`] || 
-                                   (cameraState[`${axisName}Position`] * 1000) || 0;
-            focusAxisPosition.value = Math.abs(Math.round(positionEncoder));
-        }
-    }
-    
-    // 单位切换功能
-    unitDisplay.addEventListener('click', () => {
-        // 切换单位
-        cameraState.displayUnit = cameraState.displayUnit === 'mm' ? 'um' : 'mm';
-        
-        // 更新显示
-        unitDisplay.textContent = cameraState.displayUnit;
-        
-        // 添加视觉效果
-        unitDisplay.classList.add('active');
-        setTimeout(() => {
-            unitDisplay.classList.remove('active');
-        }, 300);
-        
-        // 更新位置显示和步进值下拉框
-        updatePositionDisplay();
-        updateStepSelectOptions();
-        
-        console.log(`单位切换为: ${cameraState.displayUnit}`);
-    });
-    
-    // 更新步进选择下拉框的选项
-    function updateStepSelectOptions() {
-        // 清空现有选项
-        focusStepSelect.innerHTML = '';
-        
-        // 根据当前单位添加新选项
-        if (cameraState.displayUnit === 'mm') {
-            // mm模式下的步进值
-            addOption(focusStepSelect, '0.001', '0.001');
-            addOption(focusStepSelect, '0.01', '0.01');
-            addOption(focusStepSelect, '0.1', '0.1', true);
-            addOption(focusStepSelect, '0.5', '0.5');
-            addOption(focusStepSelect, '1', '1');
-        } else {
-            // um模式下的步进值
-            addOption(focusStepSelect, '1', '1');
-            addOption(focusStepSelect, '10', '10');
-            addOption(focusStepSelect, '100', '100', true);
-            addOption(focusStepSelect, '500', '500');
-            addOption(focusStepSelect, '1000', '1000');
-        }
-        
-        // 更新按钮状态
-        updateJogButtonState();
-    }
-    
-    // 辅助函数，添加下拉选项
-    function addOption(selectElement, value, text, selected = false) {
-        const option = document.createElement('option');
-        option.value = value;
-        option.textContent = text;
-        if (selected) option.selected = true;
-        selectElement.appendChild(option);
-    }
-    
-    // 更新点动按钮状态
-    function updateJogButtonState() {
-        if (!cameraState.isConnected) {
-            focusJogMinus.disabled = true;
-            focusJogPlus.disabled = true;
-            return;
-        }
-        
-        // 使用selectedAxis来获取位置和限制值
-        const axisName = getAxisNameById(selectedAxisId || selectedAxis);
-        if (!axisName) {
-            focusJogMinus.disabled = true;
-            focusJogPlus.disabled = true;
-            return;
-        }
-        
-        // 获取编码器位置和限制
-        const positionEncoder = cameraState[`${axisName}PositionEncoder`];
-        if (typeof positionEncoder !== 'number') {
-            focusJogMinus.disabled = true;
-            focusJogPlus.disabled = true;
-            return;
-        }
-        
-        // 从步进选择下拉列表获取步进值
-        let step = parseFloat(focusStepSelect.value);
-        
-        // 如果当前单位是mm，需要将步进值转换为编码器值（微米）
-        if (cameraState.displayUnit === 'mm') {
-            step = step * 1000; // 转换为微米
-        }
-        
-        const limits = cameraState.axisLimitsEncoder[axisName];
-        
-        // 检查是否会超出限制
-        focusJogMinus.disabled = positionEncoder - step < limits.min;
-        focusJogPlus.disabled = positionEncoder + step > limits.max;
-    }
-    
-    // 执行点动操作
-    async function performJog(direction) {
-        if (!cameraState.isConnected) return;
-        
-        // 使用selectedAxisId而不是调用getAxisIdByName
-        const axisId = selectedAxisId;
-        if (!axisId) return;
-        
-        console.log(`执行点动: 轴=${axisId}, 方向=${direction}, 步进=${focusStepSelect.value}`);
-        
-        // 从步进选择下拉列表获取步进值
-        let stepValue = parseFloat(focusStepSelect.value);
-        
-        // 如果当前单位是mm，需要将步进值转换为编码器值（微米）
-        if (cameraState.displayUnit === 'mm') {
-            stepValue = stepValue * 1000; // 转换为微米
-        }
-        
-        // 获取当前位置的实际值（可能为负）
-        const axisName = getAxisNameById(axisId);
-        let currentPosition = 0;
-        
-        if (axisName) {
-            if (cameraState.displayUnit === 'mm') {
-                currentPosition = cameraState[`${axisName}Position`] || 0;
-            } else {
-                currentPosition = (cameraState[`${axisName}PositionEncoder`] || 0) / 1000;
-            }
-        }
-        
-        // 确保+号增加实际值，-号减少实际值
-        // 如果当前值为负，需要反转方向
-        const actualDirection = currentPosition < 0 ? -direction : direction;
-        const step = stepValue * actualDirection;
-        
-        try {
-            const response = await fetch('/jog_axis', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    axis: axisId,
-                    step: step,
-                    isEncoder: true // 添加标识，表明使用的是编码器值
-                })
-            });
-            const state = await response.json();
-            updateStatus(state);
-            updatePositionDisplay();
-            updateJogButtonState();
-        } catch (error) {
-            console.error(`${selectedAxis}轴点动失败:`, error);
-        }
-    }
-    
-    // 点动按钮事件处理器
-    // 移除现有的mousedown事件处理，改为click事件
-    focusJogMinus.addEventListener('click', function() {
-        if (focusJogMinus.disabled) return;
-        performJog(-1);
-    });
-    
-    focusJogPlus.addEventListener('click', function() {
-        if (focusJogPlus.disabled) return;
-        performJog(1);
-    });
-    
- 
-    // 步进下拉列表变化时更新按钮状态
-    focusStepSelect.addEventListener('change', updateJogButtonState);
-    
-    // 处理轴选择变化
-    focusAxisSelect.addEventListener('change', () => {
-        selectedAxisId = focusAxisSelect.value;
-        selectedAxis = getAxisNameById(selectedAxisId) || 'Z'; // 根据ID获取名称，默认Z
-        console.log(`选择轴变更: ID=${selectedAxisId}, 名称=${selectedAxis}`);
-        updatePositionDisplay();
-        updateJogButtonState();
-    });
-    
-    // 初始状态更新
-    updateStepSelectOptions(); // 初始化步进选项
-    updatePositionDisplay();
-    updateJogButtonState();
-    
-    // 将更新函数添加到全局更新中
-    window.updateFocusAxisControls = function() {
-        updatePositionDisplay();
-        updateJogButtonState();
-    };
-}
-
-// 初始化事件监听器
-function initializeEventListeners() {
+// 支持函数：初始化事件监听器
+function initializeRoiButtons() {
     // ROI绘制相关事件
-    document.getElementById('draw-roi-focus-btn').addEventListener('click', toggleRoiDrawing);
-    document.getElementById('edit-roi-focus-btn').addEventListener('click', editRoi);
-    document.getElementById('clear-roi-focus-btn').addEventListener('click', clearRoi);
-    document.getElementById('toggle-focus-roi-visibility-btn').addEventListener('click', toggleRoiVisibility);
+    const editRoiBtn = document.getElementById('edit-roi-focus-btn');
+    const clearRoiBtn = document.getElementById('clear-roi-focus-btn');
+    const toggleRoiVisibilityBtn = document.getElementById('toggle-focus-roi-visibility-btn');
     
-    // 初始化ROI工具相关事件
-    initializeRoiTools();
-    
-    // ... existing code ...
-}
-
-// 在初始化DOM引用中添加工具面板的引用
-function initializeRoiTools() {
-    // 首先初始化选项卡切换
-    document.getElementById('rect-roi-tool').addEventListener('click', () => switchRoiTool('rect'));
-    document.getElementById('polygon-roi-tool').addEventListener('click', () => switchRoiTool('polygon'));
-    document.getElementById('ellipse-roi-tool').addEventListener('click', () => switchRoiTool('ellipse'));
-    
-    // 改为使用新的单选按钮容器
-    document.getElementById('draw-mode-container').addEventListener('click', () => switchDrawMode('draw'));
-    document.getElementById('edit-mode-container').addEventListener('click', () => switchDrawMode('edit'));
-    
-    // 移除对已删除按钮的事件监听
-    // document.getElementById('confirm-roi-tool-btn').addEventListener('click', confirmRoi);
-    // document.getElementById('cancel-roi-tool-btn').addEventListener('click', cancelRoi);
-    // document.getElementById('toggle-visibility-roi-btn').addEventListener('click', toggleRoiVisibility);
-    // document.getElementById('delete-roi-btn').addEventListener('click', clearRoi);
-    
-    document.getElementById('close-roi-tools').addEventListener('click', closeRoiTools);
-}
-
-// 关闭ROI工具面板
-function closeRoiTools() {
-    cameraState.isDrawingROI = false;
-    drawRoiFocusBtn.classList.remove('active');
-    
-    // 隐藏工具面板
-    const roiToolsPanel = document.getElementById('roi-tools-panel');
-    if (roiToolsPanel) {
-        roiToolsPanel.style.display = 'none';
+    if (editRoiBtn) {
+        editRoiBtn.addEventListener('click', editRoi);
     }
     
-    // 禁用ROI绘制模式
-    disableRoiDrawing();
+    if (clearRoiBtn) {
+        clearRoiBtn.addEventListener('click', clearRoi);
+    }
+    
+    if (toggleRoiVisibilityBtn) {
+        toggleRoiVisibilityBtn.addEventListener('click', toggleRoiVisibility);
+    }
 }
 
 // 切换ROI形状工具
@@ -2825,45 +1757,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 自动连接
     setTimeout(autoConnect, 500); // 延迟500ms后自动连接
 });
-
-// 编辑ROI函数
-function editRoi() {
-    if (!cameraState.isConnected || !cameraState.roiCoords) return;
-    
-    // 启用ROI绘制模式
-    cameraState.isDrawingROI = true;
-    drawRoiFocusBtn.classList.add('active');
-    
-    // 显示现有ROI并使其可编辑
-    const overlay = document.getElementById('focus-roi-overlay');
-    if (overlay) {
-        overlay.style.display = 'block';
-        overlay.classList.add('drawing');
-        
-        // 如果有现有的ROI，显示出来供编辑
-        if (currentRoiRect) {
-            currentRoiRect.classList.add('editing');
-        } else {
-            // 从状态中恢复ROI
-            const coords = cameraState.roiCoords;
-            if (coords) {
-                currentRoiRect = document.createElement('div');
-                currentRoiRect.className = 'roi-rect editing';
-                currentRoiRect.style.left = `${coords.l}px`;
-                currentRoiRect.style.top = `${coords.t}px`;
-                currentRoiRect.style.width = `${coords.r - coords.l}px`;
-                currentRoiRect.style.height = `${coords.b - coords.t}px`;
-                overlay.appendChild(currentRoiRect);
-            }
-        }
-    }
-    
-    // 显示ROI工具面板
-    const roiToolsPanel = document.getElementById('roi-tools-panel');
-    if (roiToolsPanel) {
-        roiToolsPanel.style.display = 'flex';
-    }
-}
 
 // 缩略图相关变量
 let selectedThumbnailIndex = -1;
@@ -3167,19 +2060,48 @@ async function fetchCameraImage() {
         if (response.ok) {
             const data = await response.json();
             if (data && data.image) {
-                cameraState.cameraImageUrl = data.image;
-                // 只有在未查看缩略图时才更新相机图像
-                if (!cameraState.viewingThumbnail) {
-                    const cameraFeed = document.getElementById('camera-feed');
-                    if (cameraFeed) {
-                        cameraFeed.src = data.image;
-                    }
+                if (data.image !== cameraState.cachedImageUrl) {
+                    // 只有当图片URL变化时才更新
+                    cameraState.cachedImageUrl = data.image;
+                    
+                    // 应用模糊效果
+                    applyBlurToImage(data.image, cameraState.clarity || 0);
+                    console.log('更新相机图像');
                 }
             }
         }
     } catch (error) {
         console.error('获取相机图像失败:', error);
     }
+}
+
+// 应用模糊效果
+function applyBlurToImage(imageUrl, clarity) {
+    const cameraFeed = document.getElementById('camera-feed');
+    if (!cameraFeed) return;
+    
+    // 设置图片源
+    cameraFeed.src = imageUrl;
+    
+    // 计算模糊程度 (清晰度越低，模糊程度越高)
+    // clarity通常在0-1之间，0表示完全不清晰
+    let blurAmount = 0;
+    
+    if (clarity < 0.1) {
+        blurAmount = 10; // 最大模糊
+    } else if (clarity < 0.3) {
+        blurAmount = 6;
+    } else if (clarity < 0.5) {
+        blurAmount = 3;
+    } else if (clarity < 0.7) {
+        blurAmount = 1;
+    } else {
+        blurAmount = 0; // 完全清晰
+    }
+    
+    // 应用CSS滤镜
+    cameraFeed.style.filter = `blur(${blurAmount}px)`;
+    console.log(`应用图像模糊: ${blurAmount}px (清晰度: ${clarity})`);
 }
 
 // 单位显示和切换相关代码
@@ -3226,20 +2148,674 @@ function updateFocusControlUnits() {
 
 // 单位切换函数 - 统一管理所有单位相关功能
 function toggleUnit() {
-    // 切换单位比例
-    cameraState.currentUnitScale = cameraState.currentUnitScale === 1 ? 1000 : 1;
+    // 获取当前步进值
+    const focusStepSelect = document.getElementById('focus-step-select');
+    const currentStepValue = parseFloat(focusStepSelect ? focusStepSelect.value : 1);
     
-    // 更新所有单位显示
-    updateUnitDisplay();
-    updateFocusControlUnits();
+    // 切换单位前保存当前单位状态
+    const previousUnit = cameraState.displayUnit;
     
-    // 避免调用完整的updateStatus可能导致的错误
-    // 只更新关键的轴控制显示和单位信息，不涉及clarity等属性
-    if (window.updateFocusAxisControls) {
-        window.updateFocusAxisControls();
+    // 切换单位
+    if (cameraState.displayUnit === 'um') {
+        cameraState.displayUnit = 'mm';
+        cameraState.currentUnitScale = 1000;
+        
+        // 从um转换到mm，将步进值除以1000
+        if (focusStepSelect) {
+            const newStepValue = currentStepValue / 1000;
+            focusStepSelect.value = newStepValue.toFixed(3);
+            
+            // 更新步进下拉列表的选项
+            updateStepSelectOptions('mm');
+        }
+    } else {
+        cameraState.displayUnit = 'um';
+        cameraState.currentUnitScale = 1;
+        
+        // 从mm转换到um，将步进值乘以1000
+        if (focusStepSelect) {
+            const newStepValue = currentStepValue * 1000;
+            focusStepSelect.value = Math.round(newStepValue);
+            
+            // 更新步进下拉列表的选项
+            updateStepSelectOptions('um');
+        }
     }
     
-    console.log(`单位切换为: ${cameraState.displayUnit}`);
+    // 更新所有显示单位标签
+    const unitLabels = document.querySelectorAll('.unit-label');
+    unitLabels.forEach(label => {
+        label.textContent = cameraState.displayUnit;
+    });
+    
+    // 更新轴位置显示
+    updateFocusAxisPosition(); // 使用已经存在的函数
+    
+    // 更新全局单位显示
+    const unitDisplayElement = document.getElementById('unit-display');
+    if (unitDisplayElement) {
+        unitDisplayElement.textContent = cameraState.displayUnit;
+    }
+    
+    // 更新搜索范围和对焦步进输入框
+    const focusRange = document.getElementById('focus-range');
+    const focusStep = document.getElementById('focus-step');
+    
+    if (focusRange && focusStep) {
+        if (cameraState.displayUnit === 'mm') {
+            // 从um转到mm
+            focusRange.value = (parseFloat(focusRange.value) / 1000).toFixed(3);
+            focusStep.value = (parseFloat(focusStep.value) / 1000).toFixed(3);
+        } else {
+            // 从mm转到um
+            focusRange.value = Math.round(parseFloat(focusRange.value) * 1000);
+            focusStep.value = Math.round(parseFloat(focusStep.value) * 1000);
+        }
+    }
+    
+    console.log(`单位已切换为: ${cameraState.displayUnit}`);
+    showMessage(`单位已切换为: ${cameraState.displayUnit}`, 'info');
+}
+
+// 更新步进选择下拉列表的选项
+function updateStepSelectOptions(unit) {
+    const focusStepSelect = document.getElementById('focus-step-select');
+    if (!focusStepSelect) return;
+    
+    // 清空当前选项
+    focusStepSelect.innerHTML = '';
+    
+    // 根据当前单位添加适当的选项
+    if (unit === 'mm') {
+        // 毫米模式选项
+        const mmOptions = [0.001, 0.01, 0.1, 0.5, 1.0];
+        mmOptions.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value.toFixed(3);
+            option.textContent = value.toFixed(3);
+            focusStepSelect.appendChild(option);
+        });
+        
+        // 尝试选中当前值或最接近的值
+        const currentValue = parseFloat(focusStepSelect.value);
+        selectClosestOption(focusStepSelect, currentValue);
+    } else {
+        // 微米模式选项
+        const umOptions = [1, 10, 100, 500, 1000];
+        umOptions.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            focusStepSelect.appendChild(option);
+        });
+        
+        // 尝试选中当前值或最接近的值
+        const currentValue = parseFloat(focusStepSelect.value);
+        selectClosestOption(focusStepSelect, currentValue);
+    }
+}
+
+// 选择下拉列表中最接近指定值的选项
+function selectClosestOption(selectElement, targetValue) {
+    if (!selectElement || isNaN(targetValue)) return;
+    
+    let closestOption = null;
+    let minDiff = Number.MAX_VALUE;
+    
+    // 查找最接近目标值的选项
+    for (let i = 0; i < selectElement.options.length; i++) {
+        const optionValue = parseFloat(selectElement.options[i].value);
+        const diff = Math.abs(optionValue - targetValue);
+        
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestOption = selectElement.options[i];
+        }
+    }
+    
+    // 设置选中的选项
+    if (closestOption) {
+        selectElement.value = closestOption.value;
+    }
+}
+
+// 清除ROI区域功能
+function clearRoi() {
+    if (!cameraState.isConnected) return;
+    
+    // 重置ROI状态
+    cameraState.roiEnabled = false;
+    cameraState.roiCoords = null;
+    cameraState.isDrawingROI = false;
+    
+    // 清除ROI显示
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+        overlay.innerHTML = '';
+        overlay.classList.remove('drawing');
+    }
+    
+    // 移除ROI信息显示
+    if (roiInfoDisplay) {
+        roiInfoDisplay.style.display = 'none';
+    }
+    
+    // 重置绘制状态和变量
+    isDrawing = false;
+    currentRoiRect = null;
+    polygonPoints = [];
+    
+    // 重置按钮状态
+    document.getElementById('edit-roi-focus-btn').classList.remove('active');
+    
+    // 通知后端清除ROI
+    fetch('/clear_roi', { method: 'POST' })
+        .then(response => response.json())
+        .catch(error => console.error('清除ROI失败:', error));
+    
+    console.log('ROI已删除');
+    
+    // 显示操作成功的消息
+    showMessage('ROI区域已删除', 'success');
+}
+
+// 显示/隐藏ROI区域功能
+function toggleRoiVisibility() {
+    if (!cameraState.isConnected) return;
+    
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (!overlay) return;
+    
+    const isVisible = overlay.style.display !== 'none';
+    overlay.style.display = isVisible ? 'none' : 'block';
+    
+    // 更新按钮图标
+    const toggleBtn = document.getElementById('toggle-focus-roi-visibility-btn');
+    if (toggleBtn) {
+        toggleBtn.querySelector('i').className = isVisible ? 'fas fa-eye-slash' : 'fas fa-eye';
+        toggleBtn.title = isVisible ? '显示' : '隐藏';
+    }
+    
+    console.log(`ROI区域已${isVisible ? '隐藏' : '显示'}`);
+    showMessage(`ROI区域已${isVisible ? '隐藏' : '显示'}`, 'info');
+}
+
+// 当量计算功能
+function calibrateRatio() {
+    if (!cameraState.isConnected) return;
+    
+    // 获取方格尺寸
+    const squareSize = parseFloat(document.getElementById('calib-square-size').value) || 1.0;
+    if (squareSize <= 0) {
+        showMessage('方格尺寸必须大于0', 'error');
+        return;
+    }
+    
+    // 发送请求到后端进行校准
+    fetch('/calibrate_ratio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ squareSize: squareSize })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 显示校准结果
+            const resultValue = document.getElementById('calibration-result-value');
+            if (resultValue) {
+                resultValue.textContent = `${data.ratio.toFixed(2)} px/mm`;
+            }
+            showMessage('当量校准成功', 'success');
+        } else {
+            showMessage('当量校准失败: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('当量校准请求失败:', error);
+        showMessage('当量校准请求失败', 'error');
+    });
+}
+
+// 检测Mark点
+function detectMarkPoint() {
+    if (!cameraState.isConnected) return;
+    
+    showMessage('正在检测Mark点...', 'info');
+    
+    fetch('/detect_mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            exposure: cameraState.focusParams.exposure,
+            gain: cameraState.focusParams.gain
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新标定状态
+            cameraState.markDetected = true;
+            cameraState.markPoints = data.markPoints;
+            
+            showMessage('Mark点检测成功', 'success');
+        } else {
+            showMessage('Mark点检测失败: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('检测Mark点请求失败:', error);
+        showMessage('检测Mark点请求失败', 'error');
+    });
+}
+
+// 居中Mark点
+function centerMarkPoint() {
+    if (!cameraState.isConnected || !cameraState.markDetected) {
+        showMessage('请先检测Mark点', 'error');
+        return;
+    }
+    
+    showMessage('正在居中Mark点...', 'info');
+    
+    fetch('/center_mark', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新标定状态
+            cameraState.markCentered = true;
+            
+            showMessage('Mark点已居中', 'success');
+        } else {
+            showMessage('居中Mark点失败: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('居中Mark点请求失败:', error);
+        showMessage('居中Mark点请求失败', 'error');
+    });
+}
+
+// 开始标定
+function startCalibration() {
+    if (!cameraState.isConnected) return;
+    
+    if (!cameraState.markCentered) {
+        showMessage('请先检测并居中Mark点', 'error');
+        return;
+    }
+    
+    // 获取标定参数
+    const matrixSizeSelect = document.getElementById('matrix-size');
+    const pointOffsetInput = document.getElementById('point-offset');
+    
+    const matrixSize = parseInt(matrixSizeSelect.value) || 3;
+    const pointOffset = parseFloat(pointOffsetInput.value) || 10.0;
+    
+    showMessage('开始执行标定...', 'info');
+    
+    fetch('/start_calibration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            size: matrixSize,
+            offset: pointOffset
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新标定状态
+            cameraState.isCalibrating = true;
+            
+            showMessage(`标定开始，共${data.totalPoints}个点`, 'success');
+            
+            // 轮询标定状态
+            pollCalibrationStatus();
+        } else {
+            showMessage('开始标定失败: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('开始标定请求失败:', error);
+        showMessage('开始标定请求失败', 'error');
+    });
+}
+
+// 停止标定
+function stopCalibration() {
+    if (!cameraState.isConnected || !cameraState.isCalibrating) {
+        return;
+    }
+    
+    showMessage('正在停止标定...', 'info');
+    
+    fetch('/stop_calibration', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新标定状态
+            cameraState.isCalibrating = false;
+            
+            showMessage('标定已停止', 'warning');
+        } else {
+            showMessage('停止标定失败: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('停止标定请求失败:', error);
+        showMessage('停止标定请求失败', 'error');
+    });
+}
+
+// 轮询标定状态
+function pollCalibrationStatus() {
+    if (!cameraState.isCalibrating) return;
+    
+    fetch('/calibration_status')
+        .then(response => response.json())
+        .then(data => {
+            // 更新界面显示
+            const statusElem = document.getElementById('calibration-status');
+            const progressElem = document.getElementById('calibration-progress');
+            const currentPointElem = document.getElementById('current-point');
+            
+            if (statusElem) {
+                statusElem.textContent = data.isCalibrating ? '标定中' : '已停止';
+            }
+            
+            if (progressElem) {
+                const progress = data.totalPoints > 0 ? 
+                    Math.round((data.completedPoints / data.totalPoints) * 100) : 0;
+                progressElem.textContent = `${progress}% (${data.completedPoints}/${data.totalPoints})`;
+            }
+            
+            if (currentPointElem && data.currentPoint) {
+                currentPointElem.textContent = 
+                    `当前点: (${data.currentPoint.x.toFixed(2)}, ${data.currentPoint.y.toFixed(2)})`;
+            }
+            
+            // 如果标定仍在进行，继续轮询
+            if (data.isCalibrating) {
+                setTimeout(pollCalibrationStatus, 500);
+            } else if (data.calibrationResults) {
+                // 标定结束且有结果
+                showMessage('标定完成', 'success');
+                displayCalibrationResults(data.calibrationResults);
+            }
+        })
+        .catch(error => {
+            console.error('获取标定状态失败:', error);
+            // 出错时继续轮询，但降低频率
+            setTimeout(pollCalibrationStatus, 2000);
+        });
+}
+
+// 显示标定结果
+function displayCalibrationResults(results) {
+    // 在界面上显示标定结果
+    const resultsContainer = document.getElementById('calibration-results-container');
+    if (!resultsContainer) return;
+    
+    resultsContainer.style.display = 'block';
+    
+    // 格式化并显示结果
+    let html = '<h4>标定结果</h4>';
+    html += `<p>重投影误差: ${results.reprojectionError.toFixed(4)}</p>`;
+    html += `<p>成功点数: ${results.completedPoints}/${results.totalPoints}</p>`;
+    html += '<p>内参矩阵:</p>';
+    html += '<pre>';
+    
+    // 格式化内参矩阵
+    for (const row of results.intrinsic) {
+        html += row.map(v => v.toFixed(2).padStart(10)).join(' ') + '\n';
+    }
+    
+    html += '</pre>';
+    html += '<p>畸变系数:</p>';
+    html += '<pre>';
+    html += results.distortion.map(v => v.toFixed(4).padStart(10)).join(' ');
+    html += '</pre>';
+    
+    resultsContainer.innerHTML = html;
+}
+
+// 切换校准视图
+function toggleCalibrationView() {
+    if (!cameraState.isConnected) return;
+    
+    cameraState.isShowingCalibration = !cameraState.isShowingCalibration;
+    
+    // 更新显示
+    if (simulatedImage && calibrationPattern) {
+        if (cameraState.isShowingCalibration) {
+            // 显示校准模式
+            simulatedImage.style.display = 'none';
+            calibrationPattern.style.display = 'block';
+            
+            // 生成校准图案
+            const patternSize = Math.min(calibrationPattern.clientWidth, calibrationPattern.clientHeight);
+            const squareSize = patternSize / 10; // 10x10 网格
+            
+            let patternHtml = '';
+            for (let i = 0; i < 10; i++) {
+                for (let j = 0; j < 10; j++) {
+                    const isEven = (i + j) % 2 === 0;
+                    patternHtml += `<div class="calib-square ${isEven ? 'white' : 'black'}" 
+                                    style="width: ${squareSize}px; height: ${squareSize}px;"></div>`;
+                }
+            }
+            
+            calibrationPattern.innerHTML = patternHtml;
+            toggleViewBtn.querySelector('i').className = 'fas fa-camera';
+            toggleViewBtn.title = '返回相机视图';
+            
+            // 暂停状态轮询
+            if (window.pauseStatusPolling) {
+                window.pauseStatusPolling();
+            }
+        } else {
+            // 返回相机视图
+            simulatedImage.style.display = 'block';
+            calibrationPattern.style.display = 'none';
+            calibrationPattern.innerHTML = '';
+            toggleViewBtn.querySelector('i').className = 'fas fa-th';
+            toggleViewBtn.title = '显示校准图案';
+            
+            // 恢复状态轮询
+            if (window.resumeStatusPolling) {
+                window.resumeStatusPolling();
+            }
+            
+            // 立即获取相机图像
+            fetchCameraImage();
+        }
+    }
+}
+
+// 初始化对焦轴控制
+function initFocusAxisControls() {
+    // 检查DOM元素是否存在
+    if (!focusAxisSelect || !focusJogMinus || !focusJogPlus || !focusStepSelect) {
+        console.warn('对焦轴控制元素未找到');
+        return;
+    }
+    
+    // 点动控制事件监听器
+    focusJogMinus.addEventListener('click', () => performJog(-1));
+    focusJogPlus.addEventListener('click', () => performJog(1));
+    
+    // 轴选择改变事件
+    focusAxisSelect.addEventListener('change', () => {
+        updateFocusAxisPosition();
+    });
+    
+    // 将updateFocusAxisControls函数添加到window对象，使其全局可访问
+    window.updateFocusAxisControls = updateFocusAxisPosition;
+    
+    console.log('对焦轴控制已初始化');
+}
+
+// 执行点动操作
+async function performJog(direction) {
+    if (!cameraState.isConnected) return;
+    
+    // 使用轴选择下拉框的值
+    const axisId = focusAxisSelect.value;
+    if (!axisId) return;
+    
+    // 获取轴名称
+    const axisName = getAxisNameById(axisId);
+    if (!axisName) return;
+    
+    // 从步进选择下拉列表获取步进值
+    let stepValue = parseFloat(focusStepSelect.value);
+    
+    // 确定是否使用编码器值（微米）
+    const isUsingMm = cameraState.displayUnit === 'mm';
+    
+    // 根据单位模式调整步进值
+    if (isUsingMm) {
+        // 毫米模式下，需要将步进值转换为微米(编码器值)
+        stepValue = stepValue * 1000;
+    }
+    // 微米模式下保持原值
+    
+    // 获取当前位置（使用绝对值确保正值）
+    let currentPosition = 0;
+    if (isUsingMm) {
+        // 毫米模式
+        currentPosition = Math.abs(cameraState[`${axisName}Position`] || 0);
+        // 转换为编码器值进行计算
+        currentPosition = currentPosition * 1000;
+    } else {
+        // 微米模式，直接使用编码器值
+        currentPosition = Math.abs(cameraState[`${axisName}PositionEncoder`] || 0);
+    }
+    
+    // 计算新位置（在编码器值域中计算）
+    let newPosition = currentPosition + (stepValue * direction);
+    
+    // 检查轴限制（确保在范围内）
+    const limits = cameraState.axisLimits[axisName];
+    if (limits) {
+        // 转换为编码器值进行比较
+        const limitMin = limits.min * 1000;
+        const limitMax = limits.max * 1000;
+        
+        if (newPosition < limitMin) {
+            newPosition = limitMin;
+            showMessage(`已达到${axisName}轴最小限制: ${limits.min}`, 'warning');
+        } else if (newPosition > limitMax) {
+            newPosition = limitMax;
+            showMessage(`已达到${axisName}轴最大限制: ${limits.max}`, 'warning');
+        }
+    }
+    
+    console.log(`执行点动: 轴=${axisId}, 方向=${direction}, 步进=${stepValue}, 单位=${cameraState.displayUnit}, 新位置=${newPosition}`);
+    
+    try {
+        const response = await fetch('/jog_axis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                axis: axisId,
+                step: stepValue * direction,
+                isEncoder: true, // 始终使用编码器值进行计算
+                absolutePosition: newPosition
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`服务器返回错误: ${response.status}`);
+        }
+        
+        const state = await response.json();
+        updateStatus(state);
+    } catch (error) {
+        console.error('点动控制失败:', error);
+        showMessage('点动控制失败', 'error');
+    }
+}
+
+// 更新对焦轴位置显示
+function updateFocusAxisPosition() {
+    if (!cameraState.isConnected || !focusAxisSelect || !focusAxisPosition) return;
+    
+    const axisId = focusAxisSelect.value;
+    const axisName = getAxisNameById(axisId);
+    
+    if (!axisName) {
+        focusAxisPosition.value = '--';
+        return;
+    }
+    
+    // 根据当前显示单位转换值
+    if (cameraState.displayUnit === 'mm') {
+        // 使用毫米显示，保留3位小数，并确保为正值
+        const position = cameraState[`${axisName}Position`] || 0;
+        focusAxisPosition.value = Math.abs(position).toFixed(3);
+    } else {
+        // 使用微米显示，整数，并确保为正值
+        const positionEncoder = cameraState[`${axisName}PositionEncoder`] || 
+                               (cameraState[`${axisName}Position`] * 1000) || 0;
+        focusAxisPosition.value = Math.abs(Math.round(positionEncoder));
+    }
+    
+    // 更新点动按钮的状态
+    if (focusJogMinus && focusJogPlus) {
+        const position = cameraState[`${axisName}Position`];
+        const positionEncoder = cameraState[`${axisName}PositionEncoder`];
+        const limits = cameraState.axisLimits[axisName];
+        
+        if (position !== undefined && limits) {
+            const step = parseFloat(focusStepSelect.value);
+            // 根据当前单位设置判断是否禁用按钮
+            if (cameraState.displayUnit === 'mm') {
+                // 毫米模式
+                focusJogMinus.disabled = position - step < limits.min;
+                focusJogPlus.disabled = position + step > limits.max;
+            } else {
+                // 微米模式
+                const stepEncoder = step; // 微米模式下步进值已经是编码器单位
+                focusJogMinus.disabled = positionEncoder - stepEncoder < limits.min * 1000;
+                focusJogPlus.disabled = positionEncoder + stepEncoder > limits.max * 1000;
+            }
+        } else {
+            focusJogMinus.disabled = !cameraState.isConnected;
+            focusJogPlus.disabled = !cameraState.isConnected;
+        }
+    }
+}
+
+// 更新当前位置显示
+function updatePositionDisplay() {
+    if (!cameraState.isConnected) {
+        focusAxisPosition.value = '--';
+        return;
+    }
+    // 通过id查找轴名称
+    const axisName = getAxisNameById(selectedAxisId || selectedAxis);
+    if (!axisName) {
+        focusAxisPosition.value = '--';
+        return;
+    }
+    
+    // 根据当前显示单位转换值
+    if (cameraState.displayUnit === 'mm') {
+        // 使用毫米显示，保留3位小数，并确保为正值
+        const position = cameraState[`${axisName}Position`] || 0;
+        focusAxisPosition.value = Math.abs(position).toFixed(3);
+    } else {
+        // 使用微米显示，整数，并确保为正值
+        const positionEncoder = cameraState[`${axisName}PositionEncoder`] || 
+                               (cameraState[`${axisName}Position`] * 1000) || 0;
+        focusAxisPosition.value = Math.abs(Math.round(positionEncoder));
+    }
 }
 
 // 初始化单位显示

@@ -68,16 +68,16 @@ camera_state = {
     "ZPositionEncoder": 0,  # 添加编码器值
     "UPositionEncoder": 0,  # 添加编码器值
     "axisLimits": {
-        "X": {"min": -100.0, "max": 100.0},
-        "Y": {"min": -100.0, "max": 100.0},
+        "X": {"min": 0.0, "max": 200.0},
+        "Y": {"min": 0.0, "max": 200.0},
         "Z": {"min": 0.0, "max": 50.0},
-        "U": {"min": -180.0, "max": 180.0}
+        "U": {"min": 0.0, "max": 360.0}
     },
     "axisLimitsEncoder": {  # 添加编码器值范围
-        "X": {"min": -100000, "max": 100000},
-        "Y": {"min": -100000, "max": 100000},
+        "X": {"min": 0, "max": 200000},
+        "Y": {"min": 0, "max": 200000},
         "Z": {"min": 0, "max": 50000},
-        "U": {"min": -180000, "max": 180000}
+        "U": {"min": 0, "max": 360000}
     },
     # 添加自动对焦参数 - 统一使用编码器值
     "focusParams": {
@@ -131,10 +131,10 @@ stop_focus_flag = Event()
 
 # --- 模拟 PLC 提供的轴数据 ---
 simulated_plc_axes = [
-    {"id": "1", "name": "轴1", "range_min": -100.0, "range_max": 100.0},
-    {"id": "2", "name": "轴2", "range_min": -100.0, "range_max": 100.0},
+    {"id": "1", "name": "轴1", "range_min": 0.0, "range_max": 200.0},
+    {"id": "2", "name": "轴2", "range_min": 0.0, "range_max": 200.0},
     {"id": "3", "name": "轴3", "range_min": 0.0, "range_max": 50.0},
-    {"id": "4", "name": "轴4", "range_min": -180.0, "range_max": 180.0}
+    {"id": "4", "name": "轴4", "range_min": 0.0, "range_max": 360.0}
 ]
 
 # --- 轴ID映射到原始轴名称 ---
@@ -789,77 +789,56 @@ def jog_axis():
     data = request.json
     axis_id = data.get('axis')
     step = data.get('step')
-    is_encoder = data.get('isEncoder', False)  # 确认是否使用编码器值
+    is_encoder = data.get('isEncoder', True)  # 默认使用编码器值(微米)
+    absolute_position = data.get('absolutePosition')  # 增加绝对位置支持
     
-    if not axis_id or step is None:
+    if not axis_id or (step is None and absolute_position is None):
         return jsonify({"status": "error", "message": "缺少必要参数"}), 400
     
     # 如果是数字ID，转换为原始轴名称
     axis_name = axis_id_mapping.get(axis_id, axis_id)
     
-    # 获取当前位置
-    if is_encoder:
-        current_pos = camera_state[f"{axis_name}PositionEncoder"]
-        
-        # 根据不同轴确定限制范围
-        if axis_name in ['X', 'Y']:
-            min_limit = -100000
-            max_limit = 100000
-        elif axis_name == 'Z':
-            min_limit = 0
-            max_limit = 50000
-        else:  # U轴
-            min_limit = -180000
-            max_limit = 180000
+    # 获取轴限制范围
+    if axis_name in ['X', 'Y']:
+        min_limit = 0
+        max_limit = 200
+    elif axis_name == 'Z':
+        min_limit = 0
+        max_limit = 50
+    else:  # U轴
+        min_limit = 0
+        max_limit = 360
+    
+    # 计算编码器值限制
+    min_limit_encoder = min_limit * 1000
+    max_limit_encoder = max_limit * 1000
+    
+    # 处理位置更新 - 默认使用编码器值(微米)进行计算
+    if absolute_position is not None:
+        # 使用绝对位置
+        new_pos_encoder = min(max_limit_encoder, max(min_limit_encoder, absolute_position))
     else:
-        current_pos = camera_state[f"{axis_name}Position"]
-        
-        # 根据不同轴确定限制范围
-        if axis_name in ['X', 'Y']:
-            min_limit = -100.0
-            max_limit = 100.0
-        elif axis_name == 'Z':
-            min_limit = 0.0
-            max_limit = 50.0
-        else:  # U轴
-            min_limit = -180.0
-            max_limit = 180.0
+        # 使用相对位置(步进)
+        current_pos_encoder = abs(camera_state[f"{axis_name}PositionEncoder"])
+        new_pos_encoder = current_pos_encoder + step
+        new_pos_encoder = min(max_limit_encoder, max(min_limit_encoder, new_pos_encoder))
     
-    # 计算新位置
-    new_pos = current_pos + step
+    # 更新状态，同时维护毫米值和编码器值
+    camera_state[f"{axis_name}PositionEncoder"] = round(new_pos_encoder)
+    camera_state[f"{axis_name}Position"] = round(new_pos_encoder / 1000.0, 3)
     
-    # 检查限制
-    if new_pos < min_limit or new_pos > max_limit:
-        return jsonify({"status": "error", "message": f"轴{axis_id}超出范围限制"}), 400
+    # 如果是Z轴移动，同时更新当前对焦位置和清晰度
+    if axis_name == 'Z':
+        camera_state["currentZEncoder"] = round(new_pos_encoder)
+        camera_state["currentZ"] = round(new_pos_encoder / 1000.0, 3)
+        camera_state["clarity"] = calculate_clarity(new_pos_encoder, is_encoder=True)
     
-    # 更新位置
-    if is_encoder:
-        camera_state[f"{axis_name}PositionEncoder"] = round(new_pos)
-        # 同时更新毫米值
-        camera_state[f"{axis_name}Position"] = round(new_pos / 1000.0, 3)
-        
-        # 如果是Z轴移动，同时更新currentZ和清晰度
-        if axis_name == 'Z':
-            camera_state["currentZEncoder"] = round(new_pos)
-            camera_state["currentZ"] = round(new_pos / 1000.0, 3)
-            camera_state["clarity"] = calculate_clarity(new_pos, is_encoder=True)
+    # 输出日志
+    if absolute_position is not None:
+        print(f"后端: 轴{axis_id}移动到绝对位置: {new_pos_encoder} 编码器单位 ({camera_state[f'{axis_name}Position']:.3f} mm)")
     else:
-        camera_state[f"{axis_name}Position"] = round(new_pos, 3)
-        # 同时更新编码器值
-        camera_state[f"{axis_name}PositionEncoder"] = round(new_pos * 1000)
-        
-        # 如果是Z轴移动，同时更新currentZ和清晰度
-        if axis_name == 'Z':
-            camera_state["currentZ"] = new_pos
-            camera_state["currentZEncoder"] = round(new_pos * 1000)
-            camera_state["clarity"] = calculate_clarity(new_pos)
+        print(f"后端: 轴{axis_id}点动 {step:+} 编码器单位, 新位置: {new_pos_encoder} ({camera_state[f'{axis_name}Position']:.3f} mm)")
     
-    # 输出日志，标明是使用编码器值还是毫米值
-    if is_encoder:
-        print(f"后端: 轴{axis_id}点动 {step:+} 编码器单位, 新位置: {new_pos}(编码器值)")
-    else:
-        print(f"后端: 轴{axis_id}点动 {step:+.3f}mm, 新位置: {new_pos:.3f}mm")
-        
     return jsonify(camera_state)
 
 @app.route('/save_axis_config', methods=['POST'])
@@ -1477,9 +1456,7 @@ def simulate_calibration_process():
 @app.route('/get_camera_image', methods=['GET'])
 def get_camera_image():
     """获取相机实时图像"""
-    if not camera_state["isConnected"]:
-        return jsonify({"success": False, "message": "相机未连接"}), 400
-    
+    # 即使相机未连接也允许返回一个默认图像
     try:
         # 使用favicon.png作为相机图像
         image_path = os.path.join(os.path.dirname(__file__), 'favicon.png')
