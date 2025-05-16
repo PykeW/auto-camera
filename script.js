@@ -39,11 +39,12 @@ let cameraState = {
         "4": "U"
     },
     // 添加单位显示设置
-    displayUnit: 'mm', // 默认单位为mm
+    displayUnit: 'um', // 默认单位为um
+    currentUnitScale: 1, // 1表示um, 1000表示mm
     // 添加相机图像URL
     cameraImageUrl: null,
-    // 添加相机模式
-    captureMode: 'photo' // 'photo' 或 'video'
+    viewingThumbnail: false,
+    currentDisplayedImageIndex: null
 };
 
 // 相机标定相关状态
@@ -232,7 +233,7 @@ function updateAxisDisplay(state) {
         if (input) {
             const position = state[`${axis.toUpperCase()}Position`];
             input.disabled = !state.isConnected;
-            input.value = position !== null ? position.toFixed(2) : '';
+            input.value = position !== null ? Math.abs(position).toFixed(3) : '';
             
             // 更新点动按钮状态
             const btns = document.querySelectorAll(`.jog-btn[data-axis="${axis.toUpperCase()}"]`);
@@ -316,6 +317,10 @@ function updateConnectButton() {
 function updateStatus(state) {
     cameraState = { ...cameraState, ...state };
     
+    // 保留当前显示的图片索引
+    const currentDisplayedImageIndex = cameraState.currentDisplayedImageIndex;
+    const viewingThumbnail = cameraState.viewingThumbnail;
+    
     // 更新连接状态
     updateConnectButton();
     
@@ -335,13 +340,15 @@ function updateStatus(state) {
     // 更新图像中显示的清晰度值
     const clarityDisplay = document.getElementById('clarity-display');
     if (clarityDisplay) {
-        clarityDisplay.textContent = state.clarity ? state.clarity.toFixed(3) : '--';
+        // 添加外部检查，确保state.clarity存在且不为undefined
+        clarityDisplay.textContent = (state && state.clarity !== undefined && state.clarity !== null) ? 
+            state.clarity.toFixed(3) : '--';
     }
     
     // 更新对焦位置显示
     const cameraFocusPositionDisplay = document.getElementById('focus-position-display');
-    if (cameraFocusPositionDisplay && state.ZPosition !== null && state.ZPosition !== undefined) {
-        cameraFocusPositionDisplay.textContent = state.ZPosition.toFixed(5) + " mm";
+    if (cameraFocusPositionDisplay && state && state.ZPosition !== null && state.ZPosition !== undefined) {
+        cameraFocusPositionDisplay.textContent = Math.abs(state.ZPosition).toFixed(3) + " mm";
     } else if (cameraFocusPositionDisplay) {
         cameraFocusPositionDisplay.textContent = "--";
     }
@@ -377,9 +384,18 @@ function updateStatus(state) {
         savePathInput.value = state.savePath;
     }
     
-    // 仅在视频模式下自动获取相机图像
-    if (state.isConnected && state.captureMode === 'video') {
+    // 只在未显示对焦结果缩略图时获取相机图像
+    if (state.isConnected && !viewingThumbnail) {
         fetchCameraImage();
+    } else if (viewingThumbnail && currentDisplayedImageIndex !== undefined && 
+              Array.isArray(cameraState.focusImages) && 
+              cameraState.focusImages[currentDisplayedImageIndex]) {
+        // 如果正在查看缩略图，确保显示选中的图像
+        const image = cameraState.focusImages[currentDisplayedImageIndex];
+        const cameraFeed = document.getElementById('camera-feed');
+        if (cameraFeed && image) {
+            cameraFeed.src = image.imageData || image.image || '';
+        }
     }
     
     // 更新对焦参数设置按钮状态
@@ -419,15 +435,15 @@ function updateStatus(state) {
             if (axisName) {
                 // 根据当前单位设置显示内容
                 if (cameraState.displayUnit === 'mm') {
-                    // 毫米显示
+                    // 毫米显示，保留3位小数且为正值
                     const position = cameraState[`${axisName}Position`];
                     focusPositionDisplay.textContent = position !== null && position !== undefined ? 
-                        `${position.toFixed(5)} mm` : "--";
+                        `${Math.abs(position).toFixed(3)} mm` : "--";
                 } else {
-                    // 微米显示
+                    // 微米显示，整数且为正值
                     const positionEncoder = cameraState[`${axisName}PositionEncoder`];
                     focusPositionDisplay.textContent = positionEncoder !== null && positionEncoder !== undefined ? 
-                        `${positionEncoder} um` : "--";
+                        `${Math.abs(Math.round(positionEncoder))} um` : "--";
                 }
             } else {
                 focusPositionDisplay.textContent = "--";
@@ -438,7 +454,8 @@ function updateStatus(state) {
     }
     
     if (focusClarityDisplay) {
-        focusClarityDisplay.textContent = state.clarity ? state.clarity.toFixed(3) : '--';
+        focusClarityDisplay.textContent = (state && state.clarity !== undefined && state.clarity !== null) ? 
+            state.clarity.toFixed(3) : '--';
     }
     
     // 更新Z轴控制界面
@@ -450,9 +467,10 @@ function updateStatus(state) {
 // 定期更新状态
 function startStatusPolling() {
     let pollTimeout;
+    let isPaused = false;
     
     async function poll() {
-        if (cameraState.isConnected) {
+        if (cameraState.isConnected && !isPaused) {
             try {
                 const response = await fetch('/status');
                 const state = await response.json();
@@ -461,7 +479,7 @@ function startStatusPolling() {
                 // 根据状态设置下次轮询间隔
                 const interval = state.isFocusing ? 100 : 500;
                 pollTimeout = setTimeout(poll, interval);
-        } catch (error) {
+            } catch (error) {
                 console.error('状态更新失败:', error);
                 pollTimeout = setTimeout(poll, 1000); // 出错时降低请求频率
             }
@@ -472,6 +490,17 @@ function startStatusPolling() {
 
     // 开始轮询
     poll();
+
+    // 提供暂停和恢复轮询的方法
+    window.pauseStatusPolling = function() {
+        isPaused = true;
+        console.log('状态轮询已暂停');
+    };
+    
+    window.resumeStatusPolling = function() {
+        isPaused = false;
+        console.log('状态轮询已恢复');
+    };
 
     // 清理函数
     return () => {
@@ -528,6 +557,15 @@ async function autoConnect() {
 // 开始自动对焦
 async function startAutoFocus() {
     try {
+        // 重置缩略图查看状态
+        cameraState.viewingThumbnail = false;
+        cameraState.currentDisplayedImageIndex = null;
+        
+        // 恢复状态轮询，确保可以实时更新对焦过程
+        if (window.resumeStatusPolling) {
+            window.resumeStatusPolling();
+        }
+        
         // 使用搜索范围计算起点和终点 - 现在使用编码器值
         let currentZ = 0; // 默认值
         
@@ -650,34 +688,63 @@ function toggleFocusButtons(isFocusing) {
 // 保存当前对焦位置
 async function saveFocusPosition() {
     try {
-        // 获取当前选中的轴ID
-        const selectedAxisId = document.getElementById('focus-axis-select') ? 
-                               document.getElementById('focus-axis-select').value : '3'; // 默认Z轴
+        let payload = {};
+        
+        // 检查是否正在查看缩略图，并且有选中的缩略图
+        if (cameraState.viewingThumbnail && 
+            cameraState.currentDisplayedImageIndex !== undefined && 
+            Array.isArray(cameraState.focusImages) && 
+            cameraState.focusImages[cameraState.currentDisplayedImageIndex]) {
+            
+            // 使用选中缩略图的Z位置
+            const selectedImage = cameraState.focusImages[cameraState.currentDisplayedImageIndex];
+            payload = {
+                zPosition: selectedImage.zPosition,
+                zPositionEncoder: selectedImage.zPositionEncoder,
+                axisId: '3' // 默认为Z轴ID
+            };
+            
+            console.log('使用缩略图位置保存:', payload);
+        } else {
+            // 使用当前轴位置
+            // 获取当前选中的轴ID
+            const selectedAxisId = document.getElementById('focus-axis-select') ? 
+                                document.getElementById('focus-axis-select').value : '3'; // 默认Z轴
+            
+            payload = { axisId: selectedAxisId };
+            console.log('使用当前轴位置保存:', payload);
+        }
         
         const response = await fetch('/save_focus_position', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ axisId: selectedAxisId })
+            body: JSON.stringify(payload)
         });
         
         const result = await response.json();
         
         if (result.success) {
             // 显示保存成功信息
-            alert(`保存成功: ${result.message}`);
+            showMessage(`保存成功: ${result.message}`, 'success');
             
             // 检查是否有缩略图区域，且已完成对焦
-            if (cameraState.focusCompleted && Array.isArray(cameraState.focusImages) && cameraState.focusImages.length > 0) {
+            if (cameraState.focusCompleted && Array.isArray(cameraState.focusImages) && 
+                cameraState.focusImages.length > 0 && !cameraState.viewingThumbnail) {
                 // 显示缩略图区域，让用户查看并选择不同位置
                 loadFocusImages();
+                
+                // 暂停状态轮询，防止自动更新覆盖缩略图
+                if (window.pauseStatusPolling) {
+                    window.pauseStatusPolling();
+                }
             }
         } else {
             // 显示错误信息
-            alert(`保存失败: ${result.message}`);
+            showMessage(`保存失败: ${result.message}`, 'error');
         }
     } catch (error) {
         console.error('保存对焦位置失败:', error);
-        alert('保存对焦位置失败，请查看控制台了解详情');
+        showMessage('保存对焦位置失败，请查看控制台了解详情', 'error');
     }
 }
 
@@ -2298,14 +2365,14 @@ function initFocusAxisControls() {
         
         // 根据当前显示单位转换值
         if (cameraState.displayUnit === 'mm') {
-            // 使用毫米显示，保留3位小数
+            // 使用毫米显示，保留3位小数，并确保为正值
             const position = cameraState[`${axisName}Position`] || 0;
-            focusAxisPosition.value = position.toFixed(3);
+            focusAxisPosition.value = Math.abs(position).toFixed(3);
         } else {
-            // 使用微米显示，整数
+            // 使用微米显示，整数，并确保为正值
             const positionEncoder = cameraState[`${axisName}PositionEncoder`] || 
                                    (cameraState[`${axisName}Position`] * 1000) || 0;
-            focusAxisPosition.value = Math.round(positionEncoder);
+            focusAxisPosition.value = Math.abs(Math.round(positionEncoder));
         }
     }
     
@@ -2482,45 +2549,153 @@ function initFocusAxisControls() {
 
 // 初始化事件监听器
 function initializeEventListeners() {
-    // 初始化DOM引用
-    initializeDOMReferences();
+    // ROI绘制相关事件
+    document.getElementById('draw-roi-focus-btn').addEventListener('click', toggleRoiDrawing);
+    document.getElementById('edit-roi-focus-btn').addEventListener('click', editRoi);
+    document.getElementById('clear-roi-focus-btn').addEventListener('click', clearRoi);
+    document.getElementById('toggle-focus-roi-visibility-btn').addEventListener('click', toggleRoiVisibility);
     
     // 初始化ROI工具相关事件
     initializeRoiTools();
     
-    // 添加相机模式切换按钮事件监听
-    const playBtn = document.getElementById('btn-play');
-    if (playBtn) {
-        playBtn.addEventListener('click', () => {
-            cameraState.captureMode = 'video';
-            playBtn.disabled = true;
-            const stopBtn = document.getElementById('btn-stop');
-            if (stopBtn) stopBtn.disabled = false;
-            // 开始连续获取图像
-            fetchCameraImage();
-        });
-    }
+    // ... existing code ...
+}
 
-    const stopBtn = document.getElementById('btn-stop');
-    if (stopBtn) {
-        stopBtn.addEventListener('click', () => {
-            cameraState.captureMode = 'photo';
-            stopBtn.disabled = true;
-            const playBtn = document.getElementById('btn-play');
-            if (playBtn) playBtn.disabled = false;
-        });
-    }
+// 在初始化DOM引用中添加工具面板的引用
+function initializeRoiTools() {
+    // 首先初始化选项卡切换
+    document.getElementById('rect-roi-tool').addEventListener('click', () => switchRoiTool('rect'));
+    document.getElementById('polygon-roi-tool').addEventListener('click', () => switchRoiTool('polygon'));
+    document.getElementById('ellipse-roi-tool').addEventListener('click', () => switchRoiTool('ellipse'));
+    
+    // 改为使用新的单选按钮容器
+    document.getElementById('draw-mode-container').addEventListener('click', () => switchDrawMode('draw'));
+    document.getElementById('edit-mode-container').addEventListener('click', () => switchDrawMode('edit'));
+    
+    // 移除对已删除按钮的事件监听
+    // document.getElementById('confirm-roi-tool-btn').addEventListener('click', confirmRoi);
+    // document.getElementById('cancel-roi-tool-btn').addEventListener('click', cancelRoi);
+    // document.getElementById('toggle-visibility-roi-btn').addEventListener('click', toggleRoiVisibility);
+    // document.getElementById('delete-roi-btn').addEventListener('click', clearRoi);
+    
+    document.getElementById('close-roi-tools').addEventListener('click', closeRoiTools);
+}
 
-    // 添加请求图像按钮事件监听
-    const requestImageBtn = document.getElementById('btn-request-image');
-    if (requestImageBtn) {
-        requestImageBtn.addEventListener('click', () => {
-            if (cameraState.isConnected) {
-                fetchCameraImage();
-            }
-        });
+// 关闭ROI工具面板
+function closeRoiTools() {
+    cameraState.isDrawingROI = false;
+    drawRoiFocusBtn.classList.remove('active');
+    
+    // 隐藏工具面板
+    const roiToolsPanel = document.getElementById('roi-tools-panel');
+    if (roiToolsPanel) {
+        roiToolsPanel.style.display = 'none';
     }
     
+    // 禁用ROI绘制模式
+    disableRoiDrawing();
+}
+
+// 切换ROI形状工具
+function switchRoiTool(tool) {
+    activeShapeTool = tool;
+    
+    // 更新按钮状态
+    document.getElementById('rect-roi-tool').classList.toggle('active', tool === 'rect');
+    document.getElementById('polygon-roi-tool').classList.toggle('active', tool === 'polygon');
+    document.getElementById('ellipse-roi-tool').classList.toggle('active', tool === 'ellipse');
+    
+    console.log(`已切换到${tool}工具`);
+}
+
+// 切换绘制/编辑模式
+function switchDrawMode(mode) {
+    activeDrawMode = mode;
+    
+    // 更新单选按钮状态
+    document.getElementById('draw-mode-container').classList.toggle('active', mode === 'draw');
+    document.getElementById('edit-mode-container').classList.toggle('active', mode === 'edit');
+    
+    console.log(`已切换到${mode === 'draw' ? '绘制' : '编辑'}模式`);
+}
+
+// 取消当前ROI绘制
+function cancelRoi() {
+    // 清除当前ROI但不退出绘制模式
+    const overlay = document.getElementById('focus-roi-overlay');
+    if (currentRoiRect && overlay.contains(currentRoiRect)) {
+        overlay.removeChild(currentRoiRect);
+    }
+    currentRoiRect = null;
+    
+    // 重置绘制状态
+    isDrawing = false;
+    
+    if (roiInfoDisplay) {
+        roiInfoDisplay.style.display = 'none';
+    }
+}
+
+// 更新编码值显示
+function updateEncoderValues() {
+    if(focusRange && focusRangeEncoder) {
+        // 假设1mm = 1000编码器值，这个比例应该根据实际情况调整
+        const rangeValue = parseFloat(focusRange.value);
+        const encoderValue = Math.round(rangeValue * 1000);
+        focusRangeEncoder.textContent = encoderValue;
+    }
+    
+    if(focusStep && focusStepEncoder) {
+        const stepValue = parseFloat(focusStep.value);
+        const encoderValue = Math.round(stepValue * 1000);
+        focusStepEncoder.textContent = encoderValue;
+    }
+}
+
+// 事件监听器
+document.addEventListener('DOMContentLoaded', () => {
+    // 初始化所有DOM引用
+    initializeDOMReferences();
+    
+    // ROI按钮组始终显示
+    if (focusRoiButtonGroup) {
+        focusRoiButtonGroup.style.display = 'flex';
+    }
+    
+    // 初始化ROI工具面板
+    const roiToolsPanel = document.getElementById('roi-tools-panel');
+    if (roiToolsPanel) {
+        roiToolsPanel.classList.remove('show');
+    }
+    
+    // 设置多边形绘制的双击事件
+    setupPolygonEvents();
+    
+    // 更新连接按钮初始状态
+    updateConnectButton();
+    
+    // 初始化对焦按钮状态
+    toggleFocusButtons(false);
+    
+    // 启动状态轮询
+    startStatusPolling();
+    
+    // 移除不再需要的编码值更新事件
+    // if (focusRange) {
+    //     focusRange.addEventListener('input', updateEncoderValues);
+    // }
+    // if (focusStep) {
+    //     focusStep.addEventListener('input', updateEncoderValues);
+    // }
+    
+    // 移除初始化更新编码值
+    // updateEncoderValues();
+
+    // 连接按钮点击事件
+    if (connectBtn) {
+        connectBtn.addEventListener('click', toggleConnection);
+    }
+
     // 自动对焦按钮点击事件
     if (startFocusBtn) {
         startFocusBtn.addEventListener('click', startAutoFocus);
@@ -2529,43 +2704,111 @@ function initializeEventListeners() {
         stopFocusBtn.addEventListener('click', stopAutoFocus);
     }
     
-    // 连接按钮点击事件
-    if (connectBtn) {
-        connectBtn.addEventListener('click', toggleConnection);
+    // 添加保存对焦位置按钮事件监听
+    const saveFocusPositionBtn = document.getElementById('save-focus-position-btn');
+    if (saveFocusPositionBtn) {
+        saveFocusPositionBtn.addEventListener('click', saveFocusPosition);
     }
     
-    // ROI绘制相关事件
-    if (document.getElementById('draw-roi-focus-btn')) {
-        document.getElementById('draw-roi-focus-btn').addEventListener('click', toggleRoiDrawing);
+    // 添加当量校准按钮事件监听
+    const debugCalibBtn = document.getElementById('debug-calib-btn');
+    if (debugCalibBtn) {
+        debugCalibBtn.addEventListener('click', calibrateRatio);
     }
-    if (document.getElementById('edit-roi-focus-btn')) {
-        document.getElementById('edit-roi-focus-btn').addEventListener('click', editRoi);
+    
+    // 添加标定按钮事件监听
+    if (detectMarkBtn) {
+        detectMarkBtn.addEventListener('click', detectMarkPoint);
     }
-    if (document.getElementById('clear-roi-focus-btn')) {
-        document.getElementById('clear-roi-focus-btn').addEventListener('click', clearRoi);
+    if (centerMarkBtn) {
+        centerMarkBtn.addEventListener('click', centerMarkPoint);
     }
-    if (document.getElementById('toggle-focus-roi-visibility-btn')) {
-        document.getElementById('toggle-focus-roi-visibility-btn').addEventListener('click', toggleRoiVisibility);
+    if (startCalibBtn) {
+        startCalibBtn.addEventListener('click', startCalibration);
     }
-}
+    if (stopCalibBtn) {
+        stopCalibBtn.addEventListener('click', stopCalibration);
+    }
 
-// 在页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    // 初始化事件监听
-    initializeEventListeners();
+    // 点动按钮点击事件
+    jogBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const axis = btn.dataset.axis;
+            const direction = btn.classList.contains('plus') ? 1 : -1;
+            jogAxis(axis, direction);
+        });
+    });
+
+    // 配置按钮点击事件
+    document.querySelectorAll('.config-button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault(); // 阻止默认行为
+            const axis = e.currentTarget.dataset.axis;
+            if (axis && cameraState.isConnected) {
+                showAxisConfigModal(axis);
+            }
+        });
+    });
     
-    // 初始化缩略图功能
-    initializeFocusThumbnails();
-    setupThumbnailsHorizontalScroll();
+    // 关闭按钮点击事件
+    const closeBtn = document.querySelector('.close-button');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideAxisConfigModal);
+    }
     
-    // 开始状态轮询
-    startStatusPolling();
+    // 取消按钮点击事件
+    const cancelBtn = document.getElementById('cancel-axis-config');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', hideAxisConfigModal);
+    }
     
-    // 自动连接相机
-    autoConnect();
+    // 保存按钮点击事件
+    const saveBtn = document.getElementById('save-axis-config');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveAxisConfig);
+    }
     
-    // 初始化焦轴控制
-    initFocusAxisControls();
+    // 点击弹窗外部关闭
+    const modal = document.getElementById('axis-config-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideAxisConfigModal();
+            }
+        });
+    }
+    
+    // 轴选择改变事件
+    const axisSelect = document.getElementById('axis-select');
+    if (axisSelect) {
+        axisSelect.addEventListener('change', (e) => {
+            const axisId = e.target.value;
+            if (!axisId) return;
+            
+            // 获取轴名称
+            const axisName = getAxisNameById(axisId);
+            if (!axisName) return;
+            
+            if (axisConfigs[axisName] && cameraState.axisLimits && cameraState.axisLimits[axisName]) {
+                const config = axisConfigs[axisName];
+                const limits = cameraState.axisLimits[axisName];
+                
+                document.getElementById('axis-ratio').value = config.ratio;
+                document.getElementById('axis-backlash').value = config.backlash;
+                document.getElementById('axis-speed').value = config.speed;
+                document.getElementById('axis-acc').value = config.acc;
+                document.getElementById('soft-limit-min').value = limits.min;
+                document.getElementById('soft-limit-max').value = limits.max;
+                document.getElementById('encoder-value').value = cameraState[`${axisName}Position`] || 0;
+            }
+        });
+    }
+
+    // 加载PLC轴数据
+    loadPlcAxes();
+
+    // 自动连接
+    setTimeout(autoConnect, 500); // 延迟500ms后自动连接
 });
 
 // 编辑ROI函数
@@ -2614,7 +2857,6 @@ let bestFocusIndex = -1;
 // 加载对焦图像缩略图
 function loadFocusImages() {
     let bestFocusIndex = 0;
-    let selectedThumbnailIndex = 0;
     
     const thumbnailsContainer = document.querySelector('.focus-thumbnails-container');
     const thumbnailsWrapper = document.querySelector('.focus-thumbnails');
@@ -2625,9 +2867,12 @@ function loadFocusImages() {
     }
     
     // 找到最佳清晰度的图像
-    bestFocusIndex = cameraState.focusImages.reduce((maxIndex, curr, index, arr) => {
-        return curr.clarity > arr[maxIndex].clarity ? index : maxIndex;
-    }, 0);
+    bestFocusIndex = 0; // 默认值
+    if (cameraState.focusImages.every(img => img && img.clarity !== undefined && img.clarity !== null)) {
+        bestFocusIndex = cameraState.focusImages.reduce((maxIndex, curr, index, arr) => {
+            return curr.clarity > arr[maxIndex].clarity ? index : maxIndex;
+        }, 0);
+    }
     
     // 创建并添加缩略图
     cameraState.focusImages.forEach((image, index) => {
@@ -2644,18 +2889,14 @@ function loadFocusImages() {
         const info = document.createElement('div');
         info.className = 'focus-thumbnail-info';
         info.innerHTML = `
-            <div>Z: ${image.zPosition.toFixed(3)} mm</div>
-            <div>清晰度: ${image.clarity.toFixed(2)}</div>
+            <div style="font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;">Z: ${image.zPosition ? image.zPosition.toFixed(3) : '--'} mm</div>
+            <div style="font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;">清晰度: ${image.clarity !== undefined && image.clarity !== null ? image.clarity.toFixed(3) : '--'}</div>
         `;
         thumbnail.appendChild(info);
         
         // 点击事件：在主视图中显示图像
         thumbnail.addEventListener('click', () => {
             selectThumbnail(index);
-            const cameraFeed = document.getElementById('camera-feed');
-            if (cameraFeed) {
-                cameraFeed.src = image.imageData || image.image || '';
-            }
         });
         
         // 右键菜单
@@ -2671,15 +2912,16 @@ function loadFocusImages() {
     thumbnailsContainer.style.display = 'flex';
     setTimeout(() => thumbnailsContainer.classList.add('show'), 10);
     
+    // 设置标志，防止实时图像更新
+    cameraState.viewingThumbnail = true;
+    
+    // 暂停状态轮询，防止自动更新覆盖缩略图
+    if (window.pauseStatusPolling) {
+        window.pauseStatusPolling();
+    }
+    
     // 自动选中最佳清晰度的图像并在主视图中显示
     selectThumbnail(bestFocusIndex);
-    const bestImage = cameraState.focusImages[bestFocusIndex];
-    if (bestImage) {
-        const cameraFeed = document.getElementById('camera-feed');
-        if (cameraFeed) {
-            cameraFeed.src = bestImage.imageData || bestImage.image || '';
-        }
-    }
 }
 
 // 选中缩略图
@@ -2690,6 +2932,26 @@ function selectThumbnail(index) {
     if (index >= 0 && index < thumbnails.length) {
         thumbnails[index].classList.add('selected');
         selectedThumbnailIndex = index;
+        
+        // 添加一个标志，表示正在查看缩略图图像
+        cameraState.viewingThumbnail = true;
+        
+        // 暂停状态轮询，避免实时图像更新
+        if (window.pauseStatusPolling) {
+            window.pauseStatusPolling();
+        }
+        
+        // 显示所选图像
+        const image = cameraState.focusImages[index];
+        if (image) {
+            const cameraFeed = document.getElementById('camera-feed');
+            if (cameraFeed) {
+                cameraFeed.src = image.imageData || image.image || '';
+                
+                // 记录当前显示的图像索引，防止被其他操作覆盖
+                cameraState.currentDisplayedImageIndex = index;
+            }
+        }
     }
 }
 
@@ -2728,18 +2990,37 @@ async function handleMenuAction(action, index) {
     switch (action) {
         case 'set-focus':
             try {
+                // 保持查看缩略图状态
+                cameraState.viewingThumbnail = true;
+                cameraState.currentDisplayedImageIndex = index;
+                
+                // 确保状态轮询已暂停
+                if (window.pauseStatusPolling) {
+                    window.pauseStatusPolling();
+                }
+                
                 const response = await fetch('/set_focus_position', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         zPosition: image.zPosition,
-                        zPositionEncoder: image.zPositionEncoder
+                        zPositionEncoder: image.zPositionEncoder,
+                        axisId: '3' // 默认为Z轴
                     })
                 });
                 
                 const result = await response.json();
                 if (result.success) {
                     showMessage('成功设置对焦位置', 'success');
+                    
+                    // 确保图像保持选中状态
+                    selectThumbnail(index);
+                    
+                    // 重新强制显示该图像，防止被状态更新覆盖
+                    const cameraFeed = document.getElementById('camera-feed');
+                    if (cameraFeed && image) {
+                        cameraFeed.src = image.imageData || image.image || '';
+                    }
                 } else {
                     showMessage('设置对焦位置失败', 'error');
                 }
@@ -2750,7 +3031,14 @@ async function handleMenuAction(action, index) {
             break;
             
         case 'view-large':
-            document.getElementById('camera-feed').src = image.imageData;
+            document.getElementById('camera-feed').src = image.imageData || image.image || '';
+            cameraState.viewingThumbnail = true;
+            cameraState.currentDisplayedImageIndex = index;
+            
+            // 确保状态轮询已暂停
+            if (window.pauseStatusPolling) {
+                window.pauseStatusPolling();
+            }
             break;
     }
 }
@@ -2773,6 +3061,37 @@ function initializeFocusThumbnails() {
         setTimeout(() => {
             container.style.display = 'none';
             container.classList.remove('hide');
+            // 重置查看状态，恢复实时图像
+            cameraState.viewingThumbnail = false;
+            cameraState.currentDisplayedImageIndex = null;
+            cameraState.isShowingCalibration = false; // 确保标定视图也被关闭
+            
+            // 恢复状态轮询
+            if (window.resumeStatusPolling) {
+                window.resumeStatusPolling();
+            }
+            
+            // 恢复实时图像
+            if (cameraState.isConnected) {
+                // 确保隐藏校准图案
+                if (simulatedImage) {
+                    simulatedImage.style.display = 'block';
+                }
+                if (calibrationPattern) {
+                    calibrationPattern.style.display = 'none';
+                    calibrationPattern.innerHTML = '';
+                }
+                
+                // 立即强制获取最新相机图像
+                fetchCameraImage();
+                
+                // 延迟一段时间后再次获取图像，确保更新
+                setTimeout(() => {
+                    if (!cameraState.viewingThumbnail) {
+                        fetchCameraImage();
+                    }
+                }, 500);
+            }
         }, 300);
     });
     
@@ -2784,6 +3103,12 @@ function initializeFocusThumbnails() {
     const menu = document.querySelector('.focus-thumbnail-menu');
     menu.addEventListener('contextmenu', e => e.preventDefault());
 }
+
+// 在页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+    initializeFocusThumbnails();
+    setupThumbnailsHorizontalScroll(); // 添加水平滚动支持
+});
 
 // 配置缩略图的水平滚动
 function setupThumbnailsHorizontalScroll() {
@@ -2820,7 +3145,7 @@ function showMessage(message, type = 'info') {
 
 // 获取相机实时图像
 async function fetchCameraImage() {
-    if (!cameraState.isConnected) return;
+    if (!cameraState.isConnected || cameraState.viewingThumbnail) return;
     
     try {
         const response = await fetch('/get_camera_image');
@@ -2828,13 +3153,84 @@ async function fetchCameraImage() {
             const data = await response.json();
             if (data && data.image) {
                 cameraState.cameraImageUrl = data.image;
-                const cameraFeed = document.getElementById('camera-feed');
-                if (cameraFeed) {
-                    cameraFeed.src = data.image;
+                // 只有在未查看缩略图时才更新相机图像
+                if (!cameraState.viewingThumbnail) {
+                    const cameraFeed = document.getElementById('camera-feed');
+                    if (cameraFeed) {
+                        cameraFeed.src = data.image;
+                    }
                 }
             }
         }
     } catch (error) {
         console.error('获取相机图像失败:', error);
     }
+}
+
+// 单位显示和切换相关代码
+const unitDisplayElement = document.getElementById('unit-display');
+const focusRangeInput = document.getElementById('focus-range');
+const focusStepInput = document.getElementById('focus-step');
+let rangeUnitLabel = null;
+let stepUnitLabel = null;
+
+// 初始化单位标签引用
+if (focusRangeInput && focusStepInput) {
+    rangeUnitLabel = focusRangeInput.parentElement.querySelector('.unit-label');
+    stepUnitLabel = focusStepInput.parentElement.querySelector('.unit-label');
+    
+    // 初始化单位标签
+    if (rangeUnitLabel) rangeUnitLabel.textContent = cameraState.currentUnitScale === 1000 ? 'mm' : 'um';
+    if (stepUnitLabel) stepUnitLabel.textContent = cameraState.currentUnitScale === 1000 ? 'mm' : 'um';
+}
+
+// 更新单位显示
+function updateUnitDisplay() {
+    const unitText = cameraState.currentUnitScale === 1000 ? 'mm' : 'um';
+    if (unitDisplayElement) {
+        unitDisplayElement.textContent = unitText;
+    }
+}
+
+// 更新对焦控件单位显示
+function updateFocusControlUnits() {
+    const unitText = cameraState.currentUnitScale === 1000 ? 'mm' : 'um';
+    if (rangeUnitLabel) {
+        rangeUnitLabel.textContent = unitText;
+    }
+    if (stepUnitLabel) {
+        stepUnitLabel.textContent = unitText;
+    }
+    
+    // 更新单位标签
+    const unitLabels = document.querySelectorAll('.unit-label');
+    unitLabels.forEach(label => {
+        label.textContent = unitText;
+    });
+}
+
+// 单位切换函数 - 统一管理所有单位相关功能
+function toggleUnit() {
+    // 切换单位比例
+    cameraState.currentUnitScale = cameraState.currentUnitScale === 1 ? 1000 : 1;
+    
+    // 更新所有单位显示
+    updateUnitDisplay();
+    updateFocusControlUnits();
+    
+    // 避免调用完整的updateStatus可能导致的错误
+    // 只更新关键的轴控制显示和单位信息，不涉及clarity等属性
+    if (window.updateFocusAxisControls) {
+        window.updateFocusAxisControls();
+    }
+    
+    console.log(`单位切换为: ${cameraState.displayUnit}`);
+}
+
+// 初始化单位显示
+updateUnitDisplay();
+
+// 单位切换事件监听
+if (unitDisplayElement) {
+    unitDisplayElement.addEventListener('click', toggleUnit);
 }

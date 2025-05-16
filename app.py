@@ -316,15 +316,13 @@ def generate_focus_image(z_position, clarity):
         draw.ellipse([center_x - 80, center_y - 80, center_x + 80, center_y + 80], 
                       outline='blue', width=2)
         
-        # 添加当前Z位置和清晰度信息
-        draw.text((10, 10), f"Z: {z_position/1000:.3f}mm", fill='black')
-        draw.text((10, 30), f"清晰度: {clarity:.3f}", fill='black')
+        # 不再添加左上角的对焦位置和清晰度信息，避免与缩略图信息重复
         
         # 如果不是最清晰的，添加模糊效果
         if blur_level > 0:
             from PIL import ImageFilter
             image = image.filter(ImageFilter.GaussianBlur(radius=blur_level))
-        
+            
         # 转换为二进制数据
         buffer = io.BytesIO()
         image.save(buffer, format='JPEG', quality=85)

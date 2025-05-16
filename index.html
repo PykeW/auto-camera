@@ -18,7 +18,6 @@
                 <button class="header-button" id="btn-capture" title="单张拍照" disabled><i class="fas fa-camera"></i></button>
                 <button class="header-button" id="btn-record" title="开始录制" disabled><i class="fas fa-video"></i></button>
                 <button class="header-button" id="btn-trigger" title="软件触发" disabled><i class="fas fa-bolt"></i></button>
-                <button class="header-button" id="btn-request-image" title="请求图像"><i class="fas fa-sync-alt"></i></button>
                 <button class="header-button" id="btn-settings" title="设置"><i class="fas fa-cog"></i></button>
             </div>
             <div class="header-title">相机操作</div>
@@ -198,29 +197,19 @@
                         </select>
                     </div>
                     
-                    <!-- 对焦相关数据显示 - 已移除清晰度显示 -->
-                    
-                    <!-- 修改为搜索范围和对焦步进 -->
+                    <!-- 搜索范围和对焦步进输入框（合并单位） -->
                     <div class="control-item side-by-side compact-row">
-                        <label for="focus-range">搜索范围:</label>
-                        <div class="input-group">
-                            <input type="number" id="focus-range" value="5000" step="100" min="100" class="compact-input" style="text-align: left;">
-                        </div>
+                        <label for="focus-range">搜索范围(um):</label>
+                        <input type="number" id="focus-range" value="5000" step="100" min="100" placeholder="单位: um">
                     </div>
                     <div class="control-item side-by-side compact-row">
-                        <label for="focus-step">对焦步进:</label>
-                        <div class="input-group">
-                            <input type="number" id="focus-step" value="500" step="10" min="1" class="compact-input" style="text-align: left;">
-                        </div>
+                        <label for="focus-step">对焦步进(um):</label>
+                        <input type="number" id="focus-step" value="500" step="10" min="1" placeholder="单位: um">
                     </div>
 
                     <!-- Focus ROI Controls (Moved Here) -->
                     <div class="roi-header-line">
                         <h4 class="roi-heading">对焦ROI区域</h4>
-                        <!-- Draw button now IN the header line -->
-                        <button id="draw-roi-focus-btn" class="roi-button">
-                            <i class="fas fa-pencil-alt"></i> 绘制
-                        </button>
                         <div id="focus-roi-button-group" class="roi-button-group">
                             <button id="toggle-focus-roi-visibility-btn" class="roi-button icon-button" title="显示/隐藏">
                                 <i class="fas fa-eye"></i>
