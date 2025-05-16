@@ -682,8 +682,12 @@ function toggleFocusButtons(isFocusing) {
         if (stopFocusBtn) stopFocusBtn.style.display = 'none';
         if (saveFocusPositionBtn) saveFocusPositionBtn.style.display = 'block';
         
-        // 如果已经对焦完成，检查是否需要显示缩略图区域
-        if (cameraState.focusCompleted && Array.isArray(cameraState.focusImages) && cameraState.focusImages.length > 0) {
+        // 添加标志检查，防止循环调用
+        // 只有没有正在查看缩略图且有对焦图像的情况下才调用loadFocusImages
+        if (!cameraState.viewingThumbnail && cameraState.focusCompleted && 
+            Array.isArray(cameraState.focusImages) && cameraState.focusImages.length > 0) {
+            // 将cameraState.viewingThumbnail设置为true，防止再次调用
+            cameraState.viewingThumbnail = true;
             loadFocusImages();
         }
     }
@@ -1672,6 +1676,13 @@ function loadFocusImages() {
     // 设置标志，防止实时图像更新
     cameraState.viewingThumbnail = true;
     
+    // 重要：确保对焦状态已重置，这样才能回到正常的对焦按钮状态
+    cameraState.isFocusing = false;
+    cameraState.focusCompleted = true;
+    
+    // 显式调用按钮状态更新函数，强制更新按钮显示状态
+    toggleFocusButtons(false);
+    
     // 暂停状态轮询，防止自动更新覆盖缩略图
     if (window.pauseStatusPolling) {
         window.pauseStatusPolling();
@@ -1822,6 +1833,13 @@ function initializeFocusThumbnails() {
             cameraState.viewingThumbnail = false;
             cameraState.currentDisplayedImageIndex = null;
             cameraState.isShowingCalibration = false; // 确保标定视图也被关闭
+            
+            // 显式重置对焦状态，保证能够返回到手动对焦界面
+            cameraState.isFocusing = false;
+            cameraState.focusCompleted = true;
+            
+            // 更新按钮状态为非对焦状态
+            toggleFocusButtons(false);
             
             // 恢复状态轮询
             if (window.resumeStatusPolling) {

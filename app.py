@@ -179,6 +179,9 @@ def simulate_focus_process():
         
         print(f"后端: 开始对焦过程 - 范围: {start} 到 {end}, 步进: {step}, 总步数: {steps}, 编码器模式: {isEncoder}")
         
+        # 计算中点作为最佳清晰度位置
+        optimal_z = (start + end) / 2
+        
         # 对焦循环
         current_step = 0
         for z in range(int(start), int(end) + 1, int(step)):
@@ -202,8 +205,18 @@ def simulate_focus_process():
                 camera_state["ZPosition"] = z_mm
                 camera_state["ZPositionEncoder"] = z
             
-            # 计算当前位置的清晰度值
-            clarity = calculate_clarity(z, isEncoder)
+            # 计算当前位置的清晰度值 - 使用抛物线模型来模拟清晰度曲线
+            # 越接近optimal_z，清晰度越高
+            distance_from_optimal = abs(z - optimal_z)
+            max_distance = max(abs(start - optimal_z), abs(end - optimal_z))
+            
+            # 使用二次函数模拟清晰度曲线：清晰度 = 1 - (距离/最大距离)^2
+            clarity = max(0.0, min(1.0, 1.0 - (distance_from_optimal/max_distance)**2))
+            # 添加少量随机波动
+            clarity = clarity * random.uniform(0.95, 1.0)
+            clarity = round(clarity, 3)
+            
+            # 更新相机状态的清晰度值 - 这很重要，确保每次轮询都能获取到最新的清晰度
             camera_state["clarity"] = clarity
             
             # 更新最佳位置（如果当前位置更清晰）
@@ -215,7 +228,7 @@ def simulate_focus_process():
             # 生成当前位置的对焦图像
             image_data = generate_focus_image(z, clarity)
             
-            # 存储对焦图像数据
+            # 存储对焦图像数据 - 确保每次循环都添加图像
             if image_data:
                 focus_images.append({
                     "zPosition": z / 1000.0,  # 转换为毫米
@@ -260,6 +273,7 @@ def simulate_focus_process():
             camera_state["focusImages"] = focus_images
             
             print(f"后端: 对焦完成 - 最佳位置 Z = {best_z / 1000.0}mm ({best_z} 编码器值), 清晰度 = {best_clarity:.3f}")
+            print(f"后端: 总共生成了 {len(focus_images)} 张对焦图像")
         else:
             print("后端: 对焦过程未能获取有效图像")
         
@@ -301,6 +315,32 @@ def generate_focus_image(z_position, clarity):
         center_x = width // 2
         center_y = height // 2
         font_size = 40
+
+        # 添加Momus焦平面偏移效果 - 多环状效果
+        # 清晰度越低，环状效果越明显
+        rings_intensity = max(0, 1 - clarity) * 0.8  # 环状强度与清晰度成反比
+        
+        if rings_intensity > 0.05:  # 只有当足够不清晰时才显示环
+            # 绘制多个同心圆，模拟Momus焦平面效果
+            max_rings = 5
+            for i in range(1, max_rings + 1):
+                ring_radius = i * 30
+                ring_opacity = int(255 * rings_intensity * (max_rings - i + 1) / max_rings)
+                # 带透明度的颜色
+                ring_color = (0, 120, 255, ring_opacity)
+                
+                # 计算环的厚度 - 清晰度越低环越宽
+                thickness = max(1, int(3 * rings_intensity))
+                
+                # 绘制圆环
+                for t in range(thickness):
+                    draw.ellipse([
+                        center_x - ring_radius - t, 
+                        center_y - ring_radius - t,
+                        center_x + ring_radius + t, 
+                        center_y + ring_radius + t
+                    ], outline=(0, 120, 255, ring_opacity))
+        
         # 模拟文本可用PIL的ImageFont，但简化实现
         text = f"Z: {z_position/1000:.3f}mm"
         # 简化：只绘制一个矩形代表文本
@@ -584,38 +624,64 @@ def start_focus():
         camera_state["focusParams"]["times"] = int(data.get('times', 1))
         camera_state["focusParams"]["isEncoder"] = True  # 始终使用编码器值
         
-        # 添加start和end参数
-        if 'start' in data and data['start'] is not None:
-            camera_state["focusParams"]["start"] = int(data['start'])
-            camera_state["focusParams"]["end"] = int(data['end'])
-        else:
-            # 使用当前位置和搜索范围计算起点和终点
-            current_z = camera_state["currentZEncoder"] or camera_state["ZPositionEncoder"] or 10000
-            range_value = camera_state["focusParams"]["range"]
-            camera_state["focusParams"]["start"] = max(0, current_z - range_value)
-            camera_state["focusParams"]["end"] = current_z + range_value
+        # 计算对焦范围的起始点和终点
+        range_value = camera_state["focusParams"]["range"]
+        step_value = camera_state["focusParams"]["step"]
         
-        # 计算总步数
-        steps = math.ceil((camera_state["focusParams"]["end"] - camera_state["focusParams"]["start"]) / camera_state["focusParams"]["step"])
-        camera_state["focusParams"]["steps"] = steps
+        # 获取当前Z轴位置作为中心点
+        current_z = 0
+        if camera_state.get("currentZEncoder") is not None:
+            current_z = camera_state["currentZEncoder"]
+        elif camera_state.get("ZPositionEncoder") is not None:
+            current_z = camera_state["ZPositionEncoder"]
         
-        # 更新状态
+        # 计算搜索范围的起点和终点
+        start = max(0, current_z - range_value//2)
+        end = current_z + range_value//2
+        
+        # 计算实际范围
+        actual_range = end - start
+        
+        # 确保生成至少8张缩略图，动态调整步进值
+        min_thumbnails = 8
+        if actual_range > 0:
+            # 根据范围自动调整步进值
+            if actual_range / step_value < min_thumbnails:
+                # 如果步数小于最低要求，自动减小步进值
+                adjusted_step = max(10, actual_range // min_thumbnails)  # 确保步进至少是10
+                print(f"后端: 调整步进值为 {adjusted_step}，预计生成 {min(min_thumbnails, actual_range // adjusted_step if adjusted_step > 0 else 1)} 张缩略图")
+                step_value = adjusted_step
+            else:
+                # 预计生成的缩略图数量
+                estimated_thumbnails = actual_range // step_value if step_value > 0 else 1
+                print(f"后端: 调整步进值为 {step_value}，预计生成 {estimated_thumbnails} 张缩略图")
+        
+        # 更新对焦参数
+        camera_state["focusParams"]["start"] = int(start)
+        camera_state["focusParams"]["end"] = int(end)
+        camera_state["focusParams"]["step"] = int(step_value)
+        camera_state["focusParams"]["steps"] = max(min_thumbnails, int(actual_range / step_value)) if step_value > 0 else 1
+        
+        # 开始对焦线程
         camera_state["isFocusing"] = True
-        camera_state["focusStatus"] = "对焦中"
-        camera_state["focusProgress"] = 0.0
         camera_state["focusCompleted"] = False
         camera_state["focusImages"] = []
+        camera_state["clarity"] = 0
         
-        # 启动自动对焦线程
-        global focus_thread, stop_focus_flag
+        global stop_focus_flag, focus_thread
         stop_focus_flag.clear()
-        focus_thread = Thread(target=simulate_focus_process, daemon=True)
+        
+        # 启动对焦线程 - 修复此处使用Thread而不是threading.Thread
+        focus_thread = Thread(target=simulate_focus_process)
+        focus_thread.daemon = True
         focus_thread.start()
         
-        return jsonify({"success": True, "status": camera_state})
+        return jsonify({"success": True, "isFocusing": True})
+        
     except Exception as e:
-        print(f"启动自动对焦出错: {str(e)}")
-        return jsonify({"success": False, "message": f"启动自动对焦出错: {str(e)}"}), 500
+        camera_state["isFocusing"] = False
+        print(f"后端: 开始对焦失败 - {str(e)}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/stop_focus', methods=['POST'])
 def stop_focus():
