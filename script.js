@@ -2489,7 +2489,22 @@ function initFocusAxisControls() {
             stepValue = stepValue * 1000; // 转换为微米
         }
         
-        const step = stepValue * direction;
+        // 获取当前位置的实际值（可能为负）
+        const axisName = getAxisNameById(axisId);
+        let currentPosition = 0;
+        
+        if (axisName) {
+            if (cameraState.displayUnit === 'mm') {
+                currentPosition = cameraState[`${axisName}Position`] || 0;
+            } else {
+                currentPosition = (cameraState[`${axisName}PositionEncoder`] || 0) / 1000;
+            }
+        }
+        
+        // 确保+号增加实际值，-号减少实际值
+        // 如果当前值为负，需要反转方向
+        const actualDirection = currentPosition < 0 ? -direction : direction;
+        const step = stepValue * actualDirection;
         
         try {
             const response = await fetch('/jog_axis', {
