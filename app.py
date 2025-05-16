@@ -6,6 +6,7 @@ import io
 import base64
 from PIL import Image, ImageDraw
 from math import ceil
+import math
 import os
 import json
 from threading import Thread, Event
@@ -100,7 +101,8 @@ camera_state = {
     "manualFocusPositionEncoder": None,
     # 添加对焦图像相关状态
     "focusImages": [],  # 存储对焦过程中的图像
-    "focusCompleted": False  # 标记对焦是否完成
+    "focusCompleted": False,  # 标记对焦是否完成
+    "focusProgress": 0.0  # 添加对焦进度
 }
 
 # --- 标定相关变量 ---
@@ -159,94 +161,114 @@ def calculate_clarity(z, is_encoder=False):
     return round(clarity, 3)
 
 def simulate_focus_process():
+    """模拟自动对焦过程"""
     global camera_state, stop_focus_flag
+    
     try:
-        stop_focus_flag.clear()
-        camera_state["isFocusing"] = True
-        camera_state["focusStatus"] = "对焦中"  # 简化状态显示
-        camera_state["focusImages"] = []  # 清空之前的对焦图像
-        camera_state["focusCompleted"] = False
-        print("后端: 开始自动对焦")
+        # 初始值
+        start = camera_state["focusParams"]["start"]
+        end = camera_state["focusParams"]["end"]
+        step = camera_state["focusParams"]["step"]
+        steps = camera_state["focusParams"]["steps"]
+        isEncoder = camera_state.get("focusParams", {}).get("isEncoder", False)
         
-        # 应用对焦参数
-        focus_params = camera_state["focusParams"]
+        # 准备存储对焦过程中的图像和清晰度值
+        focus_images = []
+        best_z = start
+        best_clarity = 0
         
-        # 获取当前位置和搜索范围
-        current_z_encoder = camera_state["currentZEncoder"] or camera_state["ZPositionEncoder"]
-        search_range = focus_params["range"]
-        step_size = focus_params["step"]
+        print(f"后端: 开始对焦过程 - 范围: {start} 到 {end}, 步进: {step}, 总步数: {steps}, 编码器模式: {isEncoder}")
         
-        # 计算起点和终点
-        start_z = max(0, current_z_encoder - search_range)
-        end_z = current_z_encoder + search_range
-        
-        print(f"后端: 对焦参数 - 当前Z位置: {current_z_encoder}, 搜索范围: ±{search_range}, 起点: {start_z}, 终点: {end_z}, 对焦步进: {step_size}")
-        
-        time.sleep(0.2) # 模拟初始化
-
-        if stop_focus_flag.is_set():
-            print("后端: 对焦在初始化阶段被停止")
-            camera_state["focusStatus"] = "空闲"
-            camera_state["isFocusing"] = False
-            return
-
-        # 对焦过程 - 简化状态显示
-        best_z = start_z
-        max_clarity = -1
-        image_count = 0 # 图像计数
-            
-        # 从起点到终点进行线性扫描
-        z = start_z
-        while z <= end_z:
+        # 对焦循环
+        current_step = 0
+        for z in range(int(start), int(end) + 1, int(step)):
+            # 检查是否收到停止信号
             if stop_focus_flag.is_set():
+                print("后端: 收到停止对焦信号")
                 break
-
-            # 更新编码器值和物理值
-            camera_state["currentZEncoder"] = round(z)
-            camera_state["ZPositionEncoder"] = camera_state["currentZEncoder"]
-            camera_state["currentZ"] = round(z / 1000.0, 3)
-            camera_state["ZPosition"] = camera_state["currentZ"]
-            clarity = calculate_clarity(z, is_encoder=True)
+            
+            # 更新Z轴位置
+            if isEncoder:
+                # 使用编码器值
+                camera_state["currentZEncoder"] = z
+                camera_state["currentZ"] = z / 1000.0
+                camera_state["ZPositionEncoder"] = z
+                camera_state["ZPosition"] = z / 1000.0
+            else:
+                # 使用毫米值
+                z_mm = z / 1000.0  # 转换为毫米
+                camera_state["currentZ"] = z_mm
+                camera_state["currentZEncoder"] = z
+                camera_state["ZPosition"] = z_mm
+                camera_state["ZPositionEncoder"] = z
+            
+            # 计算当前位置的清晰度值
+            clarity = calculate_clarity(z, isEncoder)
             camera_state["clarity"] = clarity
             
-            # 生成并保存当前位置的图像
-            image_data = generate_focus_image(z, clarity)
-            camera_state["focusImages"].append({
-                "zPosition": camera_state["currentZ"],
-                "zPositionEncoder": camera_state["currentZEncoder"],
-                "clarity": clarity,
-                "image": image_data,
-                "index": image_count
-            })
-            image_count += 1
-            
-            print(f"后端: 对焦 Z={camera_state['currentZEncoder']}, 清晰度={camera_state['clarity']}")
-            
-            if camera_state["clarity"] > max_clarity:
-                max_clarity = camera_state["clarity"]
+            # 更新最佳位置（如果当前位置更清晰）
+            if clarity > best_clarity:
+                best_clarity = clarity
                 best_z = z
-                
-            time.sleep(0.1) # 模拟移动和测量时间
-            z += step_size
-            z = round(z)
+                print(f"后端: 更新最佳对焦位置 Z = {z}{' 编码器值' if isEncoder else 'mm'}, 清晰度 = {clarity:.3f}")
+            
+            # 生成当前位置的对焦图像
+            image_data = generate_focus_image(z, clarity)
+            
+            # 存储对焦图像数据
+            if image_data:
+                focus_images.append({
+                    "zPosition": z / 1000.0,  # 转换为毫米
+                    "zPositionEncoder": z,    # 编码器原始值
+                    "clarity": clarity,
+                    "imageData": image_data,
+                    "isBest": False           # 后面再更新
+                })
+                print(f"后端: 生成对焦图像 - Z = {z}, 清晰度 = {clarity:.3f}")
+            
+            # 更新对焦进度
+            current_step += 1
+            camera_state["focusProgress"] = (current_step / steps) * 100 if steps > 0 else 0
+            print(f"后端: 对焦进度 {camera_state['focusProgress']:.1f}%")
+            
+            # 模拟耗时
+            time.sleep(0.2)
         
-        if not stop_focus_flag.is_set():
+        # 对焦完成后
+        if len(focus_images) > 0:
+            # 找到最佳图像，更新标志
+            best_index = max(range(len(focus_images)), key=lambda i: focus_images[i]["clarity"])
+            focus_images[best_index]["isBest"] = True
+            
+            # 更新最终的最佳位置
+            best_z = focus_images[best_index]["zPositionEncoder"]
+            best_clarity = focus_images[best_index]["clarity"]
+            
+            # 更新相机状态
+            camera_state["bestZ"] = best_z / 1000.0  # 毫米
+            camera_state["bestZEncoder"] = best_z     # 编码器值
+            camera_state["bestClarity"] = best_clarity
+            
             # 移动到最佳位置
+            camera_state["currentZ"] = best_z / 1000.0
             camera_state["currentZEncoder"] = best_z
+            camera_state["ZPosition"] = best_z / 1000.0
             camera_state["ZPositionEncoder"] = best_z
-            camera_state["currentZ"] = round(best_z / 1000.0, 3)
-            camera_state["ZPosition"] = camera_state["currentZ"]
-            camera_state["bestZEncoder"] = best_z
-            camera_state["bestZ"] = round(best_z / 1000.0, 3)
-            camera_state["clarity"] = calculate_clarity(best_z, is_encoder=True)
-            camera_state["focusCompleted"] = True
-            print(f"后端: 自动对焦完成, 最佳 Z = {best_z}(编码器值)")
-                
-            camera_state["focusStatus"] = "空闲"
+            camera_state["clarity"] = best_clarity
+            
+            # 保存图像列表
+            camera_state["focusImages"] = focus_images
+            
+            print(f"后端: 对焦完成 - 最佳位置 Z = {best_z / 1000.0}mm ({best_z} 编码器值), 清晰度 = {best_clarity:.3f}")
         else:
-            camera_state["focusStatus"] = "空闲"
+            print("后端: 对焦过程未能获取有效图像")
         
+        # 更新对焦状态
+        camera_state["focusCompleted"] = not stop_focus_flag.is_set()
+        camera_state["focusStatus"] = "完成" if camera_state["focusCompleted"] else "已中断"
         camera_state["isFocusing"] = False
+        
+        print(f"后端: 对焦过程结束 - 状态: {camera_state['focusStatus']}")
         
     except Exception as e:
         print(f"后端: 对焦过程出错: {str(e)}")
@@ -514,7 +536,8 @@ def disconnect_camera():
         "manualFocusPositionEncoder": None,
         # 添加对焦图像相关状态
         "focusImages": [],  # 存储对焦过程中的图像
-        "focusCompleted": False  # 标记对焦是否完成
+        "focusCompleted": False,  # 标记对焦是否完成
+        "focusProgress": 0.0  # 添加对焦进度
     }
     print("后端: 相机已断开")
     return jsonify(camera_state)
@@ -563,8 +586,33 @@ def start_focus():
         camera_state["focusParams"]["times"] = int(data.get('times', 1))
         camera_state["focusParams"]["isEncoder"] = True  # 始终使用编码器值
         
+        # 添加start和end参数
+        if 'start' in data and data['start'] is not None:
+            camera_state["focusParams"]["start"] = int(data['start'])
+            camera_state["focusParams"]["end"] = int(data['end'])
+        else:
+            # 使用当前位置和搜索范围计算起点和终点
+            current_z = camera_state["currentZEncoder"] or camera_state["ZPositionEncoder"] or 10000
+            range_value = camera_state["focusParams"]["range"]
+            camera_state["focusParams"]["start"] = max(0, current_z - range_value)
+            camera_state["focusParams"]["end"] = current_z + range_value
+        
+        # 计算总步数
+        steps = math.ceil((camera_state["focusParams"]["end"] - camera_state["focusParams"]["start"]) / camera_state["focusParams"]["step"])
+        camera_state["focusParams"]["steps"] = steps
+        
+        # 更新状态
+        camera_state["isFocusing"] = True
+        camera_state["focusStatus"] = "对焦中"
+        camera_state["focusProgress"] = 0.0
+        camera_state["focusCompleted"] = False
+        camera_state["focusImages"] = []
+        
         # 启动自动对焦线程
-        Thread(target=simulate_focus_process).start()
+        global focus_thread, stop_focus_flag
+        stop_focus_flag.clear()
+        focus_thread = Thread(target=simulate_focus_process, daemon=True)
+        focus_thread.start()
         
         return jsonify({"success": True, "status": camera_state})
     except Exception as e:

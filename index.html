@@ -18,6 +18,7 @@
                 <button class="header-button" id="btn-capture" title="单张拍照" disabled><i class="fas fa-camera"></i></button>
                 <button class="header-button" id="btn-record" title="开始录制" disabled><i class="fas fa-video"></i></button>
                 <button class="header-button" id="btn-trigger" title="软件触发" disabled><i class="fas fa-bolt"></i></button>
+                <button class="header-button" id="btn-request-image" title="请求图像"><i class="fas fa-sync-alt"></i></button>
                 <button class="header-button" id="btn-settings" title="设置"><i class="fas fa-cog"></i></button>
             </div>
             <div class="header-title">相机操作</div>
@@ -26,7 +27,7 @@
         <main class="main-content">
             <section class="camera-view">
                 <div class="camera-image">
-                    <img id="camera-feed" src="favicon.png" alt="相机画面">
+                    <img id="camera-feed" src="/get_camera_image" alt="相机画面">
                     <div class="roi-overlay" style="display: none;">
                         <div class="roi-box"></div>
                     </div>

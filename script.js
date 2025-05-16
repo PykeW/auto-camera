@@ -41,7 +41,9 @@ let cameraState = {
     // 添加单位显示设置
     displayUnit: 'mm', // 默认单位为mm
     // 添加相机图像URL
-    cameraImageUrl: null
+    cameraImageUrl: null,
+    // 添加相机模式
+    captureMode: 'photo' // 'photo' 或 'video'
 };
 
 // 相机标定相关状态
@@ -338,8 +340,10 @@ function updateStatus(state) {
     
     // 更新对焦位置显示
     const cameraFocusPositionDisplay = document.getElementById('focus-position-display');
-    if (cameraFocusPositionDisplay && state.ZPosition !== null) {
-        cameraFocusPositionDisplay.textContent = state.ZPosition.toFixed(3);
+    if (cameraFocusPositionDisplay && state.ZPosition !== null && state.ZPosition !== undefined) {
+        cameraFocusPositionDisplay.textContent = state.ZPosition.toFixed(5) + " mm";
+    } else if (cameraFocusPositionDisplay) {
+        cameraFocusPositionDisplay.textContent = "--";
     }
     
     // 更新按钮状态
@@ -373,8 +377,8 @@ function updateStatus(state) {
         savePathInput.value = state.savePath;
     }
     
-    // 始终获取相机图像，只要相机已连接
-    if (state.isConnected) {
+    // 仅在视频模式下自动获取相机图像
+    if (state.isConnected && state.captureMode === 'video') {
         fetchCameraImage();
     }
     
@@ -416,12 +420,14 @@ function updateStatus(state) {
                 // 根据当前单位设置显示内容
                 if (cameraState.displayUnit === 'mm') {
                     // 毫米显示
-                    const position = cameraState[`${axisName}Position`] || 0;
-                    focusPositionDisplay.textContent = `${position.toFixed(5)} mm`;
+                    const position = cameraState[`${axisName}Position`];
+                    focusPositionDisplay.textContent = position !== null && position !== undefined ? 
+                        `${position.toFixed(5)} mm` : "--";
                 } else {
                     // 微米显示
-                    const positionEncoder = cameraState[`${axisName}PositionEncoder`] || 0;
-                    focusPositionDisplay.textContent = `${positionEncoder} um`;
+                    const positionEncoder = cameraState[`${axisName}PositionEncoder`];
+                    focusPositionDisplay.textContent = positionEncoder !== null && positionEncoder !== undefined ? 
+                        `${positionEncoder} um` : "--";
                 }
             } else {
                 focusPositionDisplay.textContent = "--";
@@ -523,9 +529,21 @@ async function autoConnect() {
 async function startAutoFocus() {
     try {
         // 使用搜索范围计算起点和终点 - 现在使用编码器值
-        const currentZ = Math.round(cameraState.currentZEncoder || cameraState.ZPositionEncoder || cameraState.currentZ * 1000 || cameraState.ZPosition * 1000);
-        const range = parseInt(document.getElementById('focus-range').value);
-        const step = parseInt(document.getElementById('focus-step').value);
+        let currentZ = 0; // 默认值
+        
+        // 按优先级依次尝试获取当前Z轴位置
+        if (cameraState.currentZEncoder !== null && cameraState.currentZEncoder !== undefined) {
+            currentZ = Math.round(cameraState.currentZEncoder);
+        } else if (cameraState.ZPositionEncoder !== null && cameraState.ZPositionEncoder !== undefined) {
+            currentZ = Math.round(cameraState.ZPositionEncoder);
+        } else if (cameraState.currentZ !== null && cameraState.currentZ !== undefined) {
+            currentZ = Math.round(cameraState.currentZ * 1000);
+        } else if (cameraState.ZPosition !== null && cameraState.ZPosition !== undefined) {
+            currentZ = Math.round(cameraState.ZPosition * 1000);
+        }
+        
+        const range = parseInt(document.getElementById('focus-range').value) || 1000;
+        const step = parseInt(document.getElementById('focus-step').value) || 100;
         
         // 计算起点和终点（编码器值）
         const start = Math.max(0, currentZ - range);
@@ -565,11 +583,17 @@ async function startAutoFocus() {
             thumbnailsContainer.style.display = 'none';
         }
         
+        // 使用固定的API路径而非变量
         const response = await fetch('/start_focus', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
         });
+        
+        if (!response.ok) {
+            throw new Error(`服务器返回错误: ${response.status}`);
+        }
+        
         const state = await response.json();
         updateStatus(state);
         
@@ -2130,10 +2154,17 @@ async function calibrateRatio() {
         // 1. 获取校准图像
         console.log('当量校准: 发送获取校准图像请求...');
         const response1 = await fetch('/generate_calibration_image?square_size=50');
+        
+        if (!response1.ok) {
+            console.error('当量校准: 获取校准图像请求失败', response1.status);
+            alert('获取校准图像失败: 服务器返回错误代码 ' + response1.status);
+            return;
+        }
+        
         const result1 = await response1.json();
         console.log('当量校准: 校准图像响应', result1);
         
-        if (result1.success) {
+        if (result1 && result1.success) {
             // 显示校准图案
             console.log('当量校准: 更新状态和显示');
             cameraState.isShowingCalibration = true;
@@ -2154,10 +2185,17 @@ async function calibrateRatio() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ squareSizeMm })
             });
+            
+            if (!response2.ok) {
+                console.error('当量校准: 计算当量请求失败', response2.status);
+                alert('计算当量失败: 服务器返回错误代码 ' + response2.status);
+                return;
+            }
+            
             const result2 = await response2.json();
             console.log('当量校准: 当量计算响应', result2);
             
-            if (result2.success) {
+            if (result2 && result2.success) {
                 const ratio = result2.ratio.toFixed(2);
                 if (calibResultValue) {
                     calibResultValue.textContent = `${ratio} ${result2.unit}`;
@@ -2175,16 +2213,16 @@ async function calibrateRatio() {
                     cameraState.isShowingCalibration = false;
                 }, 2000);
             } else {
-                console.error('当量计算失败:', result2.message);
-                alert('当量计算失败: ' + (result2.message || '未知错误'));
+                console.error('当量计算失败:', result2 ? result2.message : '无响应数据');
+                alert('当量计算失败: ' + (result2 && result2.message ? result2.message : '未知错误'));
             }
         } else {
-            console.error('获取校准图像失败:', result1.message);
-            alert('获取校准图像失败: ' + (result1.message || '未知错误'));
+            console.error('获取校准图像失败:', result1 ? result1.message : '无响应数据');
+            alert('获取校准图像失败: ' + (result1 && result1.message ? result1.message : '未知错误'));
         }
     } catch (error) {
-        console.error('当量校准失败:', error);
-        alert('当量校准过程发生错误，请查看控制台日志');
+        console.error('当量校准出错:', error);
+        alert('当量校准失败: ' + (error.message || '未知错误'));
     }
 }
 
@@ -2444,153 +2482,45 @@ function initFocusAxisControls() {
 
 // 初始化事件监听器
 function initializeEventListeners() {
-    // ROI绘制相关事件
-    document.getElementById('draw-roi-focus-btn').addEventListener('click', toggleRoiDrawing);
-    document.getElementById('edit-roi-focus-btn').addEventListener('click', editRoi);
-    document.getElementById('clear-roi-focus-btn').addEventListener('click', clearRoi);
-    document.getElementById('toggle-focus-roi-visibility-btn').addEventListener('click', toggleRoiVisibility);
+    // 初始化DOM引用
+    initializeDOMReferences();
     
     // 初始化ROI工具相关事件
     initializeRoiTools();
     
-    // ... existing code ...
-}
-
-// 在初始化DOM引用中添加工具面板的引用
-function initializeRoiTools() {
-    // 首先初始化选项卡切换
-    document.getElementById('rect-roi-tool').addEventListener('click', () => switchRoiTool('rect'));
-    document.getElementById('polygon-roi-tool').addEventListener('click', () => switchRoiTool('polygon'));
-    document.getElementById('ellipse-roi-tool').addEventListener('click', () => switchRoiTool('ellipse'));
-    
-    // 改为使用新的单选按钮容器
-    document.getElementById('draw-mode-container').addEventListener('click', () => switchDrawMode('draw'));
-    document.getElementById('edit-mode-container').addEventListener('click', () => switchDrawMode('edit'));
-    
-    // 移除对已删除按钮的事件监听
-    // document.getElementById('confirm-roi-tool-btn').addEventListener('click', confirmRoi);
-    // document.getElementById('cancel-roi-tool-btn').addEventListener('click', cancelRoi);
-    // document.getElementById('toggle-visibility-roi-btn').addEventListener('click', toggleRoiVisibility);
-    // document.getElementById('delete-roi-btn').addEventListener('click', clearRoi);
-    
-    document.getElementById('close-roi-tools').addEventListener('click', closeRoiTools);
-}
-
-// 关闭ROI工具面板
-function closeRoiTools() {
-    cameraState.isDrawingROI = false;
-    drawRoiFocusBtn.classList.remove('active');
-    
-    // 隐藏工具面板
-    const roiToolsPanel = document.getElementById('roi-tools-panel');
-    if (roiToolsPanel) {
-        roiToolsPanel.style.display = 'none';
-    }
-    
-    // 禁用ROI绘制模式
-    disableRoiDrawing();
-}
-
-// 切换ROI形状工具
-function switchRoiTool(tool) {
-    activeShapeTool = tool;
-    
-    // 更新按钮状态
-    document.getElementById('rect-roi-tool').classList.toggle('active', tool === 'rect');
-    document.getElementById('polygon-roi-tool').classList.toggle('active', tool === 'polygon');
-    document.getElementById('ellipse-roi-tool').classList.toggle('active', tool === 'ellipse');
-    
-    console.log(`已切换到${tool}工具`);
-}
-
-// 切换绘制/编辑模式
-function switchDrawMode(mode) {
-    activeDrawMode = mode;
-    
-    // 更新单选按钮状态
-    document.getElementById('draw-mode-container').classList.toggle('active', mode === 'draw');
-    document.getElementById('edit-mode-container').classList.toggle('active', mode === 'edit');
-    
-    console.log(`已切换到${mode === 'draw' ? '绘制' : '编辑'}模式`);
-}
-
-// 取消当前ROI绘制
-function cancelRoi() {
-    // 清除当前ROI但不退出绘制模式
-    const overlay = document.getElementById('focus-roi-overlay');
-    if (currentRoiRect && overlay.contains(currentRoiRect)) {
-        overlay.removeChild(currentRoiRect);
-    }
-    currentRoiRect = null;
-    
-    // 重置绘制状态
-    isDrawing = false;
-    
-    if (roiInfoDisplay) {
-        roiInfoDisplay.style.display = 'none';
-    }
-}
-
-// 更新编码值显示
-function updateEncoderValues() {
-    if(focusRange && focusRangeEncoder) {
-        // 假设1mm = 1000编码器值，这个比例应该根据实际情况调整
-        const rangeValue = parseFloat(focusRange.value);
-        const encoderValue = Math.round(rangeValue * 1000);
-        focusRangeEncoder.textContent = encoderValue;
-    }
-    
-    if(focusStep && focusStepEncoder) {
-        const stepValue = parseFloat(focusStep.value);
-        const encoderValue = Math.round(stepValue * 1000);
-        focusStepEncoder.textContent = encoderValue;
-    }
-}
-
-// 事件监听器
-document.addEventListener('DOMContentLoaded', () => {
-    // 初始化所有DOM引用
-    initializeDOMReferences();
-    
-    // 初始化隐藏ROI按钮组
-    if (focusRoiButtonGroup) {
-        focusRoiButtonGroup.style.display = 'none';
-    }
-    
-    // 初始化ROI工具面板
-    const roiToolsPanel = document.getElementById('roi-tools-panel');
-    if (roiToolsPanel) {
-        roiToolsPanel.classList.remove('show');
-    }
-    
-    // 设置多边形绘制的双击事件
-    setupPolygonEvents();
-    
-    // 更新连接按钮初始状态
-    updateConnectButton();
-    
-    // 初始化对焦按钮状态
-    toggleFocusButtons(false);
-    
-    // 启动状态轮询
-    startStatusPolling();
-    
-    // 移除不再需要的编码值更新事件
-    // if (focusRange) {
-    //     focusRange.addEventListener('input', updateEncoderValues);
-    // }
-    // if (focusStep) {
-    //     focusStep.addEventListener('input', updateEncoderValues);
-    // }
-    
-    // 移除初始化更新编码值
-    // updateEncoderValues();
-
-    // 连接按钮点击事件
-    if (connectBtn) {
-        connectBtn.addEventListener('click', toggleConnection);
+    // 添加相机模式切换按钮事件监听
+    const playBtn = document.getElementById('btn-play');
+    if (playBtn) {
+        playBtn.addEventListener('click', () => {
+            cameraState.captureMode = 'video';
+            playBtn.disabled = true;
+            const stopBtn = document.getElementById('btn-stop');
+            if (stopBtn) stopBtn.disabled = false;
+            // 开始连续获取图像
+            fetchCameraImage();
+        });
     }
 
+    const stopBtn = document.getElementById('btn-stop');
+    if (stopBtn) {
+        stopBtn.addEventListener('click', () => {
+            cameraState.captureMode = 'photo';
+            stopBtn.disabled = true;
+            const playBtn = document.getElementById('btn-play');
+            if (playBtn) playBtn.disabled = false;
+        });
+    }
+
+    // 添加请求图像按钮事件监听
+    const requestImageBtn = document.getElementById('btn-request-image');
+    if (requestImageBtn) {
+        requestImageBtn.addEventListener('click', () => {
+            if (cameraState.isConnected) {
+                fetchCameraImage();
+            }
+        });
+    }
+    
     // 自动对焦按钮点击事件
     if (startFocusBtn) {
         startFocusBtn.addEventListener('click', startAutoFocus);
@@ -2599,111 +2529,43 @@ document.addEventListener('DOMContentLoaded', () => {
         stopFocusBtn.addEventListener('click', stopAutoFocus);
     }
     
-    // 添加保存对焦位置按钮事件监听
-    const saveFocusPositionBtn = document.getElementById('save-focus-position-btn');
-    if (saveFocusPositionBtn) {
-        saveFocusPositionBtn.addEventListener('click', saveFocusPosition);
+    // 连接按钮点击事件
+    if (connectBtn) {
+        connectBtn.addEventListener('click', toggleConnection);
     }
     
-    // 添加当量校准按钮事件监听
-    const debugCalibBtn = document.getElementById('debug-calib-btn');
-    if (debugCalibBtn) {
-        debugCalibBtn.addEventListener('click', calibrateRatio);
+    // ROI绘制相关事件
+    if (document.getElementById('draw-roi-focus-btn')) {
+        document.getElementById('draw-roi-focus-btn').addEventListener('click', toggleRoiDrawing);
     }
-    
-    // 添加标定按钮事件监听
-    if (detectMarkBtn) {
-        detectMarkBtn.addEventListener('click', detectMarkPoint);
+    if (document.getElementById('edit-roi-focus-btn')) {
+        document.getElementById('edit-roi-focus-btn').addEventListener('click', editRoi);
     }
-    if (centerMarkBtn) {
-        centerMarkBtn.addEventListener('click', centerMarkPoint);
+    if (document.getElementById('clear-roi-focus-btn')) {
+        document.getElementById('clear-roi-focus-btn').addEventListener('click', clearRoi);
     }
-    if (startCalibBtn) {
-        startCalibBtn.addEventListener('click', startCalibration);
+    if (document.getElementById('toggle-focus-roi-visibility-btn')) {
+        document.getElementById('toggle-focus-roi-visibility-btn').addEventListener('click', toggleRoiVisibility);
     }
-    if (stopCalibBtn) {
-        stopCalibBtn.addEventListener('click', stopCalibration);
-    }
+}
 
-    // 点动按钮点击事件
-    jogBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const axis = btn.dataset.axis;
-            const direction = btn.classList.contains('plus') ? 1 : -1;
-            jogAxis(axis, direction);
-        });
-    });
-
-    // 配置按钮点击事件
-    document.querySelectorAll('.config-button').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault(); // 阻止默认行为
-            const axis = e.currentTarget.dataset.axis;
-            if (axis && cameraState.isConnected) {
-                showAxisConfigModal(axis);
-            }
-        });
-    });
+// 在页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+    // 初始化事件监听
+    initializeEventListeners();
     
-    // 关闭按钮点击事件
-    const closeBtn = document.querySelector('.close-button');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', hideAxisConfigModal);
-    }
+    // 初始化缩略图功能
+    initializeFocusThumbnails();
+    setupThumbnailsHorizontalScroll();
     
-    // 取消按钮点击事件
-    const cancelBtn = document.getElementById('cancel-axis-config');
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', hideAxisConfigModal);
-    }
+    // 开始状态轮询
+    startStatusPolling();
     
-    // 保存按钮点击事件
-    const saveBtn = document.getElementById('save-axis-config');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', saveAxisConfig);
-    }
+    // 自动连接相机
+    autoConnect();
     
-    // 点击弹窗外部关闭
-    const modal = document.getElementById('axis-config-modal');
-    if (modal) {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                hideAxisConfigModal();
-            }
-        });
-    }
-    
-    // 轴选择改变事件
-    const axisSelect = document.getElementById('axis-select');
-    if (axisSelect) {
-        axisSelect.addEventListener('change', (e) => {
-            const axisId = e.target.value;
-            if (!axisId) return;
-            
-            // 获取轴名称
-            const axisName = getAxisNameById(axisId);
-            if (!axisName) return;
-            
-            if (axisConfigs[axisName] && cameraState.axisLimits && cameraState.axisLimits[axisName]) {
-                const config = axisConfigs[axisName];
-                const limits = cameraState.axisLimits[axisName];
-                
-                document.getElementById('axis-ratio').value = config.ratio;
-                document.getElementById('axis-backlash').value = config.backlash;
-                document.getElementById('axis-speed').value = config.speed;
-                document.getElementById('axis-acc').value = config.acc;
-                document.getElementById('soft-limit-min').value = limits.min;
-                document.getElementById('soft-limit-max').value = limits.max;
-                document.getElementById('encoder-value').value = cameraState[`${axisName}Position`] || 0;
-            }
-        });
-    }
-
-    // 加载PLC轴数据
-    loadPlcAxes();
-
-    // 自动连接
-    setTimeout(autoConnect, 500); // 延迟500ms后自动连接
+    // 初始化焦轴控制
+    initFocusAxisControls();
 });
 
 // 编辑ROI函数
@@ -2751,6 +2613,9 @@ let bestFocusIndex = -1;
 
 // 加载对焦图像缩略图
 function loadFocusImages() {
+    let bestFocusIndex = 0;
+    let selectedThumbnailIndex = 0;
+    
     const thumbnailsContainer = document.querySelector('.focus-thumbnails-container');
     const thumbnailsWrapper = document.querySelector('.focus-thumbnails');
     thumbnailsWrapper.innerHTML = '';
@@ -2771,7 +2636,8 @@ function loadFocusImages() {
         thumbnail.dataset.index = index;
         
         const img = document.createElement('img');
-        img.src = image.imageData;
+        // 使用正确的图像数据属性
+        img.src = image.imageData || image.image || '';
         img.alt = `Focus Position ${image.zPosition}`;
         thumbnail.appendChild(img);
         
@@ -2786,7 +2652,10 @@ function loadFocusImages() {
         // 点击事件：在主视图中显示图像
         thumbnail.addEventListener('click', () => {
             selectThumbnail(index);
-            document.getElementById('camera-feed').src = image.imageData;
+            const cameraFeed = document.getElementById('camera-feed');
+            if (cameraFeed) {
+                cameraFeed.src = image.imageData || image.image || '';
+            }
         });
         
         // 右键菜单
@@ -2802,8 +2671,15 @@ function loadFocusImages() {
     thumbnailsContainer.style.display = 'flex';
     setTimeout(() => thumbnailsContainer.classList.add('show'), 10);
     
-    // 自动选中最佳清晰度的图像
+    // 自动选中最佳清晰度的图像并在主视图中显示
     selectThumbnail(bestFocusIndex);
+    const bestImage = cameraState.focusImages[bestFocusIndex];
+    if (bestImage) {
+        const cameraFeed = document.getElementById('camera-feed');
+        if (cameraFeed) {
+            cameraFeed.src = bestImage.imageData || bestImage.image || '';
+        }
+    }
 }
 
 // 选中缩略图
@@ -2855,7 +2731,10 @@ async function handleMenuAction(action, index) {
                 const response = await fetch('/set_focus_position', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ zPosition: image.zPosition })
+                    body: JSON.stringify({ 
+                        zPosition: image.zPosition,
+                        zPositionEncoder: image.zPositionEncoder
+                    })
                 });
                 
                 const result = await response.json();
@@ -2906,10 +2785,18 @@ function initializeFocusThumbnails() {
     menu.addEventListener('contextmenu', e => e.preventDefault());
 }
 
-// 在页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    initializeFocusThumbnails();
-});
+// 配置缩略图的水平滚动
+function setupThumbnailsHorizontalScroll() {
+    const thumbnailsWrapper = document.querySelector('.focus-thumbnails');
+    if (thumbnailsWrapper) {
+        thumbnailsWrapper.addEventListener('wheel', (e) => {
+            // 阻止默认的垂直滚动行为
+            e.preventDefault();
+            // 将垂直滚动转换为水平滚动
+            thumbnailsWrapper.scrollLeft += (e.deltaY * 3);
+        }, { passive: false });
+    }
+}
 
 // 显示消息提示
 function showMessage(message, type = 'info') {
@@ -2939,9 +2826,12 @@ async function fetchCameraImage() {
         const response = await fetch('/get_camera_image');
         if (response.ok) {
             const data = await response.json();
-            if (data.image) {
+            if (data && data.image) {
                 cameraState.cameraImageUrl = data.image;
-                document.getElementById('camera-feed').src = data.image;
+                const cameraFeed = document.getElementById('camera-feed');
+                if (cameraFeed) {
+                    cameraFeed.src = data.image;
+                }
             }
         }
     } catch (error) {
