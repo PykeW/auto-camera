@@ -243,8 +243,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* 对焦范围和步进输入框宽度 */
 #focus-range, #focus-step {
-    width: calc(100% - 16px) !important;
-    text-align: right;
+    width: 100% !important;
+    text-align: left; /* 改为左对齐 */
+    padding-right: 22px; /* 为单位显示留出空间 */
 }
 
 /* 禁用状态 */
@@ -520,7 +521,7 @@ input[type=range]::-moz-range-thumb {
 
 .control-item.side-by-side input,
 .control-item.side-by-side span {
-    text-align: right;
+    text-align: left; /* 改为左对齐 */
 }
 
 .property-grid .range-item label {
@@ -1019,18 +1020,31 @@ input:checked + .slider:before {
         flex-direction: column;
     }
     
-    /* 确保在移动设备上轴控制正确显示 */
+    /* 优化移动设备上的轴控制布局 */
     .control-item.side-by-side {
         flex-wrap: wrap;
+        height: auto;
+        min-height: 36px;
+        padding: 4px 0;
     }
     
     .control-item.side-by-side label {
         width: 100%;
-        margin-bottom: var(--spacing-small);
+        min-width: 100%;
+        margin-bottom: 4px;
     }
     
-    .control-item.side-by-side .axis-position-control {
-        width: 100%;
+    /* 在移动设备上保持轴位置控制和步进选择在一行 */
+    .axis-position-control {
+        flex: 1 1 auto;
+        min-width: 150px;
+        margin-right: 10px;
+    }
+    
+    #focus-step-select {
+        flex: 0 0 70px;
+        min-width: 70px;
+        width: 70px;
     }
 }
 
@@ -1039,8 +1053,37 @@ input:checked + .slider:before {
         --panel-width: 100%;
     }
     
-    .axis-position-control input {
+    /* 在更小的屏幕上进一步优化 */
+    .axis-position-control {
         min-width: 0;
+    }
+    
+    .position-display-container input {
+        min-width: 40px;
+        padding-right: 24px;
+    }
+    
+    /* 确保点动按钮始终可见 */
+    .jog-btn {
+        min-width: 36px;
+        width: 36px;
+        flex: 0 0 36px;
+    }
+    
+    /* 步进选择保持可点击的最小尺寸 */
+    #focus-step-select {
+        font-size: 11px;
+    }
+    
+    /* 步进设置与轴位置控制保持合理间距 */
+    .control-item.side-by-side {
+        gap: 5px;
+    }
+    
+    /* 确保界面能正常滚动 */
+    .control-panel {
+        max-height: none;
+        overflow-y: auto;
     }
 }
 
@@ -1087,13 +1130,54 @@ input:checked + .slider:before {
     gap: 4px;
 }
 
-/* 轴控制按钮样式 */
-.jog-btn {
-    min-width: 24px;
-    width: 24px;
-    flex: 0 0 24px;
-    height: 28px;
+/* 轴位置控制区域样式优化 */
+.axis-position-control {
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    height: 32px;
+    overflow: visible;
+    margin-right: 10px;
+    min-width: 150px; /* 增加最小宽度 */
+    flex: 1; /* 允许伸缩 */
+    max-width: none;
+}
+
+/* 位置显示容器简化 */
+.position-display-container {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 80px; /* 增加最小宽度确保数值完整显示 */
     padding: 0;
+    margin: 0;
+    height: 100%;
+}
+
+/* 轴位置输入框样式 */
+.position-display-container input {
+    width: 100%;
+    min-width: 80px; /* 确保足够宽度显示 */
+    height: 100%;
+    padding: 4px 30px 4px 8px; /* 增加右侧内边距给单位留更多空间 */
+    box-sizing: border-box;
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    border: none;
+    text-align: left; /* 改为左对齐 */
+    font-size: 12px;
+}
+
+/* 点动按钮样式优化 */
+.jog-btn {
+    min-width: 32px;
+    width: 32px;
+    flex: 0 0 32px;
+    height: 32px;
+    padding: 0;
+    margin: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1103,41 +1187,167 @@ input:checked + .slider:before {
     background-color: var(--bg-medium);
     color: var(--accent-blue);
     border: none;
-    border-right: 1px solid var(--border-dark);
     border-radius: 0;
-    line-height: 1;
+    z-index: 5;
+    transition: all 0.15s ease;
+    position: relative;
 }
 
-.jog-btn.plus {
-    border-left: 1px solid var(--border-dark);
-    border-right: none;
+/* 点动按钮交互状态 */
+.jog-btn:hover:not(:disabled) {
+    background-color: #4a4a4a;
+    color: white;
+}
+
+.jog-btn:active {
+    background-color: #2a2a2a;
+    transform: scale(0.95);
+}
+
+.jog-btn:disabled {
+    opacity: 0.6;
+    color: var(--text-medium);
+}
+
+/* 单位显示样式 */
+.unit-display {
+    cursor: pointer;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #ddd;
+    user-select: none;
+    transition: all 0.2s ease;
+    position: absolute;
+    right: 6px; /* 调整位置 */
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    min-width: 22px;
+    text-align: center;
+    background-color: rgba(61, 61, 61, 0.8);
+    pointer-events: auto;
+}
+
+.unit-display:hover {
+    background-color: #555;
+}
+
+.unit-display:active {
+    transform: translateY(-50%) scale(0.95);
+    background-color: var(--accent-blue);
+}
+
+/* 控制项布局进一步优化 */
+.control-item.side-by-side {
+    padding: 0;
+    gap: 10px;
+}
+
+/* 响应式布局优化 */
+@media (max-width: 768px) {
+    .control-item.side-by-side {
+        gap: 8px;
+    }
+    
+    .axis-position-control {
+        min-width: 180px; /* 移动端上增加更多宽度 */
+    }
+    
+    #focus-step-select {
+        min-width: 70px;
+        width: 70px;
+    }
+}
+
+/* 点击涟漪效果 */
+.jog-btn:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%, -50%);
+    transform-origin: 0% 0%;
+}
+
+.jog-btn:active:after {
+    animation: ripple 0.4s ease-out;
+}
+
+@keyframes ripple {
+    0% {
+        transform: scale(0, 0) translate(-50%, -50%);
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(20, 20) translate(-50%, -50%);
+        opacity: 0;
+    }
 }
 
 /* 步进选择下拉框样式 */
-.step-select {
-    width: 40px;
-    min-width: 40px;
-    flex: 0 0 40px;
-    height: 28px;
+#focus-step-select {
+    width: 60px;
+    min-width: 60px;
+    flex: 0 0 60px;
+    height: 32px;
     background: var(--bg-medium);
     color: var(--text-light);
     border: 1px solid var(--border-medium);
     padding: 2px 16px 2px 4px;
     border-radius: 3px;
-    background-position: right 2px center;
     text-align: center;
     font-size: 12px;
     box-sizing: border-box;
     appearance: none;
     background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
     background-repeat: no-repeat;
+    background-position: right 4px center;
     background-size: .65em auto;
+    z-index: 5; /* 确保下拉框显示在最上层 */
+    margin-left: 10px; /* 增加与轴位置控制的间距 */
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    transition: all 0.15s ease;
 }
 
-/* 确保步进值下拉选项正确显示 */
-.step-select option {
-    text-align: center;
-    padding: 3px;
+/* 按钮样式 */
+.jog-btn.plus {
+    border-left: 1px solid var(--border-dark);
+    border-right: none;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.jog-btn.minus {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+/* 控制项布局优化 */
+.control-item.side-by-side {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* 增加间距 */
+    flex-wrap: nowrap;
+    width: 100%;
+    margin-bottom: 8px;
+    overflow: visible;
+    height: 36px; /* 增加高度 */
+}
+
+.control-item.side-by-side label {
+    min-width: 80px;
+    width: 80px;
+    flex-shrink: 0;
+    margin-right: 0;
 }
 
 /* 轴控制组保持对齐 */
@@ -1146,20 +1356,6 @@ input:checked + .slider:before {
     align-items: center;
     gap: 4px;
     height: 28px;
-}
-
-/* 针对对焦功能的步进选择器保持更宽 */
-#focus-step-select {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: 50px;
-    max-width: 60px;
-    margin-left: 0;
-    padding-right: 14px;
-    padding-left: 4px;
-    background-position: right 2px center;
-    text-align: center;
-    font-size: 12px;
 }
 
 /* 配置按钮样式 */
@@ -1379,203 +1575,6 @@ input:checked + .slider:before {
     color: black;
 }
 
-/* Mark点检测结果显示 */
-.mark-point {
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    border: 2px solid #ff0000;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-}
-
-.mark-point.detected {
-    border-color: #00ff00;
-}
-
-.mark-point.center {
-    border-color: #0000ff;
-    width: 14px;
-    height: 14px;
-}
-
-/* Mark点图例样式 */
-.mark-legend {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    border-radius: 4px;
-    padding: 8px 12px;
-    color: white;
-    font-size: 12px;
-    z-index: 100;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    margin: 4px 0;
-}
-
-.legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    margin-right: 8px;
-    display: inline-block;
-}
-
-.legend-dot.red {
-    background-color: #ff0000;
-    box-shadow: 0 0 5px rgba(255,0,0,0.7);
-}
-
-.legend-dot.green {
-    background-color: #00ff00;
-    box-shadow: 0 0 5px rgba(0,255,0,0.7);
-}
-
-/* 相机视图容器 */
-.camera-view {
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: #333;
-    overflow: hidden;
-}
-
-/* 标定矩阵样式 */
-.calib-matrix {
-    margin: 15px 0;
-    overflow-x: auto;
-}
-
-.calib-matrix table {
-    border-collapse: collapse;
-    width: 100%;
-    font-family: monospace;
-    background-color: #f8f9fa;
-}
-
-.calib-matrix td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: center;
-}
-
-.matrix-info {
-    margin: 10px 0;
-    font-size: 0.9em;
-    color: #666;
-}
-
-.matrix-controls {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
-}
-
-/* Mark点红绿样式优化 */
-.mark-point.detected {
-    border-color: #ff0000;
-    background-color: rgba(255, 0, 0, 0.2);
-    box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
-}
-
-.mark-point.center {
-    border-color: #00cc00;
-    background-color: rgba(0, 204, 0, 0.2);
-    box-shadow: 0 0 10px rgba(0, 204, 0, 0.5);
-}
-
-/* 标定图例样式 */
-.legend-dot {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 5px;
-}
-
-.legend-dot.red {
-    background-color: #ff0000;
-    box-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
-}
-
-.legend-dot.green {
-    background-color: #00cc00;
-    box-shadow: 0 0 5px rgba(0, 204, 0, 0.5);
-}
-
-/* 动画效果增强 */
-@keyframes pulse {
-    0% { transform: scale(1); opacity: 0.8; }
-    50% { transform: scale(1.2); opacity: 1; }
-    100% { transform: scale(1); opacity: 0.8; }
-}
-
-.mark-point.moving {
-    animation: pulse 0.8s infinite;
-}
-
-/* 轴位置控制区域样式 */
-.axis-position-control {
-    display: flex;
-    align-items: center;
-    flex-grow: 1;
-    background-color: var(--bg-medium);
-    border: 1px solid var(--border-dark);
-    border-radius: var(--border-radius);
-    height: 28px;
-    overflow: hidden;
-    margin-right: 6px;
-    max-width: 180px;
-}
-
-/* 位置显示容器样式 */
-.position-display-container {
-    position: relative;
-    display: flex;
-    flex: 1;
-    align-items: center;
-    margin: 0 2px;
-}
-
-/* 轴位置输入框样式 */
-.position-display-container input {
-    width: 100%;
-    min-width: 50px;
-    max-width: 70px;
-    height: 28px;
-    padding: 4px 22px 4px 6px;
-    box-sizing: border-box;
-    background-color: var(--bg-medium);
-    color: var(--text-light);
-    border: 1px solid var(--border-medium);
-    border-radius: 3px;
-    text-align: right;
-    font-size: 12px;
-}
-
-/* 单位显示样式 */
-.unit-display {
-    cursor: pointer;
-    padding: 1px 2px;
-    border-radius: 3px;
-    font-size: 11px;
-    color: #ddd;
-    user-select: none;
-    transition: background-color 0.2s;
-    position: absolute;
-    right: 3px;
-    z-index: 10;
-    width: 16px;
-    text-align: center;
-}
-
 /* 输入框后的单位标签样式 */
 .unit-label {
     display: inline-block;
@@ -1759,34 +1758,6 @@ input:checked + .slider:before {
     font-size: 0.95em;
     padding: 5px 0;
     border-radius: 2px;
-}
-
-/* 控制项样式 */
-.control-item.side-by-side {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: nowrap;
-    width: 100%;
-    margin-bottom: 6px;
-    justify-content: flex-start;
-    text-align: left;
-}
-
-.control-item.side-by-side label {
-    flex: 0 0 auto;
-    margin-bottom: 0;
-    margin-right: 3px;
-    min-width: 60px;
-    text-align: left;
-    font-size: 12px;
-}
-
-.control-item.side-by-side select,
-.control-item.side-by-side input {
-    flex: 1;
-    min-width: 0;
-    text-align: left;
 }
 
 /* 相机图像信息叠加层 */
@@ -2062,4 +2033,183 @@ input:checked + .slider:before {
     min-width: unset;
     width: unset;
     text-align: left;
+}
+
+/* 优化对焦区域布局 */
+.focus-section-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+/* 统一行高和间距 */
+.control-item.side-by-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    height: 32px;
+}
+
+/* 标签宽度统一 */
+.control-item.side-by-side label {
+    min-width: 80px;
+    width: 80px;
+    flex-shrink: 0;
+}
+
+/* 优化ROI按钮组样式 */
+.roi-button-group {
+    display: flex;
+    justify-content: flex-end;
+    margin-left: auto;
+    gap: 4px;
+}
+
+.roi-button {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.2s ease;
+}
+
+.roi-button:hover:not(:disabled) {
+    background-color: #4a4a4a;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.roi-button.danger-icon:hover:not(:disabled) {
+    color: var(--accent-red);
+}
+
+.roi-heading {
+    margin: 0;
+    font-size: 14px;
+    font-weight: normal;
+}
+
+/* 统一主按钮样式 */
+.focus-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.focus-controls button {
+    flex: 1;
+    height: 32px;
+    font-weight: normal;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.focus-controls button i {
+    margin-right: 5px;
+}
+
+.focus-controls .primary-button {
+    background-color: var(--accent-blue);
+    color: white;
+}
+
+.focus-controls .secondary-button {
+    background-color: #4a90e2;
+    color: white;
+}
+
+.focus-controls .danger-button {
+    background-color: var(--accent-red);
+    color: white;
+}
+
+.focus-controls button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.focus-controls .primary-button:hover:not(:disabled) {
+    background-color: #3a80d2;
+}
+
+.focus-controls .secondary-button:hover:not(:disabled) {
+    background-color: #3a80d2;
+}
+
+.focus-controls .danger-button:hover:not(:disabled) {
+    background-color: #d94c4c;
+}
+
+/* 优化轴位置控制区域 */
+.axis-position-control {
+    height: 32px;
+    border-radius: 4px;
+    margin-right: 8px;
+}
+
+.jog-btn {
+    height: 32px;
+    width: 32px;
+    font-size: 16px;
+}
+
+.position-display-container input {
+    height: 32px;
+    font-size: 13px;
+}
+
+.unit-display {
+    right: 4px;
+    font-size: 12px;
+}
+
+/* 步进选择样式优化 */
+#focus-step-select {
+    height: 32px;
+    margin-left: 8px;
+    width: 60px;
+}
+
+/* ROI标题行优化 */
+.roi-header-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+/* 输入框样式统一 */
+.control-item input[type="number"] {
+    height: 32px;
+    padding-right: 25px;
+    text-align: right;
+}
+
+.position-display-container {
+    height: 32px;
+}
+
+#focus-step-select:hover:not(:disabled) {
+    border-color: var(--accent-blue);
+    background-color: #4a4a4a;
+}
+
+#focus-step-select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
 } 

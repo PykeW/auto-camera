@@ -75,9 +75,6 @@ let calibrationState = {
 // DOM 元素
 let connectBtn, serialInput, statusText, focusStatusText, currentZInput, clarityInput;
 let startFocusBtn, stopFocusBtn, axisInputs, jogBtns, stepSelects;
-let axisConfigModal, axisSelect, encoderValue, axisRatio, axisBacklash, axisSpeed;
-let axisAcc, softLimitMin, softLimitMax;
-let configFileInput, savePathInput, selectConfigBtn, selectFolderBtn;
 let drawRoiFocusBtn, focusRoiButtonGroup;
 let focusParamsModal, focusStart, focusEnd, focusStep;
 // 当量计算相关
@@ -111,17 +108,6 @@ function initializeDOMReferences() {
     // 点动和步进控件
     jogBtns = document.querySelectorAll('.jog-btn');
     stepSelects = document.querySelectorAll('.step-select');
-
-    // 配置弹窗控件
-    axisConfigModal = document.getElementById('axis-config-modal');
-    axisSelect = document.getElementById('axis-select');
-    encoderValue = document.getElementById('encoder-value');
-    axisRatio = document.getElementById('axis-ratio');
-    axisBacklash = document.getElementById('axis-backlash');
-    axisSpeed = document.getElementById('axis-speed');
-    axisAcc = document.getElementById('axis-acc');
-    softLimitMin = document.getElementById('soft-limit-min');
-    softLimitMax = document.getElementById('soft-limit-max');
 
     // 配置文件和保存路径控件
     configFileInput = document.getElementById('config-file');
@@ -259,11 +245,7 @@ function updateAxisDisplay(state) {
                 }
             });
             
-            // 更新配置按钮状态
-            const configBtn = document.querySelector(`.config-button[data-axis="${axis.toUpperCase()}"]`);
-            if (configBtn) {
-                configBtn.disabled = !state.isConnected;
-            }
+            // 轴配置按钮相关代码已删除
         }
     });
     
@@ -833,35 +815,6 @@ function populateFocusAxisSelect() {
     }
 }
 
-// 显示轴配置弹窗
-function showAxisConfigModal(axis) {
-    // 设置当前选中的轴ID
-    const axisId = getAxisIdByName(axis);
-    if (axisSelect && axisId) {
-        axisSelect.value = axisId;
-    }
-    
-    // 获取当前轴的配置
-    const config = axisConfigs[axis];
-    
-    // 设置编码器值（从当前位置获取）
-    encoderValue.value = cameraState[`${axis}Position`] || 0;
-    
-    // 设置其他配置值
-    axisRatio.value = config.ratio;
-    axisBacklash.value = config.backlash;
-    axisSpeed.value = config.speed;
-    axisAcc.value = config.acc;
-    
-    // 设置软限位
-    const limits = cameraState.axisLimits[axis];
-    softLimitMin.value = limits.min;
-    softLimitMax.value = limits.max;
-    
-    // 显示弹窗
-    axisConfigModal.classList.add('show');
-}
-
 // 根据轴名称获取对应的PLC轴ID
 function getAxisIdByName(axisName) {
     for (const [id, name] of Object.entries(cameraState.axisMapping)) {
@@ -875,51 +828,6 @@ function getAxisIdByName(axisName) {
 // 根据轴ID获取轴名称
 function getAxisNameById(axisId) {
     return cameraState.axisMapping[axisId] || axisId;
-}
-
-// 隐藏轴配置弹窗
-function hideAxisConfigModal() {
-    axisConfigModal.classList.remove('show');
-}
-
-// 保存轴配置
-function saveAxisConfig() {
-    const axisId = axisSelect.value;
-    const axisName = getAxisNameById(axisId);
-    const config = {
-        ratio: parseFloat(axisRatio.value),
-        backlash: parseFloat(axisBacklash.value),
-        speed: parseFloat(axisSpeed.value),
-        acc: parseFloat(axisAcc.value)
-    };
-    
-    // 更新软限位
-    const min = parseFloat(softLimitMin.value);
-    const max = parseFloat(softLimitMax.value);
-    if (min < max) {
-        cameraState.axisLimits[axisName] = { min, max };
-    }
-    
-    // 更新配置
-    axisConfigs[axisName] = config;
-    
-    // 发送到后端
-    fetch('/save_axis_config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            axis: axisId,
-            config,
-            limits: { min, max }
-        })
-    }).then(response => response.json())
-      .then(data => {
-          console.log('轴配置已保存:', data);
-          hideAxisConfigModal();
-      })
-      .catch(error => {
-          console.error('保存轴配置失败:', error);
-      });
 }
 
 // 选择配置文件
@@ -1686,70 +1594,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 配置按钮点击事件
-    document.querySelectorAll('.config-button').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault(); // 阻止默认行为
-            const axis = e.currentTarget.dataset.axis;
-            if (axis && cameraState.isConnected) {
-                showAxisConfigModal(axis);
-            }
-        });
-    });
+    // 轴配置按钮相关代码已删除
     
-    // 关闭按钮点击事件
-    const closeBtn = document.querySelector('.close-button');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', hideAxisConfigModal);
-    }
+    // 轴配置弹窗相关事件监听器已删除
     
-    // 取消按钮点击事件
-    const cancelBtn = document.getElementById('cancel-axis-config');
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', hideAxisConfigModal);
-    }
-    
-    // 保存按钮点击事件
-    const saveBtn = document.getElementById('save-axis-config');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', saveAxisConfig);
-    }
-    
-    // 点击弹窗外部关闭
-    const modal = document.getElementById('axis-config-modal');
-    if (modal) {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                hideAxisConfigModal();
-            }
-        });
-    }
-    
-    // 轴选择改变事件
-    const axisSelect = document.getElementById('axis-select');
-    if (axisSelect) {
-        axisSelect.addEventListener('change', (e) => {
-            const axisId = e.target.value;
-            if (!axisId) return;
-            
-            // 获取轴名称
-            const axisName = getAxisNameById(axisId);
-            if (!axisName) return;
-            
-            if (axisConfigs[axisName] && cameraState.axisLimits && cameraState.axisLimits[axisName]) {
-                const config = axisConfigs[axisName];
-                const limits = cameraState.axisLimits[axisName];
-                
-                document.getElementById('axis-ratio').value = config.ratio;
-                document.getElementById('axis-backlash').value = config.backlash;
-                document.getElementById('axis-speed').value = config.speed;
-                document.getElementById('axis-acc').value = config.acc;
-                document.getElementById('soft-limit-min').value = limits.min;
-                document.getElementById('soft-limit-max').value = limits.max;
-                document.getElementById('encoder-value').value = cameraState[`${axisName}Position`] || 0;
-            }
-        });
-    }
+    // 轴配置弹窗相关代码已删除
 
     // 加载PLC轴数据
     loadPlcAxes();
@@ -2106,26 +1955,22 @@ function applyBlurToImage(imageUrl, clarity) {
 
 // 单位显示和切换相关代码
 const unitDisplayElement = document.getElementById('unit-display');
+const rangeUnitDisplayElement = document.getElementById('range-unit-display');
+const stepUnitDisplayElement = document.getElementById('step-unit-display');
 const focusRangeInput = document.getElementById('focus-range');
 const focusStepInput = document.getElementById('focus-step');
-let rangeUnitLabel = null;
-let stepUnitLabel = null;
-
-// 初始化单位标签引用
-if (focusRangeInput && focusStepInput) {
-    rangeUnitLabel = focusRangeInput.parentElement.querySelector('.unit-label');
-    stepUnitLabel = focusStepInput.parentElement.querySelector('.unit-label');
-    
-    // 初始化单位标签
-    if (rangeUnitLabel) rangeUnitLabel.textContent = cameraState.currentUnitScale === 1000 ? 'mm' : 'um';
-    if (stepUnitLabel) stepUnitLabel.textContent = cameraState.currentUnitScale === 1000 ? 'mm' : 'um';
-}
 
 // 更新单位显示
 function updateUnitDisplay() {
-    const unitText = cameraState.currentUnitScale === 1000 ? 'mm' : 'um';
+    const unitText = cameraState.displayUnit;
     if (unitDisplayElement) {
         unitDisplayElement.textContent = unitText;
+    }
+    if (rangeUnitDisplayElement) {
+        rangeUnitDisplayElement.textContent = unitText;
+    }
+    if (stepUnitDisplayElement) {
+        stepUnitDisplayElement.textContent = unitText;
     }
 }
 
@@ -2182,34 +2027,34 @@ function toggleUnit() {
         }
     }
     
-    // 更新所有显示单位标签
-    const unitLabels = document.querySelectorAll('.unit-label');
-    unitLabels.forEach(label => {
-        label.textContent = cameraState.displayUnit;
-    });
-    
     // 更新轴位置显示
     updateFocusAxisPosition(); // 使用已经存在的函数
     
     // 更新全局单位显示
-    const unitDisplayElement = document.getElementById('unit-display');
-    if (unitDisplayElement) {
-        unitDisplayElement.textContent = cameraState.displayUnit;
-    }
+    updateUnitDisplay();
     
     // 更新搜索范围和对焦步进输入框
-    const focusRange = document.getElementById('focus-range');
-    const focusStep = document.getElementById('focus-step');
-    
-    if (focusRange && focusStep) {
+    if (focusRangeInput && focusStepInput) {
         if (cameraState.displayUnit === 'mm') {
             // 从um转到mm
-            focusRange.value = (parseFloat(focusRange.value) / 1000).toFixed(3);
-            focusStep.value = (parseFloat(focusStep.value) / 1000).toFixed(3);
+            focusRangeInput.value = (parseFloat(focusRangeInput.value) / 1000).toFixed(3);
+            focusStepInput.value = (parseFloat(focusStepInput.value) / 1000).toFixed(3);
+            
+            // 调整step和min属性
+            focusRangeInput.step = '0.1';
+            focusRangeInput.min = '0.1';
+            focusStepInput.step = '0.01';
+            focusStepInput.min = '0.001';
         } else {
             // 从mm转到um
-            focusRange.value = Math.round(parseFloat(focusRange.value) * 1000);
-            focusStep.value = Math.round(parseFloat(focusStep.value) * 1000);
+            focusRangeInput.value = Math.round(parseFloat(focusRangeInput.value) * 1000);
+            focusStepInput.value = Math.round(parseFloat(focusStepInput.value) * 1000);
+            
+            // 恢复原始step和min属性
+            focusRangeInput.step = '100';
+            focusRangeInput.min = '100';
+            focusStepInput.step = '10';
+            focusStepInput.min = '1';
         }
     }
     
@@ -2825,3 +2670,20 @@ updateUnitDisplay();
 if (unitDisplayElement) {
     unitDisplayElement.addEventListener('click', toggleUnit);
 }
+
+// 初始化后调用一次单位显示更新
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化单位显示
+    updateUnitDisplay();
+    
+    // 为所有单位显示元素添加单位切换事件
+    if (unitDisplayElement) {
+        unitDisplayElement.addEventListener('click', toggleUnit);
+    }
+    if (rangeUnitDisplayElement) {
+        rangeUnitDisplayElement.addEventListener('click', toggleUnit);
+    }
+    if (stepUnitDisplayElement) {
+        stepUnitDisplayElement.addEventListener('click', toggleUnit);
+    }
+});

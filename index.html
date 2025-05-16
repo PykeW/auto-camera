@@ -170,69 +170,76 @@
 
                     <!-- Z Axis / Focus -->
                     <h4>Z轴控制 / 对焦</h4>
-                    <!-- 添加轴选择下拉列表 -->
-                    <div class="control-item side-by-side">
-                        <label for="focus-axis-select">选择轴:</label>
-                        <select id="focus-axis-select" class="compact-select"></select>
-                    </div>
-                    
-                    <!-- 当前轴位置显示和点动控制 -->
-                    <div class="control-item side-by-side">
-                        <label for="focus-axis-position">轴位置:</label>
-                        <div class="axis-position-control">
-                            <button class="jog-btn minus" id="focus-jog-minus">-</button>
-                            <div class="position-display-container">
-                                <input type="text" id="focus-axis-position" value="0" readonly>
-                                <span id="unit-display" class="unit-display" title="点击切换单位">um</span>
+                    <div class="focus-section-container">
+                        <!-- 添加轴选择下拉列表 -->
+                        <div class="control-item side-by-side">
+                            <label for="focus-axis-select">选择轴:</label>
+                            <select id="focus-axis-select" class="compact-select"></select>
+                        </div>
+                        
+                        <!-- 当前轴位置显示和点动控制 -->
+                        <div class="control-item side-by-side">
+                            <label for="focus-axis-position">轴位置:</label>
+                            <div class="axis-position-control">
+                                <button class="jog-btn minus" id="focus-jog-minus">-</button>
+                                <div class="position-display-container">
+                                    <input type="text" id="focus-axis-position" value="0" readonly>
+                                    <span id="unit-display" class="unit-display" title="点击切换单位">um</span>
+                                </div>
+                                <button class="jog-btn plus" id="focus-jog-plus">+</button>
                             </div>
-                            <button class="jog-btn plus" id="focus-jog-plus">+</button>
+                            <select id="focus-step-select" class="compact-select">
+                                <option value="1">1</option>
+                                <option value="10">10</option>
+                                <option value="100">100</option>
+                                <option value="500">500</option>
+                                <option value="1000">1000</option>
+                            </select>
                         </div>
-                        <!-- 步进量下拉框 -->
-                        <select id="focus-step-select" class="compact-select">
-                            <option value="1">1</option>
-                            <option value="10">10</option>
-                            <option value="100">100</option>
-                            <option value="500">500</option>
-                            <option value="1000">1000</option>
-                        </select>
-                    </div>
-                    
-                    <!-- 搜索范围和对焦步进输入框（合并单位） -->
-                    <div class="control-item side-by-side compact-row">
-                        <label for="focus-range">搜索范围(um):</label>
-                        <input type="number" id="focus-range" value="5000" step="100" min="100" placeholder="单位: um">
-                    </div>
-                    <div class="control-item side-by-side compact-row">
-                        <label for="focus-step">对焦步进(um):</label>
-                        <input type="number" id="focus-step" value="500" step="10" min="1" placeholder="单位: um">
-                    </div>
+                        
+                        <!-- 搜索范围和对焦步进输入框（合并单位） -->
+                        <div class="control-item side-by-side">
+                            <label for="focus-range">搜索范围:</label>
+                            <div class="position-display-container">
+                                <input type="number" id="focus-range" value="5000" step="100" min="100" placeholder="搜索范围">
+                                <span class="unit-display" id="range-unit-display">um</span>
+                            </div>
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label for="focus-step">对焦步进:</label>
+                            <div class="position-display-container">
+                                <input type="number" id="focus-step" value="500" step="10" min="1" placeholder="对焦步进">
+                                <span class="unit-display" id="step-unit-display">um</span>
+                            </div>
+                        </div>
 
-                    <!-- Focus ROI Controls (Moved Here) -->
-                    <div class="roi-header-line">
-                        <h4 class="roi-heading">对焦ROI区域</h4>
-                        <div id="focus-roi-button-group" class="roi-button-group">
-                            <button id="toggle-focus-roi-visibility-btn" class="roi-button icon-button" title="显示/隐藏">
-                                <i class="fas fa-eye"></i>
+                        <!-- Focus ROI Controls -->
+                        <div class="roi-header-line">
+                            <h4 class="roi-heading">对焦ROI区域</h4>
+                            <div id="focus-roi-button-group" class="roi-button-group">
+                                <button id="toggle-focus-roi-visibility-btn" class="roi-button icon-button" title="显示/隐藏">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button id="edit-roi-focus-btn" class="roi-button icon-button" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button id="clear-roi-focus-btn" class="roi-button icon-button danger-icon" title="删除">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="control-item focus-controls">
+                            <button id="start-focus-btn" class="primary-button">
+                                <i class="fas fa-crosshairs"></i> 开始自动对焦
                             </button>
-                            <button id="edit-roi-focus-btn" class="roi-button icon-button" title="编辑">
-                                <i class="fas fa-edit"></i>
+                            <button id="stop-focus-btn" class="danger-button" style="display: none;">
+                                <i class="fas fa-stop-circle"></i> 停止自动对焦
                             </button>
-                            <button id="clear-roi-focus-btn" class="roi-button icon-button danger-icon" title="删除">
-                                <i class="fas fa-trash-alt"></i>
+                            <button id="save-focus-position-btn" class="secondary-button">
+                                <i class="fas fa-save"></i> 保存对焦位置
                             </button>
                         </div>
-                    </div>
-
-                    <div class="control-item focus-controls">
-                        <button id="start-focus-btn" class="primary-button">
-                            <i class="fas fa-crosshairs"></i> 开始自动对焦
-                        </button>
-                        <button id="stop-focus-btn" class="danger-button" style="display: none;">
-                            <i class="fas fa-stop-circle"></i> 停止自动对焦
-                        </button>
-                        <button id="save-focus-position-btn" class="secondary-button" style="display: none;">
-                            <i class="fas fa-save"></i> 保存对焦位置
-                        </button>
                     </div>
 
                     <hr class="separator">
@@ -338,58 +345,6 @@
         </footer>
 
         <script src="script.js"></script>
-    </div>
-
-    <!-- 轴配置弹窗 -->
-    <div id="axis-config-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>轴配置</h3>
-                <button class="close-button">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="config-section">
-                    <div class="control-item">
-                        <label for="axis-select">选择轴：</label>
-                        <select id="axis-select">
-                            <!-- 轴选项将由JavaScript根据PLC回传的轴数据动态填充 -->
-                        </select>
-                    </div>
-                    <div class="control-item">
-                        <label for="encoder-value">编码器值：</label>
-                        <input type="number" id="encoder-value" readonly>
-                    </div>
-                    <div class="control-item">
-                        <label for="axis-ratio">轴当量(mm/p)：</label>
-                        <input type="number" id="axis-ratio" step="0.0001" min="0">
-                    </div>
-                    <div class="control-item">
-                        <label for="axis-backlash">反向间隙(mm)：</label>
-                        <input type="number" id="axis-backlash" step="0.001" min="0">
-                    </div>
-                    <div class="control-item">
-                        <label for="axis-speed">运动速度(mm/s)：</label>
-                        <input type="number" id="axis-speed" step="0.1" min="0">
-                    </div>
-                    <div class="control-item">
-                        <label for="axis-acc">加速度(mm/s²)：</label>
-                        <input type="number" id="axis-acc" step="0.1" min="0">
-                    </div>
-                    <div class="control-item">
-                        <label for="soft-limit-min">软限位最小值(mm)：</label>
-                        <input type="number" id="soft-limit-min">
-                    </div>
-                    <div class="control-item">
-                        <label for="soft-limit-max">软限位最大值(mm)：</label>
-                        <input type="number" id="soft-limit-max">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="save-axis-config" class="primary-button">保存配置</button>
-                <button id="cancel-axis-config" class="danger-button">取消</button>
-            </div>
-        </div>
     </div>
 
     <!-- 添加右键菜单 -->

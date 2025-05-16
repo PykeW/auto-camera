@@ -687,8 +687,6 @@ def toggle_roi():
     camera_state["roiEnabled"] = not camera_state["roiEnabled"]
     print(f"后端: ROI 状态切换为: {camera_state['roiEnabled']}")
     # 如果需要，可以接收前端传来的ROI坐标并更新 state['roiCoords']
-    # data = request.json
-    # if data and 'roiCoords' in data:
     #     camera_state['roiCoords'] = data['roiCoords']
     return jsonify({"status": "ok", "roiEnabled": camera_state["roiEnabled"]})
 
