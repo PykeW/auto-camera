@@ -25,19 +25,21 @@
 
         <main class="main-content">
             <section class="camera-view">
-                <div class="camera-image">
-                    <img id="camera-feed" src="/get_camera_image" alt="相机画面">
-                    <div class="roi-overlay" style="display: none;">
-                        <div class="roi-box"></div>
-                    </div>
-                    <div class="camera-info-overlay">
-                        <div class="info-item" id="focus-info">
-                            <span class="info-label">清晰度:</span>
-                            <span class="info-value" id="clarity-display">--</span>
+                <div id="camera-display-container">
+                    <div class="camera-image">
+                        <img id="camera-feed" src="/get_camera_image" alt="相机画面">
+                        <div id="focus-roi-overlay" class="roi-overlay" style="display: none;">
+                            <div class="roi-box"></div>
                         </div>
-                        <div class="info-item" id="position-info">
-                            <span class="info-label">对焦位置:</span>
-                            <span class="info-value" id="focus-position-display">--</span>
+                        <div class="camera-info-overlay">
+                            <div class="info-item" id="focus-info">
+                                <span class="info-label">清晰度:</span>
+                                <span class="info-value" id="clarity-display">--</span>
+                            </div>
+                            <div class="info-item" id="position-info">
+                                <span class="info-label">对焦位置:</span>
+                                <span class="info-value" id="focus-position-display">--</span>
+                            </div>
                         </div>
                     </div>
                 </div>

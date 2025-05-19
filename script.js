@@ -47,7 +47,152 @@ let cameraState = {
     currentDisplayedImageIndex: null,
     cachedImageUrl: null,
     clarity: null,
-    cachedTimestamp: null
+    cachedTimestamp: null,
+    preventThumbnailAutoShow: false, // 添加标志，防止缩略图在关闭后自动显示
+    isPollingPaused: false // 添加状态轮询状态标志，防止重复暂停/恢复
+};
+
+// 新增：轮询状态管理器
+const PollingManager = {
+    // 内部状态
+    _isPaused: false,
+    _debounceTimer: null,
+    _debouncePeriod: 500, // 防抖周期（毫秒）
+    _protectionTimer: null, // 用于保护期的计时器
+    _lastResumeTime: 0, // 记录最后一次恢复时间
+    _pendingOperation: null, // 记录挂起的操作
+    
+    // 带防抖的状态切换
+    _debounceStateChange(action) {
+        // 清除之前的计时器
+        if (this._debounceTimer) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = null;
+        }
+        
+        // 设置新的计时器
+        this._debounceTimer = setTimeout(() => {
+            action();
+            this._debounceTimer = null;
+        }, this._debouncePeriod);
+    },
+    
+    // 暂停轮询
+    pause() {
+        if (this._isPaused) {
+            console.log('PollingManager: 已经是暂停状态，忽略重复暂停');
+            return; // 已经是暂停状态
+        }
+        
+        // 取消任何挂起的操作
+        if (this._pendingOperation) {
+            clearTimeout(this._pendingOperation);
+            this._pendingOperation = null;
+            console.log('PollingManager: 取消挂起的恢复操作');
+        }
+        
+        // 不使用防抖，直接暂停
+        this._isPaused = true;
+        cameraState.isPollingPaused = true;
+        if (window.pauseStatusPolling) {
+            window.pauseStatusPolling();
+            console.log('PollingManager: 状态轮询已暂停');
+        }
+    },
+    
+    // 恢复轮询
+    resume() {
+        // 记录当前时间
+        const now = Date.now();
+        
+        // 防止频繁切换：如果在短时间内（300ms）已经恢复过，不再重复操作
+        if (now - this._lastResumeTime < 300) {
+            console.log('PollingManager: 短时间内检测到重复恢复请求，忽略');
+            return;
+        }
+        
+        if (!this._isPaused) {
+            console.log('PollingManager: 已经是活跃状态，忽略重复恢复');
+            return; // 已经是活跃状态
+        }
+        
+        // 取消之前的恢复操作（如果有）
+        if (this._pendingOperation) {
+            clearTimeout(this._pendingOperation);
+            this._pendingOperation = null;
+        }
+        
+        // 使用防抖，延迟恢复，防止快速切换
+        this._pendingOperation = setTimeout(() => {
+            if (!this._isPaused) return; // 重新检查状态
+            
+            this._isPaused = false;
+            cameraState.isPollingPaused = false;
+            this._lastResumeTime = Date.now(); // 更新最后恢复时间
+            
+            if (window.resumeStatusPolling) {
+                window.resumeStatusPolling();
+                console.log('PollingManager: 状态轮询已恢复');
+            }
+            
+            this._pendingOperation = null;
+        }, 100); // 减少延迟时间，但保留防抖功能
+    },
+    
+    // 获取当前状态
+    isPaused() {
+        return this._isPaused;
+    },
+    
+    // 强制重置状态
+    reset() {
+        console.log('PollingManager: 强制重置轮询状态');
+        
+        // 清除所有计时器
+        if (this._debounceTimer) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = null;
+        }
+        
+        if (this._protectionTimer) {
+            clearTimeout(this._protectionTimer);
+            this._protectionTimer = null;
+        }
+        
+        if (this._pendingOperation) {
+            clearTimeout(this._pendingOperation);
+            this._pendingOperation = null;
+        }
+        
+        // 如果之前是暂停状态，强制恢复
+        if (this._isPaused) {
+            this._isPaused = false;
+            cameraState.isPollingPaused = false;
+            this._lastResumeTime = Date.now(); // 更新最后恢复时间
+            
+            if (window.resumeStatusPolling) {
+                window.resumeStatusPolling();
+                console.log('PollingManager: 状态轮询已重置并恢复');
+            }
+        }
+    },
+    
+    // 设置保护期，在指定时间内阻止自动显示缩略图
+    setProtection(duration = 5000) {
+        if (this._protectionTimer) {
+            clearTimeout(this._protectionTimer);
+            this._protectionTimer = null;
+        }
+        
+        cameraState.preventThumbnailAutoShow = true;
+        console.log(`PollingManager: 设置${duration/1000}秒缩略图保护期`);
+        
+        this._protectionTimer = setTimeout(() => {
+            console.log('PollingManager: 缩略图保护期结束');
+            cameraState.preventThumbnailAutoShow = false;
+            this._protectionTimer = null;
+        }, duration);
+    }
 };
 
 // 相机标定相关状态
@@ -419,9 +564,23 @@ function updateStatus(state) {
         calibSquareSize.disabled = !state.isConnected;
     }
     
-    // 如果自动对焦完成并且有对焦图像，显示缩略图区域
-    if (state.focusCompleted && Array.isArray(state.focusImages) && state.focusImages.length > 0) {
-        loadFocusImages();
+    // 如果自动对焦完成并且有对焦图像，仅在没有设置禁止显示标志且当前没有显示缩略图时才显示缩略图区域
+    if (state.focusCompleted && 
+        Array.isArray(state.focusImages) && 
+        state.focusImages.length > 0 && 
+        !cameraState.preventThumbnailAutoShow && 
+        !cameraState.viewingThumbnail) {
+        
+        // 避免反复触发loadFocusImages
+        if (!cameraState.isLoadingThumbnails) {
+            cameraState.isLoadingThumbnails = true;
+            console.log('触发加载对焦图像条件满足，准备显示缩略图');
+            loadFocusImages();
+            // 操作完成后重置标志
+            setTimeout(() => {
+                cameraState.isLoadingThumbnails = false;
+            }, 300);
+        }
     }
     
     // 更新图像左上角的对焦位置和清晰度信息
@@ -497,13 +656,27 @@ function startStatusPolling() {
 
     // 提供暂停和恢复轮询的方法
     window.pauseStatusPolling = function() {
-        isPaused = true;
-        console.log('状态轮询已暂停');
+        // 避免重复暂停
+        if (!isPaused) {
+            isPaused = true;
+            // 更新PollingManager内部状态以保持同步
+            if (PollingManager) {
+                PollingManager._isPaused = true;
+            }
+            console.log('状态轮询已暂停');
+        }
     };
     
     window.resumeStatusPolling = function() {
-        isPaused = false;
-        console.log('状态轮询已恢复');
+        // 避免重复恢复
+        if (isPaused) {
+            isPaused = false;
+            // 更新PollingManager内部状态以保持同步
+            if (PollingManager) {
+                PollingManager._isPaused = false;
+            }
+            console.log('状态轮询已恢复');
+        }
     };
 
     // 清理函数
@@ -565,10 +738,12 @@ async function startAutoFocus() {
         cameraState.viewingThumbnail = false;
         cameraState.currentDisplayedImageIndex = null;
         
-        // 恢复状态轮询，确保可以实时更新对焦过程
-        if (window.resumeStatusPolling) {
-            window.resumeStatusPolling();
-        }
+        // 重要：重置阻止显示标志，允许新的对焦过程完成后显示缩略图
+        cameraState.preventThumbnailAutoShow = false;
+        console.log('重置缩略图显示阻止标志，允许新的对焦过程显示缩略图');
+        
+        // 确保轮询已恢复 (使用统一管理器)
+        PollingManager.resume();
         
         // 使用搜索范围计算起点和终点 - 现在使用编码器值
         let currentZ = 0; // 默认值
@@ -683,9 +858,10 @@ function toggleFocusButtons(isFocusing) {
         if (saveFocusPositionBtn) saveFocusPositionBtn.style.display = 'block';
         
         // 添加标志检查，防止循环调用
-        // 只有没有正在查看缩略图且有对焦图像的情况下才调用loadFocusImages
+        // 只有没有正在查看缩略图且有对焦图像且未设置防止显示标志的情况下才调用loadFocusImages
         if (!cameraState.viewingThumbnail && cameraState.focusCompleted && 
-            Array.isArray(cameraState.focusImages) && cameraState.focusImages.length > 0) {
+            Array.isArray(cameraState.focusImages) && cameraState.focusImages.length > 0 &&
+            !cameraState.preventThumbnailAutoShow) { // 新增检查，防止自动显示
             // 将cameraState.viewingThumbnail设置为true，防止再次调用
             cameraState.viewingThumbnail = true;
             loadFocusImages();
@@ -741,10 +917,7 @@ async function saveFocusPosition() {
                 // 显示缩略图区域，让用户查看并选择不同位置
                 loadFocusImages();
                 
-                // 暂停状态轮询，防止自动更新覆盖缩略图
-                if (window.pauseStatusPolling) {
-                    window.pauseStatusPolling();
-                }
+                // 轮询状态由loadFocusImages统一管理，无需在此处暂停
             }
         } else {
             // 显示错误信息
@@ -1511,105 +1684,119 @@ function updateEncoderValues() {
     }
 }
 
-// 事件监听器
-document.addEventListener('DOMContentLoaded', () => {
+// 统一初始化函数，所有事件监听只绑定一次
+function mainInit() {
     // 初始化所有DOM引用
     initializeDOMReferences();
-    
     // ROI按钮组始终显示
     if (focusRoiButtonGroup) {
         focusRoiButtonGroup.style.display = 'flex';
     }
-    
     // 初始化ROI工具面板
     const roiToolsPanel = document.getElementById('roi-tools-panel');
     if (roiToolsPanel) {
         roiToolsPanel.classList.remove('show');
     }
-    
     // 设置多边形绘制的双击事件
     setupPolygonEvents();
-    
     // 更新连接按钮初始状态
     updateConnectButton();
-    
     // 初始化对焦按钮状态
     toggleFocusButtons(false);
-    
     // 启动状态轮询
     startStatusPolling();
-    
-    // 移除不再需要的编码值更新事件
-    // if (focusRange) {
-    //     focusRange.addEventListener('input', updateEncoderValues);
-    // }
-    // if (focusStep) {
-    //     focusStep.addEventListener('input', updateEncoderValues);
-    // }
-    
-    // 移除初始化更新编码值
-    // updateEncoderValues();
-
     // 连接按钮点击事件
     if (connectBtn) {
+        connectBtn.removeEventListener('click', toggleConnection);
         connectBtn.addEventListener('click', toggleConnection);
     }
-
     // 自动对焦按钮点击事件
     if (startFocusBtn) {
+        startFocusBtn.removeEventListener('click', startAutoFocus);
         startFocusBtn.addEventListener('click', startAutoFocus);
     }
     if (stopFocusBtn) {
+        stopFocusBtn.removeEventListener('click', stopAutoFocus);
         stopFocusBtn.addEventListener('click', stopAutoFocus);
     }
-    
-    // 添加保存对焦位置按钮事件监听
+    // 保存对焦位置按钮事件监听
     const saveFocusPositionBtn = document.getElementById('save-focus-position-btn');
     if (saveFocusPositionBtn) {
+        saveFocusPositionBtn.removeEventListener('click', saveFocusPosition);
         saveFocusPositionBtn.addEventListener('click', saveFocusPosition);
     }
-    
-    // 添加当量校准按钮事件监听
+    // 当量校准按钮事件监听
     const debugCalibBtn = document.getElementById('debug-calib-btn');
     if (debugCalibBtn) {
+        debugCalibBtn.removeEventListener('click', calibrateRatio);
         debugCalibBtn.addEventListener('click', calibrateRatio);
     }
-    
-    // 添加标定按钮事件监听
+    // 标定按钮事件监听
     if (detectMarkBtn) {
+        detectMarkBtn.removeEventListener('click', detectMarkPoint);
         detectMarkBtn.addEventListener('click', detectMarkPoint);
     }
     if (centerMarkBtn) {
+        centerMarkBtn.removeEventListener('click', centerMarkPoint);
         centerMarkBtn.addEventListener('click', centerMarkPoint);
     }
     if (startCalibBtn) {
+        startCalibBtn.removeEventListener('click', startCalibration);
         startCalibBtn.addEventListener('click', startCalibration);
     }
     if (stopCalibBtn) {
+        stopCalibBtn.removeEventListener('click', stopCalibration);
         stopCalibBtn.addEventListener('click', stopCalibration);
     }
-
     // 点动按钮点击事件
     jogBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.removeEventListener('click', btn._jogHandler);
+        btn._jogHandler = () => {
             const axis = btn.dataset.axis;
             const direction = btn.classList.contains('plus') ? 1 : -1;
             jogAxis(axis, direction);
-        });
+        };
+        btn.addEventListener('click', btn._jogHandler);
     });
-
-    // 轴配置按钮相关代码已删除
-    
-    // 轴配置弹窗相关事件监听器已删除
-    
-    // 轴配置弹窗相关代码已删除
-
+    // 单位切换事件监听（只绑定一次）
+    if (unitDisplayElement) {
+        unitDisplayElement.removeEventListener('click', toggleUnit);
+        unitDisplayElement.addEventListener('click', toggleUnit);
+    }
+    if (rangeUnitDisplayElement) {
+        rangeUnitDisplayElement.removeEventListener('click', toggleUnit);
+        rangeUnitDisplayElement.addEventListener('click', toggleUnit);
+    }
+    if (stepUnitDisplayElement) {
+        stepUnitDisplayElement.removeEventListener('click', toggleUnit);
+        stepUnitDisplayElement.addEventListener('click', toggleUnit);
+    }
+    // ROI相关按钮事件监听（只绑定一次）
+    const editRoiBtn = document.getElementById('edit-roi-focus-btn');
+    if (editRoiBtn) {
+        editRoiBtn.removeEventListener('click', editRoi);
+        editRoiBtn.addEventListener('click', editRoi);
+    }
+    const clearRoiBtn = document.getElementById('clear-roi-focus-btn');
+    if (clearRoiBtn) {
+        clearRoiBtn.removeEventListener('click', clearRoi);
+        clearRoiBtn.addEventListener('click', clearRoi);
+    }
+    const toggleRoiVisibilityBtn = document.getElementById('toggle-focus-roi-visibility-btn');
+    if (toggleRoiVisibilityBtn) {
+        toggleRoiVisibilityBtn.removeEventListener('click', toggleRoiVisibility);
+        toggleRoiVisibilityBtn.addEventListener('click', toggleRoiVisibility);
+    }
+    // 初始化对焦缩略图相关事件
+    initializeFocusThumbnails();
+    setupThumbnailsHorizontalScroll();
     // 加载PLC轴数据
     loadPlcAxes();
-
     // 自动连接
-    setTimeout(autoConnect, 500); // 延迟500ms后自动连接
-});
+    setTimeout(autoConnect, 500);
+}
+// 页面加载后统一初始化
+window.addEventListener('DOMContentLoaded', mainInit);
 
 // 缩略图相关变量
 let selectedThumbnailIndex = -1;
@@ -1621,6 +1808,13 @@ function loadFocusImages() {
     
     const thumbnailsContainer = document.querySelector('.focus-thumbnails-container');
     const thumbnailsWrapper = document.querySelector('.focus-thumbnails');
+    
+    // 如果存在阻止显示的标志，直接返回，不加载缩略图
+    if (cameraState.preventThumbnailAutoShow) {
+        console.log('缩略图显示被阻止，跳过加载');
+        return;
+    }
+    
     thumbnailsWrapper.innerHTML = '';
     
     if (!Array.isArray(cameraState.focusImages) || cameraState.focusImages.length === 0) {
@@ -1683,13 +1877,82 @@ function loadFocusImages() {
     // 显式调用按钮状态更新函数，强制更新按钮显示状态
     toggleFocusButtons(false);
     
-    // 暂停状态轮询，防止自动更新覆盖缩略图
-    if (window.pauseStatusPolling) {
-        window.pauseStatusPolling();
-    }
+    // 使用PollingManager暂停轮询
+    PollingManager.pause();
     
     // 自动选中最佳清晰度的图像并在主视图中显示
     selectThumbnail(bestFocusIndex);
+}
+
+// 统一关闭缩略图浏览器的函数
+function closeThumbnailViewer() {
+    const container = document.querySelector('.focus-thumbnails-container');
+    if (!container) return;
+    
+    console.log('关闭缩略图浏览器');
+    
+    // 立即设置标志，确保在动画过程中也不会尝试重新打开
+    cameraState.preventThumbnailAutoShow = true;
+    cameraState.viewingThumbnail = false;
+    cameraState.currentDisplayedImageIndex = null;
+    
+    // 先彻底重置轮询状态，然后再处理UI
+    PollingManager.reset();
+    
+    // 添加淡出动画
+    container.classList.add('hide');
+    
+    // 动画结束后执行清理操作
+    setTimeout(() => {
+        // 隐藏容器
+        container.style.display = 'none';
+        container.classList.remove('hide');
+        
+        // 重置标定视图
+        cameraState.isShowingCalibration = false;
+        
+        // 确保对焦状态正确
+        cameraState.isFocusing = false;
+        // 将focusCompleted设为false防止触发自动显示条件
+        cameraState.focusCompleted = false;
+        
+        // 恢复实时图像
+        if (cameraState.isConnected) {
+            // 确保隐藏校准图案
+            if (simulatedImage) {
+                simulatedImage.style.display = 'block';
+            }
+            if (calibrationPattern) {
+                calibrationPattern.style.display = 'none';
+                calibrationPattern.innerHTML = '';
+            }
+            
+            // 立即获取最新相机图像
+            fetchCameraImage();
+            
+            // 延迟一段时间后再次获取图像，确保更新
+            setTimeout(() => {
+                if (!cameraState.viewingThumbnail) {
+                    fetchCameraImage();
+                }
+            }, 300);
+        }
+        
+        // 恢复轮询
+        setTimeout(() => {
+            // 确保没有处于查看缩略图状态时才恢复轮询
+            if (!cameraState.viewingThumbnail) {
+                console.log('恢复状态轮询 (关闭预览后)');
+                PollingManager.resume();
+            }
+        }, 100);
+        
+        // 设置永久阻止自动显示，直到用户主动执行对焦操作
+        console.log('设置永久阻止自动显示，直到用户主动执行对焦');
+        
+        // 不再设置超时自动恢复，只有当用户主动对焦时才会重置这个标志
+        // 在startAutoFocus函数中会重置这个标志
+    }, 300);
 }
 
 // 选中缩略图
@@ -1704,10 +1967,8 @@ function selectThumbnail(index) {
         // 添加一个标志，表示正在查看缩略图图像
         cameraState.viewingThumbnail = true;
         
-        // 暂停状态轮询，避免实时图像更新
-        if (window.pauseStatusPolling) {
-            window.pauseStatusPolling();
-        }
+        // 使用PollingManager暂停轮询
+        PollingManager.pause();
         
         // 显示所选图像
         const image = cameraState.focusImages[index];
@@ -1762,10 +2023,8 @@ async function handleMenuAction(action, index) {
                 cameraState.viewingThumbnail = true;
                 cameraState.currentDisplayedImageIndex = index;
                 
-                // 确保状态轮询已暂停
-                if (window.pauseStatusPolling) {
-                    window.pauseStatusPolling();
-                }
+                // 使用PollingManager确保轮询已暂停
+                PollingManager.pause();
                 
                 const response = await fetch('/set_focus_position', {
                     method: 'POST',
@@ -1803,10 +2062,8 @@ async function handleMenuAction(action, index) {
             cameraState.viewingThumbnail = true;
             cameraState.currentDisplayedImageIndex = index;
             
-            // 确保状态轮询已暂停
-            if (window.pauseStatusPolling) {
-                window.pauseStatusPolling();
-            }
+            // 使用PollingManager确保轮询已暂停
+            PollingManager.pause();
             break;
     }
 }
@@ -1824,50 +2081,8 @@ function initializeFocusThumbnails() {
     // 关闭按钮事件
     const closeBtn = document.querySelector('.thumbnails-close-btn');
     closeBtn.addEventListener('click', () => {
-        const container = document.querySelector('.focus-thumbnails-container');
-        container.classList.add('hide');
-        setTimeout(() => {
-            container.style.display = 'none';
-            container.classList.remove('hide');
-            // 重置查看状态，恢复实时图像
-            cameraState.viewingThumbnail = false;
-            cameraState.currentDisplayedImageIndex = null;
-            cameraState.isShowingCalibration = false; // 确保标定视图也被关闭
-            
-            // 显式重置对焦状态，保证能够返回到手动对焦界面
-            cameraState.isFocusing = false;
-            cameraState.focusCompleted = true;
-            
-            // 更新按钮状态为非对焦状态
-            toggleFocusButtons(false);
-            
-            // 恢复状态轮询
-            if (window.resumeStatusPolling) {
-                window.resumeStatusPolling();
-            }
-            
-            // 恢复实时图像
-            if (cameraState.isConnected) {
-                // 确保隐藏校准图案
-                if (simulatedImage) {
-                    simulatedImage.style.display = 'block';
-                }
-                if (calibrationPattern) {
-                    calibrationPattern.style.display = 'none';
-                    calibrationPattern.innerHTML = '';
-                }
-                
-                // 立即强制获取最新相机图像
-                fetchCameraImage();
-                
-                // 延迟一段时间后再次获取图像，确保更新
-                setTimeout(() => {
-                    if (!cameraState.viewingThumbnail) {
-                        fetchCameraImage();
-                    }
-                }, 500);
-            }
-        }, 300);
+        // 关闭缩略图浏览器
+        closeThumbnailViewer();
     });
     
     // 点击遮罩层关闭菜单
@@ -1877,25 +2092,6 @@ function initializeFocusThumbnails() {
     // 阻止右键菜单冒泡
     const menu = document.querySelector('.focus-thumbnail-menu');
     menu.addEventListener('contextmenu', e => e.preventDefault());
-}
-
-// 在页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    initializeFocusThumbnails();
-    setupThumbnailsHorizontalScroll(); // 添加水平滚动支持
-});
-
-// 配置缩略图的水平滚动
-function setupThumbnailsHorizontalScroll() {
-    const thumbnailsWrapper = document.querySelector('.focus-thumbnails');
-    if (thumbnailsWrapper) {
-        thumbnailsWrapper.addEventListener('wheel', (e) => {
-            // 阻止默认的垂直滚动行为
-            e.preventDefault();
-            // 将垂直滚动转换为水平滚动
-            thumbnailsWrapper.scrollLeft += (e.deltaY * 3);
-        }, { passive: false });
-    }
 }
 
 // 显示消息提示
@@ -2477,10 +2673,8 @@ function toggleCalibrationView() {
             toggleViewBtn.querySelector('i').className = 'fas fa-camera';
             toggleViewBtn.title = '返回相机视图';
             
-            // 暂停状态轮询
-            if (window.pauseStatusPolling) {
-                window.pauseStatusPolling();
-            }
+            // 使用PollingManager暂停轮询
+            PollingManager.pause();
         } else {
             // 返回相机视图
             simulatedImage.style.display = 'block';
@@ -2489,10 +2683,8 @@ function toggleCalibrationView() {
             toggleViewBtn.querySelector('i').className = 'fas fa-th';
             toggleViewBtn.title = '显示校准图案';
             
-            // 恢复状态轮询
-            if (window.resumeStatusPolling) {
-                window.resumeStatusPolling();
-            }
+            // 使用PollingManager恢复轮询
+            PollingManager.resume();
             
             // 立即获取相机图像
             fetchCameraImage();
@@ -2705,3 +2897,22 @@ document.addEventListener('DOMContentLoaded', function() {
         stepUnitDisplayElement.addEventListener('click', toggleUnit);
     }
 });
+
+// 在页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+    initializeFocusThumbnails();
+    setupThumbnailsHorizontalScroll(); // 添加水平滚动支持
+});
+
+// 配置缩略图的水平滚动
+function setupThumbnailsHorizontalScroll() {
+    const thumbnailsWrapper = document.querySelector('.focus-thumbnails');
+    if (thumbnailsWrapper) {
+        thumbnailsWrapper.addEventListener('wheel', (e) => {
+            // 阻止默认的垂直滚动行为
+            e.preventDefault();
+            // 将垂直滚动转换为水平滚动
+            thumbnailsWrapper.scrollLeft += (e.deltaY * 3);
+        }, { passive: false });
+    }
+}

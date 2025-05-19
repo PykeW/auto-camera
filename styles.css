@@ -31,2185 +31,2133 @@
     --spacing-large: 16px;
 }
 
-/* === 基础样式 === */
-
 * {
-    margin: 0;
-    padding: 0;
     box-sizing: border-box;
+    margin: 0;
+    padding: 0
 }
 
-html, body {
+body,
+html {
     height: 100%;
-    overflow: hidden;
+    overflow: hidden
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background-color: var(--bg-darker);
     color: var(--text-light);
-    font-size: 13px;
-    display: flex;
-    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
+    font-size: 13px
 }
 
-/* === 主布局 === */
+.app-container,
+body {
+    display: flex;
+    flex-direction: column
+}
 
 .app-container {
-    display: flex;
-    flex-direction: column;
     flex-grow: 1;
-    height: 100vh;
+    height: 100vh
 }
 
-/* 头部 */
 .header {
-    background-color: var(--bg-dark);
-    height: var(--header-height);
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--spacing-medium);
-    flex-shrink: 0;
+    background-color: var(--bg-dark);
     border-bottom: 1px solid var(--border-dark);
+    display: flex;
+    flex-shrink: 0;
+    height: var(--header-height);
+    justify-content: space-between;
+    padding: 0 var(--spacing-medium)
 }
 
 .header-controls {
     display: flex;
-    gap: var(--spacing-small);
+    gap: var(--spacing-small)
 }
 
 .header-title {
-    font-weight: normal;
     font-size: 1.1em;
+    font-weight: 400
 }
 
-/* 主内容区 */
 .main-content {
     display: flex;
     flex-grow: 1;
-    overflow: hidden;
+    overflow: hidden
 }
 
-/* 相机视图 */
 .camera-view {
-    flex-grow: 1;
     background-color: #666;
-    position: relative;
-    overflow: hidden;
+    flex-grow: 1
+}
+
+#camera-display-container,
+.camera-view {
+    align-items: center;
     display: flex;
     justify-content: center;
-    align-items: center;
+    overflow: hidden;
+    position: relative
 }
 
 #camera-display-container {
-    width: 100%;
     height: 100%;
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    width: 100%
 }
 
 #simulated-image {
-    display: block;
-    object-fit: contain;
-    transition: filter 0.1s linear;
-    background-color: var(--bg-dark);
     border: 1px solid var(--border-dark);
-    max-width: 100%;
+    display: block;
     max-height: 100%;
+    object-fit: contain;
+    transition: filter .1s linear
 }
 
-/* 控制面板 */
+#simulated-image,
 .control-panel {
-    width: var(--panel-width);
     background-color: var(--bg-dark);
-    padding: 10px;
-    overflow-y: auto;
-    flex-shrink: 0;
-    color: var(--text-light);
-    border-left: 1px solid var(--border-dark);
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    max-width: 100%;
-    max-height: calc(100vh - 120px);
-}
-.control-panel::-webkit-scrollbar {
-    display: none;
+    max-width: 100%
 }
 
-/* 状态栏 */
-.status-bar {
-    background-color: var(--bg-dark);
-    height: var(--statusbar-height);
-    display: flex;
-    align-items: center;
-    padding: 0 var(--spacing-medium);
-    gap: var(--spacing-large);
-    font-size: 12px;
-    color: var(--text-medium);
+.control-panel {
+    border-left: 1px solid var(--border-dark);
+    color: var(--text-light);
     flex-shrink: 0;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding: 10px;
+    scrollbar-width: none;
+    width: var(--panel-width);
+    -ms-overflow-style: none
+}
+
+.control-panel::-webkit-scrollbar {
+    display: none
+}
+
+.status-bar {
+    align-items: center;
+    background-color: var(--bg-dark);
     border-top: 1px solid var(--border-dark);
+    color: var(--text-medium);
+    display: flex;
+    flex-shrink: 0;
+    font-size: 12px;
+    gap: var(--spacing-large);
+    height: var(--statusbar-height);
+    padding: 0 var(--spacing-medium)
 }
 
 .status-bar span {
-    white-space: nowrap;
     border-right: 1px solid var(--border-dark);
     padding-right: var(--spacing-large);
+    white-space: nowrap
 }
 
 .status-bar span:last-child {
     border-right: none;
-    padding-right: 0;
+    padding-right: 0
 }
 
-/* === 组件样式 === */
-
-/* 面板区块 */
 .panel-section {
-    margin-bottom: 15px;
-    padding-bottom: 15px;
     border-bottom: 1px solid var(--border-dark);
+    margin-bottom: 15px;
+    padding-bottom: 15px
 }
 
 .panel-section:last-child {
     border-bottom: none;
-    margin-top: var(--spacing-small);
+    margin-top: var(--spacing-small)
 }
 
 .panel-section h3 {
-    margin-bottom: var(--spacing-medium);
-    font-size: 1.1em;
-    color: var(--text-light);
     border-bottom: 1px solid var(--border-medium);
-    padding-bottom: var(--spacing-medium);
-    font-weight: normal;
+    color: var(--text-light);
+    font-size: 1.1em;
+    font-weight: 400;
+    margin-bottom: var(--spacing-medium);
+    padding-bottom: var(--spacing-medium)
 }
 
 .panel-section p.description,
 .small-description {
-    font-size: 0.9em;
     color: var(--text-medium);
-    margin-top: var(--spacing-small);
+    font-size: .9em;
     line-height: 1.4;
+    margin-top: var(--spacing-small)
 }
 
 .small-description {
-    font-size: 0.85em;
+    font-size: .85em;
     margin-bottom: var(--spacing-small);
-    margin-top: 0;
+    margin-top: 0
 }
 
-/* 表单控件 */
 .control-item {
-    margin-bottom: 8px;
+    margin-bottom: 8px
 }
 
 label {
-    display: block;
-    margin-bottom: var(--spacing-small);
     color: var(--text-medium);
-    font-size: 0.9em;
+    display: block;
+    font-size: .9em;
+    margin-bottom: var(--spacing-small)
 }
 
-/* 输入框样式 */
-input[type="text"],
-input[type="number"],
+input[type=number],
+input[type=text],
 select {
-    width: 100%;
     background-color: var(--bg-medium);
     border: 1px solid var(--border-dark);
-    color: var(--text-light);
-    padding: var(--spacing-small) var(--spacing-medium);
     border-radius: var(--border-radius);
+    color: var(--text-light);
     font-size: inherit;
     height: 28px;
-    text-align: left; /* 确保所有输入框内容默认左对齐 */
+    padding: var(--spacing-small) var(--spacing-medium);
+    text-align: left;
+    width: 100%
 }
 
-/* 数字输入框 */
-input[type="number"] {
-    padding-right: 15px;
+input[type=number] {
     -moz-appearance: textfield;
     appearance: textfield;
+    padding-right: 15px
 }
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
     -webkit-appearance: none;
-    margin: 0;
+    margin: 0
 }
 
-/* 对焦范围和步进输入框宽度 */
-#focus-range, #focus-step {
-    width: 100% !important;
-    text-align: left; /* 改为左对齐 */
-    padding-right: 22px; /* 为单位显示留出空间 */
+#focus-range,
+#focus-step {
+    padding-right: 22px;
+    text-align: left;
+    width: 100% !important
 }
 
-/* 禁用状态 */
 input:read-only {
     background-color: #4a4a4a;
-    cursor: default;
+    cursor: default
 }
 
+button:disabled,
 input:disabled,
-select:disabled,
-button:disabled {
+select:disabled {
     background-color: #4a4a4a;
+    border-color: var(--border-dark);
     color: var(--text-medium);
     cursor: not-allowed;
-    border-color: var(--border-dark);
-    opacity: 0.7;
+    opacity: .7
 }
 
-/* 下拉框 */
 select {
     appearance: none;
-    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
-    background-repeat: no-repeat;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
     background-position: right var(--spacing-medium) center;
+    background-repeat: no-repeat;
     background-size: .65em auto;
-    padding-right: 2.5em;
+    padding-right: 2.5em
 }
 
 .compact-select {
-    width: 100%;
-    max-width: 100%;
-    padding: 4px 8px;
     border: 1px solid var(--border-medium);
     border-radius: 3px;
-    background-color: var(--bg-medium);
-    color: var(--text-light);
-    font-size: 0.9em;
-    height: 28px;
     box-sizing: border-box;
+    font-size: .9em;
+    max-width: 100%;
+    padding: 4px 8px;
+    width: 100%
 }
 
-/* 按钮 */
+.compact-select,
 button {
     background-color: var(--bg-medium);
-    border: 1px solid var(--border-dark);
     color: var(--text-light);
-    padding: var(--spacing-small) var(--spacing-medium);
+    height: 28px
+}
+
+button {
+    border: 1px solid var(--border-dark);
     border-radius: var(--border-radius);
     cursor: pointer;
     font-size: inherit;
-    height: 28px;
     line-height: 1;
+    padding: var(--spacing-small) var(--spacing-medium);
     vertical-align: middle;
-    white-space: nowrap;
+    white-space: nowrap
 }
 
 button:hover:not(:disabled) {
     background-color: #4a4a4a;
-    border-color: var(--border-medium);
+    border-color: var(--border-medium)
 }
 
-/* 主要按钮 */
 .primary-button {
     background-color: var(--accent-blue);
-    border-color: var(--accent-blue);
-}
-.primary-button:hover:not(:disabled) {
-    background-color: #157acf;
+    border-color: var(--accent-blue)
 }
 
-/* 危险按钮 */
+.primary-button:hover:not(:disabled) {
+    background-color: #157acf
+}
+
 .danger-button {
     background-color: var(--accent-red);
-    border-color: var(--accent-red);
-}
-.danger-button:hover:not(:disabled) {
-    background-color: #d9363e;
+    border-color: var(--accent-red)
 }
 
-/* 头部按钮 */
+.danger-button:hover:not(:disabled) {
+    background-color: #d9363e
+}
+
 .header-button {
     background: none;
     border: 1px solid transparent;
     font-size: 16px;
-    padding: var(--spacing-small) var(--spacing-medium);
-    width: 30px;
     height: auto;
+    padding: var(--spacing-small) var(--spacing-medium);
     text-align: center;
+    width: 30px
 }
+
 .header-button:hover {
     background-color: var(--bg-medium);
-    border-color: var(--border-dark);
+    border-color: var(--border-dark)
 }
 
 .header-button i {
     margin-right: 0;
-    vertical-align: middle;
+    vertical-align: middle
 }
 
-/* 按钮图标 */
-.focus-controls button i,
 #calibrate-btn i,
+.focus-controls button i,
 .roi-button-group .roi-button i {
     margin-right: var(--spacing-small);
-    width: 1em;
     text-align: center;
     vertical-align: middle;
+    width: 1em
 }
 
-/* 迷你按钮 */
 .mini-button {
-    padding: var(--spacing-small) var(--spacing-medium);
     flex-grow: 0 !important;
     flex-shrink: 0;
-    width: auto;
-}
-.roi-button-group .mini-button i {
-    margin-right: 0;
+    padding: var(--spacing-small) var(--spacing-medium);
+    width: auto
 }
 
-/* 按钮组 */
-.single-row-buttons button,
+.roi-button-group .mini-button i {
+    margin-right: 0
+}
+
 .axis-config-row.button-row button,
-.calibration-buttons button {
+.calibration-buttons button,
+.single-row-buttons button {
     flex-shrink: 1;
-    padding: var(--spacing-small);
+    padding: var(--spacing-small)
 }
 
 .calibration-buttons #calibrate-btn {
-    flex-grow: 1;
+    flex-grow: 1
 }
 
-/* 输入组 */
 .input-group {
-    display: flex;
-    flex-wrap: nowrap;
     align-items: center;
+    display: flex;
     flex: 1;
-    max-width: 100%;
+    flex-wrap: nowrap;
+    max-width: 100%
 }
 
 .input-group input {
-    flex-grow: 1;
+    flex-grow: 1
 }
 
 .input-group button {
     flex-shrink: 0;
-    padding: var(--spacing-small) var(--spacing-medium);
+    padding: var(--spacing-small) var(--spacing-medium)
 }
 
-/* 属性表格 */
 .property-table {
-    width: 100%;
     border-collapse: collapse;
     margin-top: var(--spacing-medium);
+    width: 100%
 }
 
-.property-table th,
-.property-table td {
+.property-table td,
+.property-table th {
     border: 1px solid var(--border-dark);
+    height: 28px;
     padding: var(--spacing-small) var(--spacing-medium);
     text-align: left;
-    height: 28px;
-    vertical-align: middle;
+    vertical-align: middle
 }
 
 .property-table th {
     background-color: var(--bg-medium);
-    font-weight: normal;
     color: var(--text-medium);
-    width: 40%;
+    font-weight: 400;
+    width: 40%
 }
 
 .property-table td {
-     padding: 0;
+    padding: 0
 }
 
-.property-table select,
-.property-table input {
+.property-table input,
+.property-table select {
+    background-color: inherit;
     border: none;
     border-radius: 0;
+    box-sizing: border-box;
+    color: inherit;
     height: 100%;
     padding: var(--spacing-small) var(--spacing-medium);
-    background-color: inherit;
-    color: inherit;
-    width: 100%;
-    box-sizing: border-box;
+    width: 100%
 }
 
-/* 滑块 */
-input[type="range"],
-.property-table input[type="range"] {
-    padding: 0;
-    cursor: pointer;
-    height: auto;
-    vertical-align: middle;
+.property-table input[type=range],
+input[type=range] {
     background-color: transparent !important;
     border: none !important;
+    cursor: pointer;
+    height: auto;
+    padding: 0;
+    vertical-align: middle
 }
 
 input[type=range]::-webkit-slider-runnable-track {
-  background: var(--border-dark);
-  height: 4px;
-  border-radius: 2px;
+    background: var(--border-dark);
+    border-radius: 2px;
+    height: 4px
 }
+
 input[type=range]::-moz-range-track {
-  background: var(--border-dark);
-  height: 4px;
-  border-radius: 2px;
+    background: var(--border-dark);
+    border-radius: 2px;
+    height: 4px
 }
+
 input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  background: var(--accent-blue);
-  border-radius: 50%;
-  cursor: pointer;
-  margin-top: -4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--accent-blue);
+    border-radius: 50%;
+    cursor: pointer;
+    height: 12px;
+    margin-top: -4px;
+    width: 12px
 }
+
 input[type=range]::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  background: var(--accent-blue);
-  border-radius: 50%;
-  cursor: pointer;
-  border: none;
+    background: var(--accent-blue);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    height: 12px;
+    width: 12px
 }
 
 .range-value {
-    font-size: 0.9em;
     color: var(--text-medium);
+    font-size: .9em;
     min-width: 35px;
-    text-align: right;
+    text-align: right
 }
 
-/* 属性网格 */
 .property-grid {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-small);
+    gap: var(--spacing-small)
 }
 
-.property-grid .control-item,
-.control-item.side-by-side {
-    display: flex;
+.control-item.side-by-side,
+.property-grid .control-item {
     align-items: center;
-    gap: var(--spacing-medium);
+    display: flex;
     flex-wrap: nowrap;
-    width: 100%;
+    gap: var(--spacing-medium);
+    width: 100%
 }
 
-.property-grid .control-item label,
-.control-item.side-by-side label {
+.control-item.side-by-side label,
+.property-grid .control-item label {
     flex-shrink: 0;
-    width: auto;
+    margin-bottom: 0;
     min-width: 80px;
     text-align: left;
-    margin-bottom: 0;
     white-space: nowrap;
+    width: auto
 }
 
-.property-grid .control-item select,
-.property-grid .control-item input[type="number"],
-.property-grid .control-item input[type="text"],
+.control-item.side-by-side .axis-position-control,
 .control-item.side-by-side input,
 .control-item.side-by-side span,
-.control-item.side-by-side .axis-position-control {
+.property-grid .control-item input[type=number],
+.property-grid .control-item input[type=text],
+.property-grid .control-item select {
     flex-grow: 1;
-    width: auto;
     min-width: 0;
+    width: auto
 }
 
 .control-item.side-by-side input,
 .control-item.side-by-side span {
-    text-align: left; /* 改为左对齐 */
+    text-align: left
 }
 
 .property-grid .range-item label {
-    min-width: 40px;
+    min-width: 40px
 }
-.property-grid .range-item input[type="range"] {
-    flex-grow: 1;
+
+.property-grid .range-item input[type=range] {
+    flex-grow: 1
 }
 
 .focus-status.side-by-side span {
-    flex-grow: 0;
+    flex-grow: 0
 }
 
 #calibration-result-value {
-    text-align: right;
     flex-grow: 1;
-    display: inline-block;
-    width: auto;
+    text-align: right;
+    width: auto
 }
 
-/* 相机信息网格 */
 .camera-info-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: var(--spacing-medium);
+    grid-template-columns: 1fr 1fr
 }
 
 .camera-info-grid .control-item label {
-    min-width: auto;
     flex-grow: 0;
-}
-.camera-info-grid .control-item input {
-    flex-grow: 1;
+    min-width: auto
 }
 
-/* 开关 */
+.camera-info-grid .control-item input {
+    flex-grow: 1
+}
+
 .toggle-item {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
+    display: flex;
     gap: var(--spacing-medium);
+    justify-content: space-between
 }
 
 .toggle-item label:first-child {
     flex-grow: 1;
-    min-width: auto;
-    margin-right: 0;
     margin-bottom: 0;
+    margin-right: 0;
+    min-width: auto
 }
 
 .switch {
-    position: relative;
     display: inline-block;
-    width: 38px;
-    height: 24px;
     flex-shrink: 0;
+    height: 24px;
+    position: relative;
+    width: 38px
 }
 
 .switch input {
-    opacity: 0;
-    width: 0;
     height: 0;
+    opacity: 0;
+    width: 0
 }
 
 .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
     background-color: var(--bg-darker);
     border: 1px solid var(--border-dark);
-    transition: .4s;
+    bottom: 0;
+    cursor: pointer;
+    left: 0;
+    right: 0;
+    top: 0
+}
+
+.slider,
+.slider:before {
+    position: absolute;
+    transition: .4s
 }
 
 .slider:before {
-    position: absolute;
+    background-color: var(--text-light);
+    bottom: 3px;
     content: "";
     height: 16px;
-    width: 16px;
     left: 3px;
-    bottom: 3px;
-    background-color: var(--text-light);
-    transition: .4s;
+    width: 16px
 }
 
-input:checked + .slider {
+input:checked+.slider {
     background-color: var(--accent-blue);
-    border-color: var(--accent-blue);
+    border-color: var(--accent-blue)
 }
 
-input:focus + .slider {
-    box-shadow: 0 0 1px var(--accent-blue);
+input:focus+.slider {
+    box-shadow: 0 0 1px var(--accent-blue)
 }
 
-input:checked + .slider:before {
-    transform: translateX(16px);
+input:checked+.slider:before {
+    transform: translateX(16px)
 }
 
 .slider.round {
-    border-radius: 24px;
-}
-.slider.round:before {
-    border-radius: 50%;
+    border-radius: 24px
 }
 
-.switch input:disabled + .slider {
-    cursor: not-allowed;
+.slider.round:before {
+    border-radius: 50%
+}
+
+.switch input:disabled+.slider {
     background-color: #3a3a3a;
     border-color: var(--border-dark);
-    opacity: 0.7;
+    cursor: not-allowed;
+    opacity: .7
 }
-.switch input:disabled + .slider:before {
-    background-color: #777;
+
+.switch input:disabled+.slider:before {
+    background-color: #777
 }
-.switch input:checked:disabled + .slider {
+
+.switch input:checked:disabled+.slider {
     background-color: #105a9e;
-    opacity: 0.6;
+    opacity: .6
 }
 
-/* === 功能区域 === */
-
-/* 对焦控件 */
 .focus-overlay {
+    height: 100%;
+    left: 0;
+    pointer-events: none;
     position: absolute;
     top: 0;
-    left: 0;
     width: 100%;
-    height: 100%;
-    pointer-events: none; /* 默认不拦截鼠标事件 */
-    z-index: 5;
+    z-index: 5
 }
 
-/* 启用ROI绘制时才拦截鼠标事件 */
 .focus-overlay.drawing {
-    pointer-events: all;
     cursor: crosshair;
+    pointer-events: all
 }
 
-/* ROI矩形样式 */
 .roi-rect {
-    position: absolute;
-    border: 2px solid #FF5722;
-    background-color: rgba(255, 87, 34, 0.2);
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-    pointer-events: none; /* 不拦截鼠标事件 */
+    background-color: rgba(255, 87, 34, .2);
+    border: 2px solid #ff5722;
+    box-shadow: 0 0 5px rgba(0, 0, 0, .3);
+    pointer-events: none;
+    position: absolute
 }
 
-/* ROI临时绘制中样式 */
 .roi-rect.drawing {
-    border: 2px dashed #FF5722;
-    background-color: rgba(255, 87, 34, 0.15);
-    box-shadow: none;
+    background-color: rgba(255, 87, 34, .15);
+    border: 2px dashed #ff5722;
+    box-shadow: none
 }
 
-/* ROI坐标信息显示 */
 .roi-info {
-    position: absolute;
-    bottom: 5px;
-    right: 5px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 3px 8px;
+    background-color: rgba(0, 0, 0, .7);
     border-radius: 3px;
+    bottom: 5px;
+    color: #fff;
     font-size: 12px;
-    z-index: 6;
+    padding: 3px 8px;
+    position: absolute;
+    right: 5px;
+    z-index: 6
 }
 
 .focus-controls {
-    display: flex;
-    gap: var(--spacing-medium);
+    gap: var(--spacing-medium)
 }
 
 .focus-controls button {
     flex-grow: 1;
-    height: 32px;
-    white-space: nowrap;
-    padding: 0 10px;
     font-size: 13px;
+    padding: 0 10px;
+    white-space: nowrap
 }
 
 .focus-controls .secondary-button {
-    background-color: #2C6E91;
+    background-color: #2c6e91
 }
 
 .focus-controls .secondary-button:hover:not(:disabled) {
-    background-color: #3588B2;
+    background-color: #3588b2
 }
 
 .focus-status label {
     display: inline-block;
-    margin-bottom: 0;
+    margin-bottom: 0
 }
 
 #focus-status-text {
-    font-weight: bold;
-    margin-left: var(--spacing-small);
-    padding: 2px 6px;
     border-radius: var(--border-radius);
     display: inline-block;
+    font-weight: 700;
+    margin-left: var(--spacing-small);
+    padding: 2px 6px
 }
 
-/* 状态颜色 */
 .status-未连接,
-.status-空闲 { background-color: var(--bg-medium); color: var(--text-medium); }
-.status-初始化-检查,
-.status-请求Z轴控制权,
-.status-保存参数中 { background-color: var(--accent-blue); color: var(--text-light); }
-.status-对焦中,
-.status-移动到最佳位置,
-.status-当量计算-模拟- { background-color: var(--accent-yellow); color: var(--text-dark); }
-.status-已对焦 { background-color: var(--accent-green); color: var(--text-dark); }
-.status-已停止,
-.status-错误 { background-color: var(--accent-red); color: var(--text-light); }
+.status-空闲 {
+    background-color: var(--bg-medium);
+    color: var(--text-medium)
+}
 
-/* 轴配置 */
+.status-保存参数中,
+.status-初始化-检查,
+.status-请求Z轴控制权 {
+    background-color: var(--accent-blue);
+    color: var(--text-light)
+}
+
+.status-对焦中,
+.status-当量计算-模拟-,
+.status-移动到最佳位置 {
+    background-color: var(--accent-yellow);
+    color: var(--text-dark)
+}
+
+.status-已对焦 {
+    background-color: var(--accent-green);
+    color: var(--text-dark)
+}
+
+.status-已停止,
+.status-错误 {
+    background-color: var(--accent-red);
+    color: var(--text-light)
+}
+
 .axis-config-group {
+    flex-direction: column
+}
+
+.axis-config-group,
+.axis-config-row {
     display: flex;
-    flex-direction: column;
-    gap: var(--spacing-small);
+    gap: var(--spacing-small)
 }
 
 .axis-config-row {
-    display: flex;
-    gap: var(--spacing-small);
-    align-items: center;
+    align-items: center
 }
 
 .axis-config-row select {
-    flex-grow: 1;
+    flex-grow: 1
 }
 
 .axis-config-row button {
-    flex-shrink: 0;
+    flex-shrink: 0
 }
 
-/* 轴下拉菜单 */
 .axis-dropdown {
-    display: none;
-    position: absolute;
     background-color: var(--bg-medium);
     border: 1px solid var(--border-dark);
     border-radius: var(--border-radius);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+    display: none;
     margin-top: var(--spacing-small);
-    width: calc(100% - var(--spacing-large) * 2);
     max-height: 0;
-    overflow: hidden;
     opacity: 0;
+    overflow: hidden;
+    position: absolute;
     transform: translateY(-10px);
-    transition: opacity 0.2s ease, transform 0.2s ease, max-height 0.2s ease;
+    transition: opacity .2s ease, transform .2s ease, max-height .2s ease;
+    width: calc(100% - var(--spacing-large)*2);
+    z-index: 100
 }
 
 .axis-dropdown.show {
     display: block;
-    opacity: 1;
-    transform: translateY(0);
     max-height: 250px;
+    opacity: 1;
+    transform: translateY(0)
 }
 
 .axis-dropdown-header {
-    padding: var(--spacing-small) var(--spacing-medium);
-    font-size: 0.9em;
-    color: var(--text-medium);
-    border-bottom: 1px solid var(--border-dark);
     background-color: var(--bg-darker);
+    border-bottom: 1px solid var(--border-dark);
+    color: var(--text-medium);
+    font-size: .9em;
+    padding: var(--spacing-small) var(--spacing-medium)
 }
 
 .axis-list {
     list-style: none;
-    padding: 0;
     margin: 0;
     max-height: 180px;
     overflow-y: auto;
-    scrollbar-width: thin;
+    padding: 0;
     scrollbar-color: var(--border-medium) var(--bg-darker);
+    scrollbar-width: thin
 }
+
 .axis-list::-webkit-scrollbar {
-    width: 5px;
+    width: 5px
 }
+
 .axis-list::-webkit-scrollbar-thumb {
     background-color: var(--border-medium);
-    border-radius: 3px;
+    border-radius: 3px
 }
 
 .axis-list li {
-    padding: var(--spacing-medium);
-    cursor: pointer;
     border-bottom: 1px solid var(--border-dark);
     color: var(--text-light);
-    transition: background-color 0.15s ease;
-    font-size: 0.95em;
-}
-.axis-list li:last-child {
-    border-bottom: none;
-}
-.axis-list li:hover {
-    background-color: var(--accent-blue);
-    color: var(--text-light);
+    cursor: pointer;
+    font-size: .95em;
+    padding: var(--spacing-medium);
+    transition: background-color .15s ease
 }
 
-.axis-list li.axis-list-loading,
-.axis-list li.axis-list-empty,
-.axis-list li.axis-list-error {
-    color: var(--text-medium);
-    font-style: italic;
-    cursor: default;
-    text-align: center;
-    padding: var(--spacing-large);
+.axis-list li:last-child {
+    border-bottom: none
 }
-.axis-list li.axis-list-loading:hover,
+
+.axis-list li:hover {
+    background-color: var(--accent-blue);
+    color: var(--text-light)
+}
+
+.axis-list li.axis-list-empty,
+.axis-list li.axis-list-error,
+.axis-list li.axis-list-loading {
+    color: var(--text-medium);
+    cursor: default;
+    font-style: italic;
+    padding: var(--spacing-large);
+    text-align: center
+}
+
 .axis-list li.axis-list-empty:hover,
-.axis-list li.axis-list-error:hover {
-     background-color: transparent;
+.axis-list li.axis-list-error:hover,
+.axis-list li.axis-list-loading:hover {
+    background-color: transparent
 }
 
 .axis-dropdown-footer {
-    padding: var(--spacing-small) var(--spacing-medium);
-    font-size: 0.8em;
-    color: var(--text-medium);
-    border-top: 1px solid var(--border-dark);
     background-color: var(--bg-darker);
-    text-align: right;
+    border-top: 1px solid var(--border-dark);
+    color: var(--text-medium);
+    font-size: .8em;
+    padding: var(--spacing-small) var(--spacing-medium);
+    text-align: right
 }
 
-/* ROI区域 */
 .roi-header-line {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-small);
+    margin-bottom: var(--spacing-small)
 }
 
 .roi-header-line h4 {
     flex-grow: 1;
     margin-bottom: 0;
-    margin-right: var(--spacing-medium);
+    margin-right: var(--spacing-medium)
 }
 
-.roi-header-line > .roi-button,
-.roi-header-line .roi-button-group {
+.roi-header-line .roi-button-group,
+.roi-header-line>.roi-button {
     flex-shrink: 0;
     margin-left: auto;
-    margin-top: 0;
+    margin-top: 0
 }
 
-.roi-header-line > .roi-button {
+.roi-header-line>.roi-button {
     padding-left: var(--spacing-medium);
     padding-right: var(--spacing-medium);
-    width: auto;
+    width: auto
 }
 
 .roi-button {
-    margin-top: var(--spacing-medium);
-    width: 100%;
+    width: 100%
+}
+
+.roi-button,
+.roi-button-group {
+    margin-top: var(--spacing-medium)
 }
 
 .roi-button-group {
-    display: flex;
     align-items: center;
-    gap: var(--spacing-small);
-    margin-top: var(--spacing-medium);
+    gap: var(--spacing-small)
 }
 
 .roi-button-group .roi-button {
-    margin-top: 0;
     flex-shrink: 0;
+    margin-top: 0;
     padding: var(--spacing-small) var(--spacing-medium);
-    width: auto;
+    width: auto
 }
 
-/* 校准 */
 .calibration-buttons {
     display: flex;
-    gap: var(--spacing-medium);
+    gap: var(--spacing-medium)
 }
 
-/* 视图切换按钮 */
 #toggle-view-btn {
-    position: absolute;
-    z-index: 10;
-    top: 10px;
-    left: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
+    background-color: rgba(0, 0, 0, .7);
     border: none;
-    padding: 5px 10px;
     border-radius: 4px;
+    color: #fff;
     cursor: pointer;
-    font-size: 0.9em;
-    transition: all 0.3s ease;
+    font-size: .9em;
+    left: 10px;
+    padding: 5px 10px;
+    position: absolute;
+    top: 10px;
+    transition: all .3s ease;
+    z-index: 10
 }
 
 #toggle-view-btn:hover:not(:disabled) {
-    background-color: rgba(50, 50, 50, 0.9);
+    background-color: rgba(50, 50, 50, .9)
 }
 
 #toggle-view-btn:disabled {
-    background-color: rgba(100, 100, 100, 0.5);
-    cursor: not-allowed;
+    background-color: hsla(0, 0%, 39%, .5);
+    cursor: not-allowed
 }
 
-/* 校准图案容器 */
 #calibration-pattern-display {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: none;
     background-color: #f0f0f0;
+    display: none;
+    height: 100%;
+    left: 0;
     overflow: hidden;
-}
-
-/* 当量计算按钮 */
-#calibrate-btn {
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-#calibrate-btn.success::after {
-    content: '√';
     position: absolute;
     top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
+    width: 100%
+}
+
+#calibrate-btn {
+    overflow: hidden;
+    position: relative;
+    transition: all .3s ease
+}
+
+#calibrate-btn.success:after {
     align-items: center;
-    justify-content: center;
-    background-color: rgba(40, 167, 69, 0.8);
-    color: white;
-    font-weight: bold;
     animation: fade-out 1s forwards;
+    background-color: rgba(40, 167, 69, .8);
+    color: #fff;
+    content: "√";
+    display: flex;
+    font-weight: 700;
+    height: 100%;
+    justify-content: center;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 100%
 }
 
 @keyframes fade-out {
-    0% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; }
+    0% {
+        opacity: 1
+    }
+
+    80% {
+        opacity: 1
+    }
+
+    to {
+        opacity: 0
+    }
 }
 
 #calibration-result-value {
-    font-weight: bold;
-    color: #3a3a3a;
     background-color: #f8f9fa;
-    padding: 2px 8px;
     border-radius: 3px;
+    color: #3a3a3a;
     display: inline-block;
+    font-weight: 700;
     min-width: 80px;
-    text-align: center;
+    padding: 2px 8px;
+    text-align: center
 }
 
-/* 改进校准ROI区域的按钮组 */
 #calib-roi-button-group {
     display: none;
-    gap: 5px;
+    gap: 5px
 }
 
-/* 为方格当量的文本框添加单位后缀 */
 #calib-square-size {
-    position: relative;
+    position: relative
 }
 
-#calib-square-size::after {
-    content: 'mm';
+#calib-square-size:after {
+    color: #6c757d;
+    content: "mm";
+    pointer-events: none;
     position: absolute;
     right: 5px;
     top: 50%;
-    transform: translateY(-50%);
-    color: #6c757d;
-    pointer-events: none;
+    transform: translateY(-50%)
 }
-
-/* === 工具类 === */
 
 .separator {
-    margin: 15px 0;
     border: none;
     border-top: 1px solid var(--border-dark);
+    margin: 15px 0
 }
 
-/* === 响应式布局 === */
-
-@media (max-width: 768px) {
+@media (max-width:768px) {
     .control-panel {
-        width: 100%;
         border-left: none;
         border-top: 1px solid var(--border-dark);
+        width: 100%
     }
 
     .main-content {
-        flex-direction: column;
+        flex-direction: column
     }
-    
-    /* 优化移动设备上的轴控制布局 */
+
     .control-item.side-by-side {
         flex-wrap: wrap;
         height: auto;
         min-height: 36px;
-        padding: 4px 0;
+        padding: 4px 0
     }
-    
+
     .control-item.side-by-side label {
-        width: 100%;
-        min-width: 100%;
         margin-bottom: 4px;
+        min-width: 100%;
+        width: 100%
     }
-    
-    /* 在移动设备上保持轴位置控制和步进选择在一行 */
+
     .axis-position-control {
         flex: 1 1 auto;
-        min-width: 150px;
         margin-right: 10px;
+        min-width: 150px
     }
-    
+
     #focus-step-select {
         flex: 0 0 70px;
         min-width: 70px;
-        width: 70px;
+        width: 70px
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width:480px) {
     :root {
-        --panel-width: 100%;
+        --panel-width: 100%
     }
-    
-    /* 在更小的屏幕上进一步优化 */
+
     .axis-position-control {
-        min-width: 0;
+        min-width: 0
     }
-    
+
     .position-display-container input {
         min-width: 40px;
-        padding-right: 24px;
+        padding-right: 24px
     }
-    
-    /* 确保点动按钮始终可见 */
+
     .jog-btn {
-        min-width: 36px;
-        width: 36px;
         flex: 0 0 36px;
+        min-width: 36px;
+        width: 36px
     }
-    
-    /* 步进选择保持可点击的最小尺寸 */
+
     #focus-step-select {
-        font-size: 11px;
+        font-size: 11px
     }
-    
-    /* 步进设置与轴位置控制保持合理间距 */
+
     .control-item.side-by-side {
-        gap: 5px;
+        gap: 5px
     }
-    
-    /* 确保界面能正常滚动 */
+
     .control-panel {
         max-height: none;
-        overflow-y: auto;
+        overflow-y: auto
     }
 }
 
 .axis-config-panel {
-    background: rgba(0, 0, 0, 0.7);
-    padding: 10px;
+    background: rgba(0, 0, 0, .7);
     border-radius: 5px;
+    left: 10px;
+    padding: 10px;
     position: absolute;
     top: 10px;
-    left: 10px;
-    z-index: 100;
+    z-index: 100
 }
 
 .axis-group {
     display: grid;
-    gap: 8px;
+    gap: 8px
 }
 
 .axis-item {
-    display: flex;
     align-items: center;
-    gap: 8px;
-    color: white;
+    color: #fff;
+    display: flex;
+    gap: 8px
 }
 
 .axis-item label {
-    min-width: 25px;
-    font-weight: bold;
+    font-weight: 700;
+    min-width: 25px
 }
 
-.axis-item input[type="number"] {
-    width: 70px;
+.axis-item input[type=number] {
     background: #333;
-    color: #fff;
     border: 1px solid #555;
-    padding: 4px;
     border-radius: 3px;
+    color: #fff;
+    padding: 4px;
     text-align: right;
+    width: 70px
 }
 
-.axis-controls {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* 轴位置控制区域样式优化 */
 .axis-position-control {
-    display: flex;
     align-items: center;
     background-color: var(--bg-medium);
     border: 1px solid var(--border-dark);
     border-radius: var(--border-radius);
-    height: 32px;
-    overflow: visible;
-    margin-right: 10px;
-    min-width: 150px; /* 增加最小宽度 */
-    flex: 1; /* 允许伸缩 */
-    max-width: none;
-}
-
-/* 位置显示容器简化 */
-.position-display-container {
-    position: relative;
     display: flex;
     flex: 1;
-    min-width: 80px; /* 增加最小宽度确保数值完整显示 */
-    padding: 0;
-    margin: 0;
-    height: 100%;
+    margin-right: 10px;
+    max-width: none;
+    min-width: 150px;
+    overflow: visible
 }
 
-/* 轴位置输入框样式 */
-.position-display-container input {
-    width: 100%;
-    min-width: 80px; /* 确保足够宽度显示 */
-    height: 100%;
-    padding: 4px 30px 4px 8px; /* 增加右侧内边距给单位留更多空间 */
-    box-sizing: border-box;
-    background-color: var(--bg-medium);
-    color: var(--text-light);
-    border: none;
-    text-align: left; /* 改为左对齐 */
-    font-size: 12px;
-}
-
-/* 点动按钮样式优化 */
-.jog-btn {
-    min-width: 32px;
-    width: 32px;
-    flex: 0 0 32px;
-    height: 32px;
-    padding: 0;
-    margin: 0;
+.position-display-container {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    background-color: var(--bg-medium);
-    color: var(--accent-blue);
-    border: none;
-    border-radius: 0;
-    z-index: 5;
-    transition: all 0.15s ease;
-    position: relative;
+    flex: 1;
+    height: 100%;
+    margin: 0;
+    min-width: 80px;
+    padding: 0;
+    position: relative
 }
 
-/* 点动按钮交互状态 */
+.position-display-container input {
+    box-sizing: border-box;
+    color: var(--text-light);
+    font-size: 12px;
+    height: 100%;
+    min-width: 80px;
+    padding: 4px 30px 4px 8px;
+    text-align: left;
+    width: 100%
+}
+
+.jog-btn,
+.position-display-container input {
+    background-color: var(--bg-medium);
+    border: none
+}
+
+.jog-btn {
+    align-items: center;
+    border-radius: 0;
+    color: var(--accent-blue);
+    cursor: pointer;
+    display: flex;
+    flex: 0 0 32px;
+    font-weight: 700;
+    justify-content: center;
+    margin: 0;
+    min-width: 32px;
+    padding: 0;
+    position: relative;
+    transition: all .15s ease;
+    z-index: 5
+}
+
 .jog-btn:hover:not(:disabled) {
     background-color: #4a4a4a;
-    color: white;
+    color: #fff
 }
 
 .jog-btn:active {
     background-color: #2a2a2a;
-    transform: scale(0.95);
+    transform: scale(.95)
 }
 
 .jog-btn:disabled {
-    opacity: 0.6;
     color: var(--text-medium);
+    opacity: .6
 }
 
-/* 单位显示样式 */
 .unit-display {
-    cursor: pointer;
-    padding: 1px 4px;
+    background-color: rgba(61, 61, 61, .8);
     border-radius: 3px;
-    font-size: 11px;
     color: #ddd;
-    user-select: none;
-    transition: all 0.2s ease;
+    cursor: pointer;
+    font-size: 11px;
+    min-width: 22px;
+    padding: 1px 4px;
+    pointer-events: auto;
     position: absolute;
-    right: 6px; /* 调整位置 */
+    right: 6px;
+    text-align: center;
     top: 50%;
     transform: translateY(-50%);
-    z-index: 10;
-    min-width: 22px;
-    text-align: center;
-    background-color: rgba(61, 61, 61, 0.8);
-    pointer-events: auto;
-}
-
-.unit-display:hover {
-    background-color: #555;
+    transition: all .2s ease;
+    user-select: none;
+    z-index: 10
 }
 
 .unit-display:active {
-    transform: translateY(-50%) scale(0.95);
     background-color: var(--accent-blue);
+    transform: translateY(-50%) scale(.95)
 }
 
-/* 控制项布局进一步优化 */
 .control-item.side-by-side {
-    padding: 0;
-    gap: 10px;
+    padding: 0
 }
 
-/* 响应式布局优化 */
-@media (max-width: 768px) {
+@media (max-width:768px) {
     .control-item.side-by-side {
-        gap: 8px;
+        gap: 8px
     }
-    
+
     .axis-position-control {
-        min-width: 180px; /* 移动端上增加更多宽度 */
+        min-width: 180px
     }
-    
+
     #focus-step-select {
         min-width: 70px;
-        width: 70px;
+        width: 70px
     }
 }
 
-/* 点击涟漪效果 */
 .jog-btn:after {
-    content: '';
+    background: hsla(0, 0%, 100%, .5);
+    border-radius: 100%;
+    content: "";
+    height: 5px;
+    left: 50%;
+    opacity: 0;
     position: absolute;
     top: 50%;
-    left: 50%;
-    width: 5px;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.5);
-    opacity: 0;
-    border-radius: 100%;
-    transform: scale(1, 1) translate(-50%, -50%);
-    transform-origin: 0% 0%;
+    transform: scale(1) translate(-50%, -50%);
+    transform-origin: 0 0;
+    width: 5px
 }
 
 .jog-btn:active:after {
-    animation: ripple 0.4s ease-out;
+    animation: ripple .4s ease-out
 }
 
 @keyframes ripple {
     0% {
-        transform: scale(0, 0) translate(-50%, -50%);
-        opacity: 0.5;
+        opacity: .5;
+        transform: scale(0) translate(-50%, -50%)
     }
-    100% {
-        transform: scale(20, 20) translate(-50%, -50%);
+
+    to {
         opacity: 0;
+        transform: scale(20) translate(-50%, -50%)
     }
 }
 
-/* 步进选择下拉框样式 */
 #focus-step-select {
-    width: 60px;
-    min-width: 60px;
-    flex: 0 0 60px;
-    height: 32px;
-    background: var(--bg-medium);
-    color: var(--text-light);
-    border: 1px solid var(--border-medium);
-    padding: 2px 16px 2px 4px;
-    border-radius: 3px;
-    text-align: center;
-    font-size: 12px;
-    box-sizing: border-box;
     appearance: none;
-    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
-    background-repeat: no-repeat;
+    background: var(--bg-medium);
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
     background-position: right 4px center;
+    background-repeat: no-repeat;
     background-size: .65em auto;
-    z-index: 5; /* 确保下拉框显示在最上层 */
-    margin-left: 10px; /* 增加与轴位置控制的间距 */
-    -webkit-tap-highlight-color: transparent;
+    border: 1px solid var(--border-medium);
+    border-radius: 3px;
+    box-sizing: border-box;
+    color: var(--text-light);
     cursor: pointer;
+    flex: 0 0 60px;
+    font-size: 12px;
+    margin-left: 10px;
+    min-width: 60px;
+    padding: 2px 16px 2px 4px;
     position: relative;
+    text-align: center;
+    transition: all .15s ease;
     user-select: none;
-    transition: all 0.15s ease;
+    z-index: 5;
+    -webkit-tap-highlight-color: transparent
 }
 
-/* 按钮样式 */
 .jog-btn.plus {
+    border-bottom-right-radius: 4px;
     border-left: 1px solid var(--border-dark);
     border-right: none;
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
+    border-top-right-radius: 4px
 }
 
 .jog-btn.minus {
-    border-top-left-radius: 4px;
     border-bottom-left-radius: 4px;
+    border-top-left-radius: 4px
 }
 
-/* 控制项布局优化 */
 .control-item.side-by-side {
-    display: flex;
-    align-items: center;
-    gap: 10px; /* 增加间距 */
     flex-wrap: nowrap;
-    width: 100%;
-    margin-bottom: 8px;
+    gap: 10px;
+    height: 36px;
     overflow: visible;
-    height: 36px; /* 增加高度 */
+    width: 100%
 }
 
 .control-item.side-by-side label {
-    min-width: 80px;
-    width: 80px;
-    flex-shrink: 0;
-    margin-right: 0;
+    margin-right: 0
 }
 
-/* 轴控制组保持对齐 */
 .axis-controls {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 28px;
+    gap: 4px
 }
 
-/* 配置按钮样式 */
+.axis-controls,
 .config-button {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    flex: 0 0 28px;
-    display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 0;
-    margin-left: 2px;
+    display: flex;
+    height: 28px
+}
+
+.config-button {
     background: none;
     border: none;
+    border-radius: var(--border-radius);
     color: var(--text-medium);
     cursor: pointer;
-    border-radius: var(--border-radius);
+    flex: 0 0 28px;
+    justify-content: center;
+    margin-left: 2px;
+    min-width: 28px;
+    padding: 0;
+    width: 28px
 }
 
 .config-button:hover {
-    color: var(--text-light);
     background-color: var(--bg-medium);
+    color: var(--text-light)
 }
 
-/* 相机标定控制样式 */
 .calibration-controls {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin: 10px 0;
+    margin: 10px 0
 }
 
 .calibration-controls button {
     flex: 1;
+    font-size: .9em;
+    height: auto;
     min-width: 120px;
     padding: 8px;
-    height: auto;
-    font-size: 0.9em;
-    transition: all 0.2s ease;
+    transition: all .2s ease
 }
 
 .calibration-controls button i {
-    margin-right: 5px;
     font-size: 1.1em;
+    margin-right: 5px
 }
 
 .calibration-controls button:disabled {
-    opacity: 0.6;
     cursor: not-allowed;
+    opacity: .6
 }
 
 .calibration-controls button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 3px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 3px 5px rgba(0, 0, 0, .2);
+    transform: translateY(-2px)
 }
 
-/* 标定状态显示 */
 .calibration-status {
+    background-color: #f8f9fa;
+    border-radius: 4px;
     margin-top: 10px;
     padding: 8px;
-    border-radius: 4px;
-    background-color: #f8f9fa;
-    transition: background-color 0.3s ease;
+    transition: background-color .3s ease
 }
 
 .calibration-status.active {
-    background-color: rgba(76, 175, 80, 0.1);
-    border-left: 3px solid #4CAF50;
+    background-color: rgba(76, 175, 80, .1);
+    border-left: 3px solid #4caf50
 }
 
 .calibration-status.warning {
-    background-color: rgba(255, 193, 7, 0.1);
-    border-left: 3px solid #FFC107;
+    background-color: rgba(255, 193, 7, .1);
+    border-left: 3px solid #ffc107
 }
 
 .calibration-status.error {
-    background-color: rgba(220, 53, 69, 0.1);
-    border-left: 3px solid #DC3545;
+    background-color: rgba(220, 53, 69, .1);
+    border-left: 3px solid #dc3545
 }
 
-/* 标定点位阵显示 */
 .calibration-matrix-display {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: rgba(0,0,0,0.7);
+    background-color: rgba(0, 0, 0, .7);
     border-radius: 4px;
-    padding: 10px;
-    z-index: 100;
     display: none;
+    padding: 10px;
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    z-index: 100
 }
 
 .matrix-grid {
     display: grid;
-    grid-gap: 2px;
+    grid-gap: 2px
 }
 
 .matrix-cell {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
     background-color: #555;
-    transition: all 0.2s ease;
+    border-radius: 50%;
+    height: 8px;
+    transition: all .2s ease;
+    width: 8px
 }
 
 .matrix-cell.visited {
-    background-color: #4CAF50;
+    background-color: #4caf50
 }
 
 .matrix-cell.current {
-    background-color: #FFC107;
-    box-shadow: 0 0 5px #FFC107;
-    transform: scale(1.3);
+    background-color: #ffc107;
+    box-shadow: 0 0 5px #ffc107;
+    transform: scale(1.3)
 }
 
 .matrix-cell.failed {
-    background-color: #DC3545;
+    background-color: #dc3545
 }
 
-/* Mark点显示 */
 .mark-point {
-    position: absolute;
-    width: 10px;
-    height: 10px;
+    border: 2px solid red;
     border-radius: 50%;
-    border: 2px solid #ff0000;
-    transform: translate(-50%, -50%);
+    box-shadow: 0 0 5px rgba(255, 0, 0, .5);
+    height: 10px;
     pointer-events: none;
-    box-shadow: 0 0 5px rgba(255,0,0,0.5);
-    z-index: 50;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    z-index: 50
 }
 
 .mark-point.detected {
-    border-color: #00ff00;
-    box-shadow: 0 0 8px rgba(0,255,0,0.7);
+    border-color: #0f0;
+    box-shadow: 0 0 8px rgba(0, 255, 0, .7)
 }
 
 .mark-point.center {
-    border-color: #0000ff;
-    width: 14px;
+    border-color: #00f;
+    box-shadow: 0 0 8px rgba(0, 0, 255, .7);
     height: 14px;
-    box-shadow: 0 0 8px rgba(0,0,255,0.7);
+    width: 14px
 }
 
-/* 标定结果显示 */
 .calibration-results {
-    margin-top: 15px;
-    padding: 10px;
     background-color: #f8f9fa;
     border-radius: 4px;
-    font-size: 0.9em;
+    display: none;
+    font-size: .9em;
+    margin-top: 15px;
     max-height: 200px;
     overflow-y: auto;
-    display: none;
+    padding: 10px
 }
 
 .calibration-results pre {
     margin: 0;
-    white-space: pre-wrap;
+    white-space: pre-wrap
 }
 
-/* 移动动画 */
 @keyframes movePoint {
-    0% { transform: translate(-50%, -50%) scale(1); }
-    50% { transform: translate(-50%, -50%) scale(1.3); }
-    100% { transform: translate(-50%, -50%) scale(1); }
+    0% {
+        transform: translate(-50%, -50%) scale(1)
+    }
+
+    50% {
+        transform: translate(-50%, -50%) scale(1.3)
+    }
+
+    to {
+        transform: translate(-50%, -50%) scale(1)
+    }
 }
 
 .mark-point.moving {
-    animation: movePoint 0.5s infinite;
+    animation: movePoint .5s infinite
 }
 
-/* 标定进度条样式优化 */
 .progress-bar {
-    flex: 1;
-    height: 20px;
     background-color: #f0f0f0;
     border-radius: 10px;
-    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+    flex: 1;
+    height: 20px;
     margin: 5px 0;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    overflow: hidden
 }
 
 .progress {
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    color: #fff;
+    font-size: .8em;
     height: 100%;
-    background: linear-gradient(90deg, #4CAF50, #8BC34A);
-    transition: width 0.3s ease;
-    text-align: center;
-    color: white;
-    font-size: 0.8em;
     line-height: 20px;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+    transition: width .3s ease
 }
 
-/* 状态文本样式 */
 .status-text {
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 0.9em;
     background-color: #f8f9fa;
+    border-radius: 3px;
     color: #333;
+    font-size: .9em;
+    padding: 2px 8px
 }
 
 .status-text.active {
-    background-color: #4CAF50;
-    color: white;
+    background-color: #4caf50;
+    color: #fff
 }
 
 .status-text.error {
     background-color: #dc3545;
-    color: white;
+    color: #fff
 }
 
 .status-text.warning {
     background-color: #ffc107;
-    color: black;
+    color: #000
 }
 
-/* 输入框后的单位标签样式 */
 .unit-label {
-    display: inline-block;
-    font-size: 11px;
-    color: #ddd;
-    user-select: none;
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Heiti SC", "SimHei", sans-serif;
-    font-weight: normal;
     background: transparent;
-    margin-left: 2px;
-    padding: 0 2px;
-    min-width: unset;
-    width: unset;
+    color: #ddd;
+    display: inline-block;
     flex: 0 0 auto;
+    font-family: -apple-system, PingFang SC, Microsoft YaHei, Heiti SC, SimHei, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    margin-left: 2px;
+    min-width: unset;
+    padding: 0 2px;
     text-align: left;
+    user-select: none;
+    width: unset
 }
 
 .input-group .unit-label {
-    align-self: center;
+    align-self: center
 }
 
 .unit-display:hover {
-    background-color: #555;
+    background-color: #555
 }
 
 .unit-display.active {
     background-color: var(--accent-blue);
-    color: white;
+    color: #fff
 }
 
-/* 通用的side-by-side布局修正 */
 .side-by-side label {
-    min-width: 80px;
-    flex-shrink: 0; /* 防止标签压缩 */
+    flex-shrink: 0;
+    min-width: 80px
 }
 
-.side-by-side select,
-.side-by-side input,
+.side-by-side .axis-position-control,
 .side-by-side .input-group,
-.side-by-side .axis-position-control {
+.side-by-side input,
+.side-by-side select {
     flex: 1;
-    min-width: 0; /* 允许压缩 */
-    width: auto; /* 允许扩展 */
+    min-width: 0;
+    width: auto
 }
 
-/* ROI工具面板样式修改 */
 .roi-tools-panel {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: #333333;
+    background-color: #333;
+    border: 1px solid #444;
     border-radius: 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-    z-index: 20;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
     display: none;
     flex-direction: column;
     padding: 0;
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    transition: all .3s ease;
     width: 190px;
-    transition: all 0.3s ease;
-    border: 1px solid #444;
+    z-index: 20
 }
 
 .roi-tools-header {
+    align-items: center;
+    background-color: #333;
+    border-bottom: 1px solid #444;
+    color: #fff;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    color: white;
-    padding: 4px 8px;
-    border-bottom: 1px solid #444;
-    background-color: #333;
+    padding: 4px 8px
 }
 
 .roi-tools-header h5 {
-    margin: 0;
-    font-size: 1em;
-    font-weight: normal;
     color: #fff;
+    font-size: 1em;
+    font-weight: 400;
+    margin: 0
 }
 
 .roi-tools-header .close-button {
-    font-size: 1em;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    line-height: 1;
-    color: #fff;
     background: none;
     border: none;
+    color: #fff;
+    font-size: 1em;
+    height: 20px;
+    line-height: 1;
+    padding: 0;
+    width: 20px
 }
 
 .roi-tools-content {
     display: flex;
     flex-direction: column;
-    padding: 0;
+    padding: 0
 }
 
-/* 形状工具按钮 */
 .roi-shape-tools {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
     border-bottom: 1px solid #444;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr
 }
 
 .roi-tool-button {
     background-color: #333;
-    color: white;
     border: none;
     border-radius: 0;
-    padding: 6px 5px;
-    font-size: 0.9em;
+    color: #fff;
     cursor: pointer;
+    font-size: .9em;
+    padding: 6px 5px;
     text-align: center;
-    transition: all 0.2s ease;
+    transition: all .2s ease
 }
 
 .roi-tool-button:hover {
-    background-color: #444;
+    background-color: #444
 }
 
 .roi-tool-button.active {
     background-color: #1e90ff;
-    color: white;
+    color: #fff
 }
 
-/* 绘制模式选择 */
 .roi-draw-mode-group {
-    padding: 5px;
     background-color: #333;
+    padding: 5px
 }
 
 .radio-button-container {
-    display: flex;
     align-items: center;
-    padding: 4px;
-    margin-bottom: 4px;
     cursor: pointer;
+    display: flex;
+    margin-bottom: 4px;
+    padding: 4px
 }
 
 .radio-circle {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
     border: 2px solid #777;
+    border-radius: 50%;
+    display: inline-block;
+    height: 14px;
     margin-right: 8px;
     position: relative;
-    display: inline-block;
+    width: 14px
 }
 
 .radio-button-container.active .radio-circle {
-    border-color: #1e90ff;
+    border-color: #1e90ff
 }
 
-.radio-button-container.active .radio-circle::after {
-    content: '';
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+.radio-button-container.active .radio-circle:after {
     background: #1e90ff;
-    top: 3px;
+    border-radius: 50%;
+    content: "";
+    height: 8px;
     left: 3px;
+    position: absolute;
+    top: 3px;
+    width: 8px
 }
 
 .radio-button-container label {
-    font-size: 0.9em;
-    color: white;
-    margin: 0;
+    color: #fff;
     cursor: pointer;
+    font-size: .9em;
+    margin: 0
 }
 
-/* 重画按钮容器 */
 .redraw-button-container {
     margin-top: 8px;
-    padding: 0 4px;
+    padding: 0 4px
 }
 
 .redraw-button-container .roi-tool-button {
-    width: 100%;
     background-color: #1e90ff;
-    color: white;
-    font-size: 0.95em;
-    padding: 5px 0;
     border-radius: 2px;
+    color: #fff;
+    font-size: .95em;
+    padding: 5px 0;
+    width: 100%
 }
 
-/* 相机图像信息叠加层 */
 .camera-info-overlay {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 10px;
+    background-color: rgba(0, 0, 0, .7);
     border-radius: 4px;
-    font-size: 14px;
-    z-index: 5;
+    color: #fff;
     display: flex;
     flex-direction: column;
+    font-family: -apple-system, PingFang SC, Microsoft YaHei, Heiti SC, SimHei, sans-serif;
+    font-size: 14px;
     gap: 5px;
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Heiti SC", "SimHei", sans-serif;
+    left: 10px;
+    padding: 10px;
+    position: absolute;
+    top: 10px;
+    z-index: 5
 }
 
 .info-item {
-    display: flex;
     align-items: center;
-    gap: 8px;
+    display: flex;
+    gap: 8px
 }
 
 .info-label {
-    font-weight: bold;
-    color: #aaffff;
+    color: #aff;
+    font-weight: 700
 }
 
 .info-value {
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Heiti SC", "SimHei", monospace;
-    font-size: 16px;
-    color: #ffffff;
+    color: #fff;
+    font-family: -apple-system, PingFang SC, Microsoft YaHei, Heiti SC, SimHei, monospace;
+    font-size: 16px
 }
 
-/* 缩略图信息显示 */
 .focus-thumbnail-info {
-    position: absolute;
+    background: linear-gradient(transparent, rgba(0, 0, 0, .8));
     bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-    padding: 15px 5px 5px;
+    color: #fff;
+    font-family: -apple-system, PingFang SC, Microsoft YaHei, Heiti SC, SimHei, sans-serif;
     font-size: 10px;
-    color: white;
+    left: 0;
+    opacity: 1;
+    padding: 15px 5px 5px;
+    position: absolute;
+    right: 0;
     text-align: center;
-    opacity: 1; /* 始终显示 */
-    transition: opacity 0.2s;
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Heiti SC", "SimHei", sans-serif;
+    transition: opacity .2s
 }
 
 .focus-thumbnail:hover .focus-thumbnail-info {
-    opacity: 1;
+    opacity: 1
 }
 
-/* 对焦图像缩略图区域 */
 .focus-thumbnails-container {
-    position: absolute;
+    background-color: rgba(0, 0, 0, .85);
     bottom: 0;
-    left: 0;
-    right: 0;
-    background-color: rgba(0, 0, 0, 0.85);
-    z-index: 50;
-    height: 140px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, .3);
     display: none;
     flex-direction: column;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-    transition: transform 0.3s ease;
+    height: 140px;
+    left: 0;
+    position: absolute;
+    right: 0;
+    transition: transform .3s ease;
+    z-index: 50
 }
 
 .thumbnails-header {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 5px 10px;
     background-color: #1e1e1e;
     border-bottom: 1px solid #444;
-    color: white;
+    color: #fff;
+    display: flex;
+    font-family: -apple-system, PingFang SC, Microsoft YaHei, Heiti SC, SimHei, sans-serif;
     font-size: 12px;
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Heiti SC", "SimHei", sans-serif;
+    justify-content: space-between;
+    padding: 5px 10px
 }
 
 .thumbnails-close-btn {
+    align-items: center;
     background: none;
     border: none;
     color: #bbb;
     cursor: pointer;
-    font-size: 14px;
-    padding: 0;
-    width: 20px;
-    height: 20px;
     display: flex;
-    align-items: center;
+    font-size: 14px;
+    height: 20px;
     justify-content: center;
-    transition: color 0.2s;
+    padding: 0;
+    transition: color .2s;
+    width: 20px
 }
 
 .thumbnails-close-btn:hover {
-    color: white;
+    color: #fff
 }
 
 .focus-thumbnails {
     display: flex;
     flex-wrap: nowrap;
+    gap: 10px;
+    height: 100px;
     overflow-x: auto;
     overflow-y: hidden;
     padding: 10px;
-    height: 100px;
-    scrollbar-width: thin;
     scrollbar-color: #555 #1e1e1e;
-    gap: 10px;
+    scrollbar-width: thin
 }
 
 .focus-thumbnails::-webkit-scrollbar {
-    height: 6px;
+    height: 6px
 }
 
 .focus-thumbnails::-webkit-scrollbar-track {
-    background: #1e1e1e;
+    background: #1e1e1e
 }
 
 .focus-thumbnails::-webkit-scrollbar-thumb {
     background-color: #555;
-    border-radius: 3px;
+    border-radius: 3px
 }
 
 .focus-thumbnail {
-    flex: 0 0 auto;
-    position: relative;
-    width: 120px;
-    height: 90px;
     background-color: #333;
     border: 2px solid transparent;
     border-radius: 4px;
-    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, .2);
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    flex: 0 0 auto;
+    height: 90px;
+    overflow: hidden;
+    position: relative;
+    transition: all .2s ease;
+    width: 120px
 }
 
 .focus-thumbnail:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     border-color: #1890ff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, .3);
+    transform: translateY(-2px)
 }
 
 .focus-thumbnail.selected {
     border-color: #52c41a;
-    box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2);
+    box-shadow: 0 0 0 2px rgba(82, 196, 26, .2)
 }
 
 .focus-thumbnail.best {
     border-color: #faad14;
-    box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.2);
+    box-shadow: 0 0 0 2px rgba(250, 173, 20, .2)
 }
 
 .focus-thumbnail img {
-    width: 100%;
     height: 100%;
     object-fit: cover;
+    width: 100%
 }
 
-/* 右键菜单样式 */
 .focus-thumbnail-menu {
-    position: fixed;
     background-color: #2d2d2d;
     border: 1px solid #444;
     border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    padding: 5px 0;
-    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
     min-width: 150px;
+    padding: 5px 0;
+    position: fixed;
+    z-index: 1000
 }
 
 .focus-thumbnail-menu-item {
-    padding: 6px 15px;
-    color: white;
-    font-size: 12px;
+    color: #fff;
     cursor: pointer;
-    white-space: nowrap;
-    transition: background-color 0.2s;
+    font-size: 12px;
+    padding: 6px 15px;
+    transition: background-color .2s;
+    white-space: nowrap
 }
 
 .focus-thumbnail-menu-item:hover {
-    background-color: #1890ff;
+    background-color: #1890ff
 }
 
 .focus-thumbnail-menu-item i {
     margin-right: 8px;
-    width: 14px;
     text-align: center;
+    width: 14px
 }
 
-/* 右键菜单遮罩层 */
 .context-menu-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
     bottom: 0;
-    z-index: 999;
     display: none;
+    left: 0;
+    position: fixed;
+    right: 0;
+    top: 0;
+    z-index: 999
 }
 
-/* 缩略图区域显示/隐藏动画 */
 .focus-thumbnails-container.show {
-    transform: translateY(0);
+    transform: translateY(0)
 }
 
 .focus-thumbnails-container.hide {
-    transform: translateY(100%);
+    transform: translateY(100%)
 }
 
-/* 消息提示样式 */
 .message-toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 12px 20px;
     border-radius: 4px;
-    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+    color: #fff;
     font-size: 14px;
-    z-index: 1000;
     opacity: 0;
+    padding: 12px 20px;
+    position: fixed;
+    right: 20px;
+    top: 20px;
     transform: translateY(-20px);
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all .3s ease;
+    z-index: 1000
 }
 
 .message-toast.show {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0)
 }
 
 .message-toast.success {
-    background-color: #52c41a;
+    background-color: #52c41a
 }
 
 .message-toast.error {
-    background-color: #ff4d4f;
+    background-color: #ff4d4f
 }
 
 .message-toast.info {
-    background-color: #1890ff;
+    background-color: #1890ff
 }
 
-/* 紧凑型输入组样式 */
 .compact-input-group {
-    display: flex;
     align-items: center;
-    width: 100%;
+    display: flex;
+    width: 100%
 }
 
 .compact-input-group input {
     flex: 1 1 auto;
     min-width: 0;
-    width: 0;
     text-align: right;
+    width: 0
 }
 
 .compact-input-group .unit-label {
-    flex: 0 0 auto;
-    display: inline-block;
-    font-size: 11px;
-    color: #ddd;
-    user-select: none;
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Heiti SC", "SimHei", sans-serif;
-    font-weight: normal;
     background: transparent;
+    color: #ddd;
+    display: inline-block;
+    flex: 0 0 auto;
+    font-family: -apple-system, PingFang SC, Microsoft YaHei, Heiti SC, SimHei, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
     margin-left: 2px;
-    padding: 0 2px;
     min-width: unset;
-    width: unset;
+    padding: 0 2px;
     text-align: left;
+    user-select: none;
+    width: unset
 }
 
-/* 优化对焦区域布局 */
 .focus-section-container {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 15px;
+    margin-bottom: 15px
 }
 
-/* 统一行高和间距 */
 .control-item.side-by-side {
-    display: flex;
     align-items: center;
+    display: flex;
     gap: 8px;
-    margin-bottom: 8px;
     height: 32px;
+    margin-bottom: 8px
 }
 
-/* 标签宽度统一 */
 .control-item.side-by-side label {
-    min-width: 80px;
-    width: 80px;
     flex-shrink: 0;
+    min-width: 80px;
+    width: 80px
 }
 
-/* 优化ROI按钮组样式 */
 .roi-button-group {
     display: flex;
-    justify-content: flex-end;
-    margin-left: auto;
     gap: 4px;
+    justify-content: flex-end;
+    margin-left: auto
 }
 
 .roi-button {
-    width: 28px;
-    height: 28px;
-    border-radius: 4px;
-    display: flex;
     align-items: center;
-    justify-content: center;
     background-color: var(--bg-medium);
     border: 1px solid var(--border-dark);
+    border-radius: 4px;
     color: var(--text-light);
     cursor: pointer;
+    display: flex;
+    height: 28px;
+    justify-content: center;
     padding: 0;
-    transition: all 0.2s ease;
+    transition: all .2s ease;
+    width: 28px
 }
 
 .roi-button:hover:not(:disabled) {
     background-color: #4a4a4a;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+    transform: translateY(-1px)
 }
 
 .roi-button.danger-icon:hover:not(:disabled) {
-    color: var(--accent-red);
+    color: var(--accent-red)
 }
 
 .roi-heading {
-    margin: 0;
     font-size: 14px;
-    font-weight: normal;
+    font-weight: 400;
+    margin: 0
 }
 
-/* 统一主按钮样式 */
 .focus-controls {
     display: flex;
     gap: 8px;
-    margin-top: 10px;
     margin-bottom: 10px;
+    margin-top: 10px
 }
 
 .focus-controls button {
-    flex: 1;
-    height: 32px;
-    font-weight: normal;
+    align-items: center;
+    border: none;
     border-radius: 4px;
     display: flex;
-    align-items: center;
+    flex: 1;
+    font-weight: 400;
+    height: 32px;
     justify-content: center;
-    transition: all 0.2s ease;
-    border: none;
+    transition: all .2s ease
 }
 
 .focus-controls button i {
-    margin-right: 5px;
+    margin-right: 5px
 }
 
 .focus-controls .primary-button {
     background-color: var(--accent-blue);
-    color: white;
+    color: #fff
 }
 
 .focus-controls .secondary-button {
     background-color: #4a90e2;
-    color: white;
+    color: #fff
 }
 
 .focus-controls .danger-button {
     background-color: var(--accent-red);
-    color: white;
+    color: #fff
 }
 
 .focus-controls button:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+    transform: translateY(-1px)
 }
 
-.focus-controls .primary-button:hover:not(:disabled) {
-    background-color: #3a80d2;
-}
-
+.focus-controls .primary-button:hover:not(:disabled),
 .focus-controls .secondary-button:hover:not(:disabled) {
-    background-color: #3a80d2;
+    background-color: #3a80d2
 }
 
 .focus-controls .danger-button:hover:not(:disabled) {
-    background-color: #d94c4c;
+    background-color: #d94c4c
 }
 
-/* 优化轴位置控制区域 */
 .axis-position-control {
-    height: 32px;
     border-radius: 4px;
-    margin-right: 8px;
+    height: 32px;
+    margin-right: 8px
 }
 
 .jog-btn {
-    height: 32px;
-    width: 32px;
     font-size: 16px;
+    height: 32px;
+    width: 32px
 }
 
 .position-display-container input {
-    height: 32px;
     font-size: 13px;
+    height: 32px
 }
 
 .unit-display {
-    right: 4px;
     font-size: 12px;
+    right: 4px
 }
 
-/* 步进选择样式优化 */
 #focus-step-select {
     height: 32px;
     margin-left: 8px;
-    width: 60px;
+    width: 60px
 }
 
-/* ROI标题行优化 */
 .roi-header-line {
+    align-items: center;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 8px
 }
 
-/* 输入框样式统一 */
-.control-item input[type="number"] {
+.control-item input[type=number] {
     height: 32px;
     padding-right: 25px;
-    text-align: right;
+    text-align: right
 }
 
 .position-display-container {
-    height: 32px;
+    height: 32px
 }
 
 #focus-step-select:hover:not(:disabled) {
-    border-color: var(--accent-blue);
     background-color: #4a4a4a;
+    border-color: var(--accent-blue)
 }
 
 #focus-step-select:focus {
-    outline: none;
     border-color: var(--accent-blue);
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
-} 
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, .2);
+    outline: none
+}
+
+#focus-roi-overlay,
+.roi-overlay {
+    background: transparent;
+    bottom: 0;
+    height: 100%;
+    left: 0;
+    pointer-events: auto;
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 100%;
+    z-index: 10
+}
