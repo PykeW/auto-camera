@@ -1978,7 +1978,7 @@ input:checked+.slider:before {
 .compact-input-group input {
     flex: 1 1 auto;
     min-width: 0;
-    text-align: right;
+    text-align: left;
     width: 0
 }
 
@@ -2147,7 +2147,7 @@ input:checked+.slider:before {
 .control-item input[type=number] {
     height: 32px;
     padding-right: 25px;
-    text-align: right
+    text-align: left
 }
 
 .position-display-container {

@@ -53,6 +53,22 @@
             </option>
           </select>
         </div>
+
+        <!-- Z轴速度显示 -->
+        <div class="control-item side-by-side">
+          <label for="focus-axis-speed">Z轴速度:</label>
+          <div class="position-display-container">
+            <input 
+              type="number" 
+              id="focus-axis-speed" 
+              v-model="selectedSpeed"
+              :step="speedStep" 
+              :min="speedMin"
+              :disabled="!isConnected || isFocusing"
+            >
+            <span class="unit-display">{{ speedUnit }}</span>
+          </div>
+        </div>
         
         <!-- 搜索范围和对焦步进输入框 -->
         <div class="control-item side-by-side">
@@ -168,6 +184,7 @@
   const stepValue = ref(100); // 默认100um步进
   const rangeValue = ref(5000); // 默认5000um范围
   const focusStepValue = ref(500); // 默认500um步进
+  const selectedSpeed = ref(1000); // 默认速度1000 um/s
   
   // 计算属性
   const isConnected = computed(() => cameraStore.isConnected);
@@ -176,6 +193,14 @@
   const plcAxes = computed(() => axisStore.plcAxes);
   const isDrawingROI = computed(() => roiStore.isDrawingROI);
   const roiEnabled = computed(() => roiStore.roiEnabled);
+  
+  // 速度相关计算属性
+  const speedUnit = computed(() => {
+    return displayUnit.value === 'mm' ? 'mm/s' : 'um/s';
+  });
+  
+  const speedStep = computed(() => displayUnit.value === 'mm' ? '0.1' : '100');
+  const speedMin = computed(() => displayUnit.value === 'mm' ? '0.1' : '10');
   
   // 轴位置相关
   const selectedAxisName = computed(() => {
@@ -269,8 +294,8 @@
     if (direction < 0 && isMinLimitReached.value) return;    
     if (direction > 0 && isMaxLimitReached.value) return;        
     
-    // 执行点动    
-    await axisStore.jogAxis(selectedAxisName.value, direction, step);        
+    // 执行点动，传递速度参数
+    await axisStore.jogAxis(selectedAxisName.value, direction, step, selectedSpeed.value);        
     
     // 更新清晰度    
     if (selectedAxisName.value === 'Z') {      
@@ -378,11 +403,20 @@
       stepValue.value = 0.1;
       rangeValue.value = Number((parseFloat(rangeValue.value) / 1000).toFixed(3));
       focusStepValue.value = Number((parseFloat(focusStepValue.value) / 1000).toFixed(3));
+      selectedSpeed.value = Number((parseFloat(selectedSpeed.value) / 1000).toFixed(3));
     } else {
       // 从mm转到um
       stepValue.value = 100;
       rangeValue.value = Math.round(parseFloat(rangeValue.value) * 1000);
       focusStepValue.value = Math.round(parseFloat(focusStepValue.value) * 1000);
+      selectedSpeed.value = Math.round(parseFloat(selectedSpeed.value) * 1000);
     }
   });
   </script>
+  
+  <style scoped>
+  /* 输入框文字左对齐 */
+  input[type="number"] {
+    text-align: left;
+  }
+  </style>

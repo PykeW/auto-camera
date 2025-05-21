@@ -16,6 +16,8 @@ export const useCalibrationStore = defineStore('calibration', () => {
   const markPoints = ref([]);
   const calibrationMatrix = ref([]);
   const failedPoints = ref([]);
+  const selectedAxes = ref([]);
+  const axisMapping = ref({});
   
   // 标定参数
   const matrixSize = ref(3);
@@ -30,6 +32,16 @@ export const useCalibrationStore = defineStore('calibration', () => {
   });
   
   // 方法
+  // 设置选中的轴
+  function setSelectedAxes(axes) {
+    selectedAxes.value = [...axes];
+  }
+  
+  // 设置轴映射关系
+  function setAxisMapping(mapping) {
+    axisMapping.value = { ...mapping };
+  }
+  
   // 切换校准视图
   function toggleCalibrationView() {
     const cameraStore = useCameraStore();
@@ -131,6 +143,11 @@ export const useCalibrationStore = defineStore('calibration', () => {
     if (!cameraStore.isConnected || !markCentered.value) return false;
     if (isCalibrating.value) return false;
     
+    // 检查是否至少选择了X和Y轴
+    if (!selectedAxes.value.includes('X') || !selectedAxes.value.includes('Y')) {
+      return false;
+    }
+    
     // 生成标定矩阵
     const size = matrixSize.value;
     const offset = pointOffset.value;
@@ -148,7 +165,9 @@ export const useCalibrationStore = defineStore('calibration', () => {
           y: yPos,
           index: pointIndex,
           row: y,
-          col: x
+          col: x,
+          axes: selectedAxes.value,
+          axisMapping: axisMapping.value
         });
       }
     }
@@ -226,7 +245,9 @@ export const useCalibrationStore = defineStore('calibration', () => {
           completedPoints: completedPoints.value,
           totalPoints: totalPoints.value,
           resolution: [640, 480],
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          selectedAxes: selectedAxes.value,
+          axisMapping: axisMapping.value
         };
       }
       
@@ -252,6 +273,8 @@ export const useCalibrationStore = defineStore('calibration', () => {
     markPoints,
     calibrationMatrix,
     failedPoints,
+    selectedAxes,
+    axisMapping,
     matrixSize,
     pointOffset,
     markSize,
@@ -261,6 +284,8 @@ export const useCalibrationStore = defineStore('calibration', () => {
     calibrationProgress,
     
     // 方法
+    setSelectedAxes,
+    setAxisMapping,
     toggleCalibrationView,
     calibrateRatio,
     detectMarkPoint,

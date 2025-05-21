@@ -79,7 +79,7 @@ export const useAxisStore = defineStore('axis', () => {
   }
   
   // 模拟轴移动
-  async function jogAxis(axis, direction, step) {
+  async function jogAxis(axis, direction, step, speed = null) {
     const cameraStore = useCameraStore();
     if (!cameraStore.isConnected) return false;
     
@@ -95,6 +95,9 @@ export const useAxisStore = defineStore('axis', () => {
     
     // 限制在范围内
     newPos = Math.max(limits.min, Math.min(limits.max, newPos));
+    
+    // 记录使用的速度（用于显示，实际不影响模拟移动）
+    const usedSpeed = speed || (displayUnit.value === 'um' ? 1000 : 1.0);
     
     // 模拟移动延迟
     await new Promise(resolve => setTimeout(resolve, 100));
