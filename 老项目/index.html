@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>相机控制系统 - 完整流程模拟</title>
+    <!-- Font Awesome 6.0.0 - Ensure integrity and crossorigin attributes are present -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-controls">
+                <button class="header-button" id="btn-play" title="连续采集" disabled><i class="fas fa-play"></i></button>
+                <button class="header-button" id="btn-stop" title="停止采集" disabled><i class="fas fa-stop"></i></button>
+                <button class="header-button" id="btn-capture" title="单张拍照" disabled><i class="fas fa-camera"></i></button>
+                <button class="header-button" id="btn-record" title="开始录制" disabled><i class="fas fa-video"></i></button>
+                <button class="header-button" id="btn-trigger" title="软件触发" disabled><i class="fas fa-bolt"></i></button>
+                <button class="header-button" id="btn-settings" title="设置"><i class="fas fa-cog"></i></button>
+            </div>
+            <div class="header-title">相机操作</div>
+        </header>
+
+        <main class="main-content">
+            <section class="camera-view">
+                <div id="camera-display-container">
+                    <div class="camera-image">
+                        <img id="camera-feed" src="/get_camera_image" alt="相机画面">
+                        <div id="focus-roi-overlay" class="roi-overlay" style="display: none;">
+                            <div class="roi-box"></div>
+                        </div>
+                        <div class="camera-info-overlay">
+                            <div class="info-item" id="focus-info">
+                                <span class="info-label">清晰度:</span>
+                                <span class="info-value" id="clarity-display">--</span>
+                            </div>
+                            <div class="info-item" id="position-info">
+                                <span class="info-label">对焦位置:</span>
+                                <span class="info-value" id="focus-position-display">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 添加缩略图区域 -->
+                <div class="focus-thumbnails-container">
+                    <div class="thumbnails-header">
+                        <span>对焦图像预览</span>
+                        <button class="thumbnails-close-btn" title="关闭预览">&times;</button>
+                    </div>
+                    <div class="focus-thumbnails"></div>
+                </div>
+            </section>
+
+            <aside class="control-panel" id="control-panel-content">
+                <!-- Camera Connection & Axis -->
+                <div class="panel-section requires-connection">
+                    <label for="serial-number">相机序列号：</label>
+                    <div class="input-group">
+                        <input type="text" id="serial-number" value="SN_Sim_1" readonly>
+                        <button id="connect-btn" class="connect-button">连接</button>
+                    </div>
+                </div>
+
+                <!-- Camera Info -->
+                <div class="panel-section requires-connection">
+                    <div class="control-item">
+                        <label for="config-file">配置文件：</label>
+                        <div class="input-group">
+                            <input type="text" id="config-file" value="" readonly placeholder="未选择文件" disabled>
+                            <button id="select-config-btn" class="select-button mini-button" disabled>
+                                <i class="fas fa-folder-open"></i> 选择
+                            </button>
+                        </div>
+                        <p class="small-description">相机配置文件路径 (.cfg)</p>
+                    </div>
+                    <div class="control-item">
+                        <label for="save-path">图像保存路径：</label>
+                        <div class="input-group">
+                            <input type="text" id="save-path" value="" readonly placeholder="未选择路径" disabled>
+                            <button id="select-folder-btn" class="select-button mini-button" disabled>
+                                <i class="fas fa-folder"></i> 选择
+                            </button>
+                        </div>
+                        <p class="small-description">图像和视频的保存目录</p>
+                    </div>
+                    <div class="camera-info-grid">
+                        <div class="control-item">
+                            <label for="camera-name">相机名称：</label>
+                            <input type="text" id="camera-name" value="" disabled="">
+                        </div>
+                        <div class="control-item">
+                            <label for="camera-model">相机型号：</label>
+                            <input type="text" id="camera-model" value="" readonly="" disabled="">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Camera Properties & Controls -->
+                <div class="panel-section requires-connection">
+                    <h3>相机属性与控制</h3>
+
+                    <div class="property-grid">
+                        <!-- Simulated Properties -->
+                        <div class="control-item">
+                            <label>Y反转:</label>
+                            <select class="compact-select" disabled=""><option>否</option><option>是</option></select>
+                        </div>
+                        <div class="control-item">
+                            <label>X反转:</label>
+                            <select class="compact-select" disabled=""><option>否</option><option>是</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>触发模式:</label>
+                            <select id="trigger-mode-select" disabled=""><option value="连续采集">连续采集</option><option value="软件触发">软件触发</option><option>外部触发</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>触发信号:</label>
+                            <select disabled=""><option>上升沿</option><option>下降沿</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>触发源:</label>
+                            <select disabled=""><option>通道0</option><option>通道1</option><option>软件</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label>图像格式:</label>
+                            <select disabled=""><option>MONO8</option><option>RGB8</option></select>
+                        </div>
+                         <div class="control-item">
+                            <label for="exposure-time">曝光时间(us):</label>
+                            <input type="number" id="exposure-time" value="-1" disabled="">
+                        </div>
+                        <div class="control-item">
+                            <label for="gain">增益:</label>
+                            <input type="number" id="gain" value="-1" disabled="">
+                        </div>
+                        <div class="control-item toggle-item">
+                            <label for="enable-camera-cb">使能:</label>
+                            <label class="switch">
+                                <input type="checkbox" id="enable-camera-cb" disabled="">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="control-item toggle-item">
+                            <label for="white-balance-cb">自动白平衡:</label>
+                             <label class="switch">
+                                <input type="checkbox" id="white-balance-cb" disabled="">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <!-- Re-added Red, Green, Blue Range Sliders -->
+                        <div class="control-item range-item manual-wb-control" style="display: flex;">
+                            <label>红(R):</label>
+                            <input type="range" id="wb-red" disabled="" min="0" max="255" value="128">
+                            <span class="range-value">(128)</span>
+                        </div>
+                        <div class="control-item range-item manual-wb-control" style="display: flex;">
+                            <label>绿(G):</label>
+                            <input type="range" id="wb-green" disabled="" min="0" max="255" value="128">
+                            <span class="range-value">(128)</span>
+                        </div>
+                        <div class="control-item range-item manual-wb-control" style="display: flex;">
+                            <label>蓝(B):</label>
+                            <input type="range" id="wb-blue" disabled="" min="0" max="255" value="128">
+                            <span class="range-value">(128)</span>
+                        </div>
+                    </div>
+
+                    <hr class="separator">
+
+                    <!-- Z Axis / Focus -->
+                    <h4>Z轴控制 / 对焦</h4>
+                    <div class="focus-section-container">
+                        <!-- 添加轴选择下拉列表 -->
+                        <div class="control-item side-by-side">
+                            <label for="focus-axis-select">选择轴:</label>
+                            <select id="focus-axis-select" class="compact-select"></select>
+                        </div>
+                        
+                        <!-- 当前轴位置显示和点动控制 -->
+                        <div class="control-item side-by-side">
+                            <label for="focus-axis-position">轴位置:</label>
+                            <div class="axis-position-control">
+                                <button class="jog-btn minus" id="focus-jog-minus">-</button>
+                                <div class="position-display-container">
+                                    <input type="text" id="focus-axis-position" value="0" readonly>
+                                    <span id="unit-display" class="unit-display" title="点击切换单位">um</span>
+                                </div>
+                                <button class="jog-btn plus" id="focus-jog-plus">+</button>
+                            </div>
+                            <select id="focus-step-select" class="compact-select">
+                                <option value="1">1</option>
+                                <option value="10">10</option>
+                                <option value="100">100</option>
+                                <option value="500">500</option>
+                                <option value="1000">1000</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 搜索范围和对焦步进输入框（合并单位） -->
+                        <div class="control-item side-by-side">
+                            <label for="focus-range">搜索范围:</label>
+                            <div class="position-display-container">
+                                <input type="number" id="focus-range" value="5000" step="100" min="100" placeholder="搜索范围">
+                                <span class="unit-display" id="range-unit-display">um</span>
+                            </div>
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label for="focus-step">对焦步进:</label>
+                            <div class="position-display-container">
+                                <input type="number" id="focus-step" value="500" step="10" min="1" placeholder="对焦步进">
+                                <span class="unit-display" id="step-unit-display">um</span>
+                            </div>
+                        </div>
+
+                        <!-- Focus ROI Controls -->
+                        <div class="roi-header-line">
+                            <h4 class="roi-heading">对焦ROI区域</h4>
+                            <div id="focus-roi-button-group" class="roi-button-group">
+                                <button id="toggle-focus-roi-visibility-btn" class="roi-button icon-button" title="显示/隐藏">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button id="edit-roi-focus-btn" class="roi-button icon-button" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button id="clear-roi-focus-btn" class="roi-button icon-button danger-icon" title="删除">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="control-item focus-controls">
+                            <button id="start-focus-btn" class="primary-button">
+                                <i class="fas fa-crosshairs"></i> 开始自动对焦
+                            </button>
+                            <button id="stop-focus-btn" class="danger-button" style="display: none;">
+                                <i class="fas fa-stop-circle"></i> 停止自动对焦
+                            </button>
+                            <button id="save-focus-position-btn" class="secondary-button">
+                                <i class="fas fa-save"></i> 保存对焦位置
+                            </button>
+                        </div>
+                    </div>
+
+                    <hr class="separator">
+
+                    <!-- 相机标定模块 - 简化版 -->
+                    <h4 class="section-title"><i class="fas fa-camera-retro"></i> 相机标定</h4>
+                    
+                    <!-- 标定参数配置区域 -->
+                    <div class="control-group">
+                        <div class="control-item side-by-side">
+                            <label for="matrix-size">矩阵大小:</label>
+                            <select id="matrix-size" class="compact-select">
+                                <option value="3" selected>3×3</option>
+                                <option value="5">5×5</option>
+                                <option value="7">7×7</option>
+                                <option value="9">9×9</option>
+                            </select>
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label for="point-offset">点位偏移(mm):</label>
+                            <input type="number" id="point-offset" value="10.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="control-item side-by-side">
+                            <label for="mark-size">Mark点尺寸(mm):</label>
+                            <input type="number" id="mark-size" value="2.0" step="0.1" min="0.1">
+                        </div>
+                    </div>
+                    
+                    <!-- 标定操作按钮区域 -->
+                    <div class="calibration-buttons-group">
+                        <button id="detect-mark-btn" class="primary-button">
+                            <i class="fas fa-crosshairs"></i> 检测Mark点
+                        </button>
+                        <button id="center-mark-btn" class="primary-button" disabled>
+                            <i class="fas fa-compress-arrows-alt"></i> 居中Mark点
+                        </button>
+                        <button id="start-calib-btn" class="primary-button" disabled>
+                            <i class="fas fa-play-circle"></i> 开始标定
+                        </button>
+                        <button id="stop-calib-btn" class="danger-button" disabled>
+                            <i class="fas fa-stop-circle"></i> 停止标定
+                        </button>
+                    </div>
+                    
+                    <!-- 标定进度与状态区域 -->
+                    <div class="status-container">
+                        <div class="status-row">
+                            <label>标定状态:</label>
+                            <span id="calibration-status" class="status-chip">未开始</span>
+                        </div>
+                        <div class="status-row">
+                            <label>当前点位:</label>
+                            <span id="current-point" class="status-chip">--</span>
+                        </div>
+                        <div class="progress-row">
+                            <label>进度:</label>
+                            <div class="progress-bar">
+                                <div id="calibration-progress" class="progress" style="width: 0%">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 结果操作按钮 -->
+                    <div class="result-actions-row">
+                        <button id="export-matrix-btn" class="secondary-button" disabled>
+                            <i class="fas fa-file-export"></i> 导出矩阵
+                        </button>
+                        <button id="view-results-btn" class="secondary-button" disabled>
+                            <i class="fas fa-search"></i> 查看详细结果
+                        </button>
+                    </div>
+
+                    <hr class="separator">
+
+                    <!-- 当量计算 -->
+                    <h4>当量计算</h4>
+                     <!-- Apply side-by-side layout -->
+                     <div class="control-item side-by-side">
+                         <label for="calib-square-size">方格尺寸(mm):</label>
+                         <input type="number" id="calib-square-size" value="1.0" step="0.1" min="0.1">
+                     </div>
+                      <!-- Apply side-by-side layout -->
+                      <div class="control-item side-by-side">
+                         <label>计算结果:</label>
+                         <span id="calibration-result-value">-- px/mm</span>
+                      </div>
+                      
+                      <!-- 当量校准按钮 -->
+                      <div class="control-item">
+                          <button id="debug-calib-btn" class="primary-button"><i class="fas fa-ruler-combined"></i> 当量校准</button>
+                      </div>
+                  </div>
+             </aside>
+        </main>
+
+        <footer class="status-bar">
+            <span id="footer-status">状态: 未连接</span>
+            <span>帧率: -- FPS</span>
+            <span>鼠标: (<span id="mouse-coords">---, ---</span>)</span>
+            <span>Z轴: <span id="footer-z-pos">--</span> mm</span>
+            <span>图像: Pixmap(<span id="image-dims">---, ---</span>)</span>
+            <span>缩放: 100%</span>
+        </footer>
+
+        <script src="script.js"></script>
+    </div>
+
+    <!-- 添加右键菜单 -->
+    <div class="focus-thumbnail-menu" style="display: none;">
+        <div class="focus-thumbnail-menu-item" data-action="set-focus">
+            <i class="fas fa-crosshairs"></i>设为对焦位置
+        </div>
+        <div class="focus-thumbnail-menu-item" data-action="view-large">
+            <i class="fas fa-search-plus"></i>查看大图
+        </div>
+    </div>
+    <div class="context-menu-overlay"></div>
+</body>
+</html> 
