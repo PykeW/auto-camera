@@ -1,7 +1,9 @@
- // src/stores/camera.js
+// src/stores/camera.js
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { generateCameraImage, generateFocusImage } from '../utils/imageGenerator';
+import { useFocusStore } from './focus';
+import { useAxisStore } from './axis';
 
 export const useCameraStore = defineStore('camera', () => {
   // 状态
@@ -72,16 +74,50 @@ export const useCameraStore = defineStore('camera', () => {
   async function fetchCameraImage() {
     if (!isConnected.value) return;
     
-    // 检查缓存时间，如果最近获取过图像，则不再获取
-    if (cachedTimestamp.value && Date.now() - cachedTimestamp.value < 2000) {
-      return cachedImageUrl.value;
+    const focusStore = useFocusStore();
+    const axisStore = useAxisStore();
+    
+    // 获取当前Z轴位置
+    const zPosition = axisStore.positions['Z'];
+    const zPositionEncoder = axisStore.positionsEncoder['Z'];
+    
+    // 根据当前位置计算清晰度
+    let clarity = focusStore.calculateClarity(zPosition, false);
+    
+    // 使用对焦过程中的图像集和当前位置来显示实时图像
+    if (focusStore.focusCompleted && focusStore.focusImages.length > 0) {
+      // 在已有的对焦图像中找到最接近当前位置的图像
+      const zPositionToUse = axisStore.displayUnit === 'mm' ? zPosition : zPositionEncoder / 1000.0;
+      
+      // 尝试查找最接近当前位置的图像
+      const nearestImage = focusStore.focusImages
+        .map(img => ({
+          image: img,
+          distance: Math.abs(img.zPosition - zPositionToUse)
+        }))
+        .sort((a, b) => a.distance - b.distance)[0]?.image;
+      
+      // 如果找到了合适的图像，直接使用
+      if (nearestImage && nearestImage.imageData) {
+        cameraImageUrl.value = nearestImage.imageData;
+        cachedImageUrl.value = nearestImage.imageData;
+        cachedTimestamp.value = Date.now();
+        
+        // 更新清晰度
+        focusStore.clarity = nearestImage.clarity;
+        
+        return nearestImage.imageData;
+      }
     }
     
-    // 生成模拟图像
-    const imageData = await generateCameraImage();
+    // 如果没有找到匹配的图像或没有对焦过，则生成一个基于当前清晰度的图像
+    const imageData = await generateFocusImage(zPositionEncoder, clarity);
     cameraImageUrl.value = imageData;
     cachedImageUrl.value = imageData;
     cachedTimestamp.value = Date.now();
+    
+    // 更新清晰度
+    focusStore.clarity = clarity;
     
     return imageData;
   }

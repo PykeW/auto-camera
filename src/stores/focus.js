@@ -217,6 +217,9 @@ export const useFocusStore = defineStore('focus', () => {
       // 更新对焦状态
       focusCompleted.value = true;
       focusStatus.value = '已对焦';
+      
+      // 不再自动显示对焦图像缩略图，而是等待用户点击"保存对焦位置"按钮
+      // loadFocusImages(); 
     }
     
     // 对焦结束
@@ -311,15 +314,21 @@ export const useFocusStore = defineStore('focus', () => {
   
   // 计算清晰度
   function calculateClarity(z, isEncoder = false) {
-    if (isEncoder) {
-      z = z / 1000.0; // 将编码器值转换为毫米
-    }
+    // 如果输入的是编码器值（微米），直接使用
+    // 如果是毫米值，转换为微米
+    const zInMicrons = isEncoder ? z : z * 1000;
     
-    const diff = z - bestZ.value;
-    const range = zRange.value.max - zRange.value.min;
+    // 最佳焦点位置固定在10000微米
+    const optimalPosition = 10000;
     
-    // 使用高斯函数模拟清晰度
-    let clarity = Math.max(0.0, Math.min(1.0, (1.0 + Math.random() * 0.05) * (1 - Math.abs(diff) / range * 1.5)));
+    // 计算与最佳位置的距离（微米）
+    const distance = Math.abs(zInMicrons - optimalPosition);
+    
+    // 使用高斯函数计算清晰度，范围在2000微米内
+    const maxDistance = 2000; // 2000微米范围内有效
+    const clarity = Math.exp(-(distance * distance) / (2 * maxDistance * maxDistance));
+    
+    // 返回0-1之间的值，保留3位小数
     return Math.round(clarity * 1000) / 1000;
   }
 

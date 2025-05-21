@@ -83,7 +83,7 @@
       if (cameraStore.isConnected && !cameraStore.isPollingPaused && !focusStore.viewingThumbnail) {
         cameraStore.fetchCameraImage();
       }
-    }, 1000);
+    }, 500);
   }
   
   // 监听连接状态变化

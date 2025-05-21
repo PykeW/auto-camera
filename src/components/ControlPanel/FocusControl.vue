@@ -6,7 +6,7 @@
       <div class="focus-section-container">
         <!-- 轴选择下拉列表 -->
         <div class="control-item side-by-side">
-          <label for="focus-axis-select">选择轴:</label>
+          <label for="focus-axis-select">Z轴选择:</label>
           <select id="focus-axis-select" class="compact-select" v-model="selectedAxisId">
             <option v-for="axis in plcAxes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
           </select>
@@ -14,7 +14,7 @@
         
         <!-- 当前轴位置显示和点动控制 -->
         <div class="control-item side-by-side">
-          <label for="focus-axis-position">轴位置:</label>
+          <label for="focus-axis-position">Z轴位置:</label>
           <div class="axis-position-control">
             <button 
               class="jog-btn minus" 
@@ -256,26 +256,28 @@
     }
   });
   
-  // 方法
-  // 点动控制
-  async function performJog(direction) {
-    if (!isConnected.value) return;
+  // 方法  
+  // 点动控制  
+  async function performJog(direction) {    
+    if (!isConnected.value) return;        
     
-    const step = stepValue.value;
+    // 确保从DOM中获取最新选择的步进值    
+    const stepSelect = document.getElementById('focus-step-select');    
+    const step = stepSelect ? parseFloat(stepSelect.value) : stepValue.value;        
     
-    // 检查是否会超出限制
-    if (direction < 0 && isMinLimitReached.value) return;
-    if (direction > 0 && isMaxLimitReached.value) return;
+    // 检查是否会超出限制    
+    if (direction < 0 && isMinLimitReached.value) return;    
+    if (direction > 0 && isMaxLimitReached.value) return;        
     
-    // 执行点动
-    await axisStore.jogAxis(selectedAxisName.value, direction, step);
+    // 执行点动    
+    await axisStore.jogAxis(selectedAxisName.value, direction, step);        
     
-    // 更新清晰度
-    if (selectedAxisName.value === 'Z') {
-      const isEncoder = displayUnit.value === 'um';
-      const z = isEncoder ? positionEncoder.value : position.value;
-      focusStore.clarity = focusStore.calculateClarity(z, isEncoder);
-    }
+    // 更新清晰度    
+    if (selectedAxisName.value === 'Z') {      
+      const isEncoder = displayUnit.value === 'um';      
+      const z = isEncoder ? positionEncoder.value : position.value;      
+      focusStore.clarity = focusStore.calculateClarity(z, isEncoder);    
+    }  
   }
   
   // 切换单位
@@ -300,12 +302,22 @@
       return;
     }
     
+    showMessage('自动对焦开始', 'info');
+    
+    // 创建一次性的watch来监听对焦状态
+    const unwatch = watch(() => focusStore.focusCompleted, (newVal, oldVal) => {
+      if (newVal && !oldVal) {
+        // 对焦完成时
+        showMessage('自动对焦已完成', 'success');
+        unwatch(); // 移除监听器
+      }
+    });
+
     const result = await focusStore.startAutoFocus(range, step);
     
-    if (result) {
-      showMessage('自动对焦开始', 'info');
-    } else {
+    if (!result) {
       showMessage('无法开始自动对焦', 'error');
+      unwatch(); // 如果无法开始，也要移除监听器
     }
   }
   
@@ -328,11 +340,6 @@
     
     if (result) {
       showMessage('对焦位置已保存', 'success');
-      
-      // 如果对焦已完成且有图像，显示缩略图
-      if (focusStore.focusCompleted && focusStore.focusImages.length > 0 && !focusStore.viewingThumbnail) {
-        focusStore.loadFocusImages();
-      }
     }
   }
   

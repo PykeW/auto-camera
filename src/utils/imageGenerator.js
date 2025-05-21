@@ -72,9 +72,22 @@ export function generateCameraImage(width = 640, height = 480) {
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       
+      // 确保清晰度在有效范围内
+      clarity = Math.max(0, Math.min(1, clarity));
+      
       // 绘制白色背景
-      ctx.fillStyle = 'white';
+      ctx.fillStyle = '#f2f2f2';
       ctx.fillRect(0, 0, width, height);
+      
+      // 添加随机纹理以增加真实感
+      const textureOpacity = 0.03;
+      ctx.fillStyle = `rgba(0, 0, 0, ${textureOpacity})`;
+      for (let i = 0; i < 5000; i++) {
+        const x = Math.random() * width;
+        const y = Math.random() * height;
+        const size = 1 + Math.random() * 2;
+        ctx.fillRect(x, y, size, size);
+      }
       
       // 绘制网格线
       ctx.strokeStyle = '#AAAAAA';
@@ -100,75 +113,105 @@ export function generateCameraImage(width = 640, height = 480) {
         ctx.stroke();
       }
       
-      // 在中心区域绘制一些文本和形状
-      const centerX = width / 2;
-      const centerY = height / 2;
+      // 绘制分辨率测试图案
+      ctx.font = '20px Arial';
+      const testText = "1234567890 ABCDEFGHIJKLM";
+      ctx.fillText(testText, width / 2 - 150, height / 2 + 100);
       
-      // 根据清晰度模拟环状效果
-      const ringsIntensity = Math.max(0, 1 - clarity) * 0.8;
-      
-      if (ringsIntensity > 0.05) {
-        // 绘制多个同心圆，模拟Momus焦平面效果
-        const maxRings = 5;
-        for (let i = 1; i <= maxRings; i++) {
-          const ringRadius = i * 30;
-          const ringOpacity = ringsIntensity * (maxRings - i + 1) / maxRings;
-          
-          // 设置圆环颜色
-          ctx.strokeStyle = `rgba(0, 120, 255, ${ringOpacity})`;
-          
-          // 计算环的厚度 - 清晰度越低环越宽
-          const thickness = Math.max(1, Math.floor(3 * ringsIntensity));
-          
-          // 绘制圆环
-          for (let t = 0; t < thickness; t++) {
+      // 根据清晰度模拟焦点效果
+      if (clarity < 1.0) {
+        // 首先，模拟Bokeh效果（光晕效果）
+        if (clarity < 0.7) {
+          const bokehCount = Math.floor((1 - clarity) * 15);
+          for (let i = 0; i < bokehCount; i++) {
+            const bokehX = width / 2 + (Math.random() - 0.5) * width * 0.7;
+            const bokehY = height / 2 + (Math.random() - 0.5) * height * 0.7;
+            const bokehSize = 10 + Math.random() * 20;
+            const gradient = ctx.createRadialGradient(
+              bokehX, bokehY, 0,
+              bokehX, bokehY, bokehSize
+            );
+            gradient.addColorStop(0, `rgba(255, 255, 255, ${0.3 * (1 - clarity)})`);
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = gradient;
             ctx.beginPath();
-            ctx.arc(centerX, centerY, ringRadius + t, 0, Math.PI * 2);
-            ctx.stroke();
+            ctx.arc(bokehX, bokehY, bokehSize, 0, Math.PI * 2);
+            ctx.fill();
           }
+        }
+        
+        // 模拟模糊效果
+        // 1. 使用白色半透明叠加
+        const blurOpacity = Math.min(0.7, (1 - clarity) * 0.5);
+        ctx.fillStyle = `rgba(255, 255, 255, ${blurOpacity})`;
+        ctx.fillRect(0, 0, width, height);
+        
+        // 2. 绘制模糊圆环，模拟不同程度的散焦
+        const maxBlurRings = 3;
+        for (let i = 1; i <= maxBlurRings; i++) {
+          const blurRadius = 80 + i * 40;
+          const ringOpacity = (1 - clarity) * 0.15;
+          
+          ctx.strokeStyle = `rgba(150, 150, 150, ${ringOpacity})`;
+          ctx.lineWidth = 1 + (1 - clarity) * 5;
+          ctx.beginPath();
+          ctx.arc(width / 2, height / 2, blurRadius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 3. 根据清晰度，添加色差效果，模拟色差像差
+        if (clarity < 0.7) {
+          const aberrationOffset = (1 - clarity) * 5;
+          
+          // 保存原始画布内容
+          const imageData = ctx.getImageData(0, 0, width, height);
+          
+          // 红色通道偏移
+          ctx.globalCompositeOperation = 'screen';
+          ctx.fillStyle = `rgba(255, 0, 0, 0.3)`;
+          ctx.fillRect(aberrationOffset, 0, width, height);
+          
+          // 蓝色通道偏移
+          ctx.fillStyle = `rgba(0, 0, 255, 0.3)`;
+          ctx.fillRect(-aberrationOffset, 0, width, height);
+          
+          // 恢复正常混合模式
+          ctx.globalCompositeOperation = 'source-over';
         }
       }
       
-      // 绘制文本框
-      const text = `Z: ${(zPosition/1000).toFixed(3)}mm`;
-      const fontSize = 40;
-      const textWidth = text.length * fontSize / 2;
-      const textHeight = fontSize;
-      
-      ctx.fillStyle = '#EEEEEE';
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.rect(centerX - textWidth/2, centerY - textHeight/2, textWidth, textHeight);
-      ctx.fill();
-      ctx.stroke();
-      
-      // 绘制一些形状
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.rect(centerX - 100, centerY - 100, 200, 200);
-      ctx.stroke();
-      
-      ctx.strokeStyle = 'blue';
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 80, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // 模拟模糊效果 - 通过简化的方法模拟，因为Canvas不支持直接的高斯模糊
-      if (clarity < 1) {
-        // 模拟模糊效果，可以根据需要实现
-        // 1. 可以使用filter: blur() CSS属性在前端展示
-        // 2. 可以实现简单的盒子模糊算法
-        // 3. 这里我们通过半透明白色矩形来简单模拟
+      // 显示在最佳焦点位置会出现的更多细节
+      if (clarity > 0.85) {
+        // 绘制精细线条和细节，这些只有在接近最佳焦点时才能看到
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 0.5;
         
-        const blurAmount = (1 - clarity) * 0.6;
-        ctx.fillStyle = `rgba(255, 255, 255, ${blurAmount})`;
-        ctx.fillRect(0, 0, width, height);
+        // 绘制放射线
+        const rayCount = 12;
+        for (let i = 0; i < rayCount; i++) {
+          const angle = (i / rayCount) * Math.PI * 2;
+          const endX = width / 2 + Math.cos(angle) * 200;
+          const endY = height / 2 + Math.sin(angle) * 200;
+          
+          ctx.beginPath();
+          ctx.moveTo(width / 2, height / 2);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+        }
+        
+        // 添加更多的细节文字
+        ctx.font = '8px Arial';
+        ctx.fillStyle = '#000000';
+        for (let i = 0; i < 360; i += 30) {
+          const angle = i * Math.PI / 180;
+          const textX = width / 2 + Math.cos(angle) * 150;
+          const textY = height / 2 + Math.sin(angle) * 150;
+          ctx.fillText(`${i}°`, textX, textY);
+        }
       }
       
       // 转换为base64数据URL
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
       resolve(dataUrl);
     });
   }

@@ -61,7 +61,7 @@ export const useAxisStore = defineStore('axis', () => {
     // 初始化轴位置（毫米值）
     positions.value.X = randomPosition(-100, 100);
     positions.value.Y = randomPosition(-100, 100);
-    positions.value.Z = randomPosition(0, 50);
+    positions.value.Z = 7.0; // 设置为7mm，对应7000μm
     positions.value.U = randomPosition(-180, 180);
     
     // 初始化编码器值
@@ -89,8 +89,9 @@ export const useAxisStore = defineStore('axis', () => {
     const currentPos = positions.value[axis];
     const limits = axisLimits.value[axis];
     
-    // 计算新位置
-    let newPos = currentPos + stepValue * direction;
+    // 计算新位置，根据当前单位进行转换
+    let adjustedStep = displayUnit.value === 'um' ? stepValue / 1000 : stepValue;
+    let newPos = currentPos + adjustedStep * direction;
     
     // 限制在范围内
     newPos = Math.max(limits.min, Math.min(limits.max, newPos));
@@ -102,9 +103,9 @@ export const useAxisStore = defineStore('axis', () => {
     positions.value[axis] = newPos;
     positionsEncoder.value[axis] = Math.round(newPos * 1000);
     
-    // 如果是Z轴移动，需要更新焦点控制
-    if (axis === 'Z') {
-      // 这里可以调用focus store的方法更新清晰度等参数
+    // 如果是Z轴移动，需要更新相机图像
+    if (axis === 'Z' && !cameraStore.isPollingPaused) {
+      cameraStore.fetchCameraImage();
     }
     
     return true;
