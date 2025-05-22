@@ -4,6 +4,7 @@ import { ref, computed } from 'vue';
 import { generateCameraImage, generateFocusImage } from '../utils/imageGenerator';
 import { useFocusStore } from './focus';
 import { useAxisStore } from './axis';
+import { useCalibrationStore } from './calibration'; // 新增导入
 
 export const useCameraStore = defineStore('camera', () => {
   // 状态
@@ -73,10 +74,22 @@ export const useCameraStore = defineStore('camera', () => {
   // 获取相机图像
   async function fetchCameraImage() {
     if (!isConnected.value) return;
-    
+
     const focusStore = useFocusStore();
     const axisStore = useAxisStore();
-    
+    const calibrationStore = useCalibrationStore(); // 新增
+
+    // 条件：当 calibrationStore 中的 selectedAxes 同时包含 'X' 和 'Y' 时，切换图片
+    const xySelected = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
+
+    if (xySelected) {
+      cameraImageUrl.value = '/9dian/12_161833.png';
+      cachedImageUrl.value = '/9dian/12_161833.png';
+      cachedTimestamp.value = Date.now();
+      // focusStore.clarity = someDefaultClarity; // 根据需要处理清晰度
+      return cameraImageUrl.value;
+    }
+
     // 获取当前Z轴位置
     const zPosition = axisStore.positions['Z'];
     const zPositionEncoder = axisStore.positionsEncoder['Z'];

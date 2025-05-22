@@ -1,4 +1,4 @@
- <!-- src/components/ControlPanel/index.vue -->
+<!-- src/components/ControlPanel/index.vue -->
 <template>
     <aside class="control-panel" id="control-panel-content">
       <CameraConnection />
@@ -6,6 +6,7 @@
       <CameraProperties />
       <FocusControl />
       <CalibrationControl />
+      <MarkPointControl />
     </aside>
   </template>
   
@@ -15,4 +16,5 @@
   import CameraProperties from './CameraProperties.vue';
   import FocusControl from './FocusControl.vue';
   import CalibrationControl from './CalibrationControl.vue';
+  import MarkPointControl from './MarkPointControl.vue';
   </script>
