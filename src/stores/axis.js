@@ -59,10 +59,10 @@ export const useAxisStore = defineStore('axis', () => {
   // 方法
   function initializePositions() {
     // 初始化轴位置（毫米值）
-    positions.value.X = randomPosition(-100, 100);
-    positions.value.Y = randomPosition(-100, 100);
-    positions.value.Z = 7.0; // 设置为7mm，对应7000μm
-    positions.value.U = randomPosition(-180, 180);
+    positions.value.X = 5.0; // 5000um
+    positions.value.Y = 6.0; // 6000um
+    positions.value.Z = 7.0; // 7000um
+    positions.value.U = 7.0; // 7000um（如需角度可再调整）
     
     // 初始化编码器值
     updateEncoderPositions();

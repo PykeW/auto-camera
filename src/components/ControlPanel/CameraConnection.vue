@@ -12,7 +12,7 @@
   </template>
   
   <script setup>
-  import { ref, computed } from 'vue';
+  import { ref, computed, onMounted } from 'vue';
   import { useCameraStore } from '../../stores/camera';
   import { useAxisStore } from '../../stores/axis';
   
@@ -38,4 +38,12 @@
       await cameraStore.disconnect();
     }
   }
+  
+  // 组件挂载时自动连接相机
+  onMounted(async () => {
+    if (!isConnected.value) {
+      await cameraStore.connect();
+      axisStore.initializePositions();
+    }
+  });
   </script>

@@ -40,8 +40,8 @@
           <div class="axes-params-section">
             <!-- X轴参数区域 -->
             <div v-if="selectedX" class="axis-params">
-              <!-- X轴位置显示和点动控制 -->
-              <div class="control-item side-by-side">
+              <!-- X轴位置显示、点动、步进选择合并一行 -->
+              <div class="axis-control-row">
                 <label for="x-axis-position">X轴位置:</label>
                 <div class="axis-position-control">
                   <button 
@@ -65,22 +65,22 @@
                     :disabled="!isConnected || isXMaxLimitReached"
                     @click="performXJog(1)"
                   >+</button>
+                  <select 
+                    id="x-step-select" 
+                    class="compact-select step-select"
+                    v-model="xStepValue"
+                  >
+                    <option v-for="option in stepOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
                 </div>
-                <select 
-                  id="x-step-select" 
-                  class="compact-select step-select"
-                  v-model="xStepValue"
-                >
-                  <option v-for="option in stepOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
               </div>
               
               <!-- X轴速度显示 -->
               <div class="control-item side-by-side">
                 <label for="x-axis-speed">X轴速度:</label>
-                <div class="speed-display-container">
+                <div class="position-display-container">
                   <input 
                     type="number" 
                     id="x-axis-speed" 
@@ -97,8 +97,7 @@
             
             <!-- Y轴参数区域 -->
             <div v-if="selectedY" class="axis-params">
-              <!-- Y轴位置显示和点动控制 -->
-              <div class="control-item side-by-side">
+              <div class="axis-control-row">
                 <label for="y-axis-position">Y轴位置:</label>
                 <div class="axis-position-control">
                   <button 
@@ -122,22 +121,22 @@
                     :disabled="!isConnected || isYMaxLimitReached"
                     @click="performYJog(1)"
                   >+</button>
+                  <select 
+                    id="y-step-select" 
+                    class="compact-select step-select"
+                    v-model="yStepValue"
+                  >
+                    <option v-for="option in stepOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
                 </div>
-                <select 
-                  id="y-step-select" 
-                  class="compact-select step-select"
-                  v-model="yStepValue"
-                >
-                  <option v-for="option in stepOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
               </div>
               
               <!-- Y轴速度显示 -->
               <div class="control-item side-by-side">
                 <label for="y-axis-speed">Y轴速度:</label>
-                <div class="speed-display-container">
+                <div class="position-display-container">
                   <input 
                     type="number" 
                     id="y-axis-speed" 
@@ -154,8 +153,7 @@
             
             <!-- U轴参数区域 -->
             <div v-if="selectedU" class="axis-params">
-              <!-- U轴位置显示和点动控制 -->
-              <div class="control-item side-by-side">
+              <div class="axis-control-row">
                 <label for="u-axis-position">U轴位置:</label>
                 <div class="axis-position-control">
                   <button 
@@ -179,22 +177,22 @@
                     :disabled="!isConnected || isUMaxLimitReached"
                     @click="performUJog(1)"
                   >+</button>
+                  <select 
+                    id="u-step-select" 
+                    class="compact-select step-select"
+                    v-model="uStepValue"
+                  >
+                    <option v-for="option in uStepOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}
+                    </option>
+                  </select>
                 </div>
-                <select 
-                  id="u-step-select" 
-                  class="compact-select step-select"
-                  v-model="uStepValue"
-                >
-                  <option v-for="option in uStepOptions" :key="option.value" :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
               </div>
               
               <!-- U轴速度显示 -->
               <div class="control-item side-by-side">
                 <label for="u-axis-speed">U轴速度:</label>
-                <div class="speed-display-container">
+                <div class="position-display-container">
                   <input 
                     type="number" 
                     id="u-axis-speed" 
@@ -224,9 +222,16 @@
           <label for="point-offset">点位偏移(mm):</label>
           <input type="number" id="point-offset" v-model="pointOffset" step="0.1" min="0.1">
         </div>
-        <div class="control-item side-by-side">
-          <label for="mark-size">Mark点尺寸(mm):</label>
-          <input type="number" id="mark-size" v-model="markSize" step="0.1" min="0.1">
+        
+        <!-- Mark点方式选择和图片显示 -->
+        <div class="control-item side-by-side" v-if="selectedX && selectedY">
+          <label for="mark-method">Mark点方式:</label>
+          <select id="mark-method" class="compact-select" v-model="calibrationStore.markMethod" @change="onMarkMethodChange">
+            <option value="template">模板匹配</option>
+            <option value="circle">圆形检测</option>
+            <option value="cross">十字检测</option>
+          </select>
+          <img v-if="calibrationStore.markPreviewImg" :src="calibrationStore.markPreviewImg" alt="Mark点示例" style="height:32px;margin-left:8px;border-radius:4px;" />
         </div>
       </div>
       
@@ -680,9 +685,10 @@
     set: (value) => calibrationStore.pointOffset = parseFloat(value)
   });
   
-  const markSize = computed({
-    get: () => calibrationStore.markSize,
-    set: (value) => calibrationStore.markSize = parseFloat(value)
+  const markMethod = ref('template');
+  const markPreviewImg = computed(() => {
+    // 这里只用一张图片做示例，实际可根据markMethod切换不同图片
+    return '/9dian/12_161825.png';
   });
   
   const squareSize = computed({
@@ -843,6 +849,11 @@
       showMessage('当量计算失败', 'error');
     }
   }
+  
+  // Mark点方式变更处理
+  function onMarkMethodChange(e) {
+    calibrationStore.setMarkMethod(e.target.value);
+  }
   </script>
   
   <style scoped>
@@ -919,7 +930,7 @@
     border: 1px solid #444;
     border-radius: 3px;
     appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
     background-position: right 5px center;
     background-repeat: no-repeat;
     background-size: .65em auto;
