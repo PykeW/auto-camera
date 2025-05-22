@@ -223,41 +223,68 @@
           <input type="number" id="point-offset" v-model="pointOffset" step="0.1" min="0.1">
         </div>
         
-        <!-- Mark点方式选择和图片显示 -->
+        <!-- Mark点方式选择和参数 -->
         <div class="control-item side-by-side" v-if="selectedX && selectedY">
           <label for="mark-method">Mark点方式:</label>
           <select id="mark-method" class="compact-select" v-model="calibrationStore.markMethod" @change="onMarkMethodChange">
             <option value="template">模板匹配</option>
-            <option value="circle">圆形检测</option>
-            <option value="cross">十字检测</option>
+            <option value="contourExtraction">轮廓提取</option>
+            <!-- <option value="circle">圆形检测</option> -->
+            <!-- <option value="cross">十字检测</option> -->
           </select>
           <img v-if="calibrationStore.markPreviewImg" :src="calibrationStore.markPreviewImg" alt="Mark点示例" style="height:32px;margin-left:8px;border-radius:4px;" />
+        </div>
+
+        <!-- Parameters for Template Matching -->
+        <div v-if="calibrationStore.markMethod === 'template' && selectedX && selectedY" class="parameters-group control-group">
+          <h5 class="parameters-title">模板匹配参数</h5>
+          <div class="control-item side-by-side">
+            <label for="capture-template-roi-btn">模板图片:</label>
+            <button id="capture-template-roi-btn" class="secondary-button compact-input" @click="captureTemplateFromROI">
+              <i class="fas fa-crop-alt"></i> 截取模板ROI
+            </button>
+          </div>
+          <div v-if="templateMatchingParams.templateImage" class="control-item side-by-side template-preview-container">
+            <label>模板预览:</label>
+            <img :src="templateMatchingParams.templateImage" alt="模板预览" class="template-preview-img">
+          </div>
+          <div class="control-item side-by-side">
+            <label for="matching-threshold">匹配阈值:</label>
+            <input type="number" id="matching-threshold" class="compact-input" v-model="templateMatchingParams.threshold" min="0" max="1" step="0.01">
+          </div>
+          <div class="control-item button-group-inline">
+            <button class="secondary-button" @click="drawTemplate" :disabled="!templateMatchingParams.templateImage">
+              <i :class="roiStore.isDrawingTemplateOnOverlay && roiStore.templateDataUrlForOverlay === templateMatchingParams.templateImage ? 'fas fa-eye-slash' : 'fas fa-paint-brush'"></i> 
+              {{ drawTemplateButtonText }}
+            </button>
+            <button class="secondary-button" @click="detectMarkWithTemplate" :disabled="!templateMatchingParams.templateImage">
+              <i class="fas fa-search-location"></i> 检测
+            </button>
+          </div>
+        </div>
+
+        <!-- Parameters for Contour Extraction -->
+        <div v-if="calibrationStore.markMethod === 'contourExtraction' && selectedX && selectedY" class="parameters-group control-group">
+          <h5 class="parameters-title">轮廓提取参数</h5>
+          <div class="control-item side-by-side">
+            <label for="contour-min-area">最小面积:</label>
+            <input type="number" id="contour-min-area" class="compact-input" v-model="contourExtractionParams.minArea">
+          </div>
+          <div class="control-item side-by-side">
+            <label for="contour-max-area">最大面积:</label>
+            <input type="number" id="contour-max-area" class="compact-input" v-model="contourExtractionParams.maxArea">
+          </div>
+           <!-- Add detect button for contour if needed -->
         </div>
       </div>
       
       <!-- 标定操作按钮区域 -->
       <div class="calibration-buttons-group">
         <button 
-          id="detect-mark-btn" 
-          class="primary-button"
-          @click="detectMarkPoint"
-          :disabled="!isConnected || isCalibrating || !canStartCalibration"
-        >
-          <i class="fas fa-crosshairs"></i> 检测Mark点
-        </button>
-        <button 
-          id="center-mark-btn" 
-          class="primary-button"
-          @click="centerMarkPoint"
-          :disabled="!isConnected || isCalibrating || !markDetected || !canStartCalibration"
-        >
-          <i class="fas fa-compress-arrows-alt"></i> 居中Mark点
-        </button>
-        <button 
           id="start-calib-btn" 
           class="primary-button"
           @click="startCalibration"
-          :disabled="!isConnected || isCalibrating || !markCentered || !canStartCalibration"
+          :disabled="!isConnected || isCalibrating || !canStartCalibration"
         >
           <i class="fas fa-play-circle"></i> 开始标定
         </button>
@@ -269,28 +296,14 @@
         >
           <i class="fas fa-stop-circle"></i> 停止标定
         </button>
-      </div>
-      
-      <!-- 标定进度与状态区域 -->
-      <div class="status-container">
-        <div class="status-row">
-          <label>标定状态:</label>
-          <span id="calibration-status" class="status-chip">{{ calibrationStatus }}</span>
-        </div>
-        <div class="status-row">
-          <label>当前点位:</label>
-          <span id="current-point" class="status-chip">{{ currentPointText }}</span>
-        </div>
-        <div class="progress-row">
-          <label>进度:</label>
-          <div class="progress-bar">
-            <div 
-              id="calibration-progress" 
-              class="progress" 
-              :style="{ width: calibrationProgress + '%' }"
-            >{{ calibrationProgress }}%</div>
-          </div>
-        </div>
+        <button 
+          id="reset-calib-btn" 
+          class="secondary-button"
+          @click="resetCalibration"
+          :disabled="!isConnected || isCalibrating"
+        >
+          <i class="fas fa-redo"></i> 重置结果
+        </button>
       </div>
       
       <!-- 结果操作按钮 -->
@@ -339,17 +352,19 @@
   </template>
   
   <script setup>
-  import { ref, computed, watch } from 'vue';
+  import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
   import { useCameraStore } from '../../stores/camera';
   import { useFocusStore } from '../../stores/focus';
   import { useCalibrationStore } from '../../stores/calibration';
   import { useAxisStore } from '../../stores/axis';
+  import { useRoiStore } from '../../stores/roi'; // Import ROI store
   import { showMessage } from '../../utils/helpers';
   
   const cameraStore = useCameraStore();
   const focusStore = useFocusStore();
   const calibrationStore = useCalibrationStore();
   const axisStore = useAxisStore();
+  const roiStore = useRoiStore(); // Initialize ROI store
   
   // 计算属性
   const isConnected = computed(() => cameraStore.isConnected);
@@ -361,6 +376,13 @@
   const hasCalibrationResult = computed(() => !!calibrationStore.calibrationResult);
   const plcAxes = computed(() => axisStore.plcAxes);
   const displayUnit = computed(() => axisStore.displayUnit);
+  
+  // 绘制模板按钮文字
+  const drawTemplateButtonText = computed(() => {
+    return roiStore.isDrawingTemplateOnOverlay && 
+           roiStore.templateDataUrlForOverlay === templateMatchingParams.value.templateImage 
+           ? '隐藏模板' : '绘制模板';
+  });
   
   // U轴单位控制（度/弧度）
   const uUnitMode = ref('deg'); // 'deg' 或 'rad'
@@ -392,6 +414,239 @@
   const uSpeedStep = computed(() => uUnitMode.value === 'deg' ? 0.1 : 0.01);
   const uSpeedMin = computed(() => uUnitMode.value === 'deg' ? 0.1 : 0.01);
   
+  // --- Start of MarkPointControl related script ---
+  const templateMatchingParams = ref({
+    templateImage: null, // Will store data URL of the captured ROI
+    threshold: 0.8,
+  });
+  const contourExtractionParams = ref({
+    minArea: 100,
+    maxArea: 1000,
+  });
+  
+  // 组件挂载后初始化函数
+  onMounted(() => {
+    // 初始化时同步模板参数
+    console.log('组件挂载：同步模板参数');
+    
+    // 优先从roiStore获取模板
+    if (roiStore.capturedTemplateDataUrl) {
+      console.log('从roiStore获取模板数据');
+      templateMatchingParams.value.templateImage = roiStore.capturedTemplateDataUrl;
+      
+      // 同时也更新calibrationStore的模板参数
+      if (calibrationStore.templateMatchingParams) {
+        calibrationStore.templateMatchingParams.templateImageSrc = roiStore.capturedTemplateDataUrl;
+        calibrationStore.templateMatchingParams.threshold = templateMatchingParams.value.threshold;
+      }
+    }
+    
+    // 添加自定义事件监听器，接收模板捕获事件
+    window.addEventListener('template-captured', (event) => {
+      console.log('接收到template-captured事件');
+      if (event.detail && event.detail.templateDataUrl) {
+        console.log('从事件中获取模板数据');
+        templateMatchingParams.value.templateImage = event.detail.templateDataUrl;
+        
+        // 同步到calibrationStore
+        if (calibrationStore.templateMatchingParams) {
+          calibrationStore.templateMatchingParams.templateImageSrc = event.detail.templateDataUrl;
+          calibrationStore.templateMatchingParams.threshold = templateMatchingParams.value.threshold;
+        }
+      }
+    });
+    
+    // 添加模板状态检查和恢复工具
+    window._debug_template = {
+      // 检查模板状态
+      check: () => {
+        console.log('=== 模板状态检查 ===');
+        console.log('本地模板:', !!templateMatchingParams.value.templateImage);
+        console.log('ROI存储模板:', !!roiStore.capturedTemplateDataUrl);
+        console.log('ROI显示模板:', !!roiStore.templateDataUrlForOverlay);
+        console.log('标定存储模板:', !!calibrationStore.templateMatchingParams?.templateImageSrc);
+        console.log('模板显示状态:', roiStore.isDrawingTemplateOnOverlay);
+        return {
+          localTemplate: !!templateMatchingParams.value.templateImage,
+          roiTemplate: !!roiStore.capturedTemplateDataUrl,
+          overlayTemplate: !!roiStore.templateDataUrlForOverlay,
+          calibTemplate: !!calibrationStore.templateMatchingParams?.templateImageSrc,
+          isShowing: roiStore.isDrawingTemplateOnOverlay
+        };
+      },
+      
+      // 同步模板状态 - 从任一来源同步到所有地方
+      sync: () => {
+        console.log('=== 同步模板数据 ===');
+        // 从任一可用源获取模板
+        let templateSource = templateMatchingParams.value.templateImage ||
+                            roiStore.capturedTemplateDataUrl ||
+                            roiStore.templateDataUrlForOverlay ||
+                            calibrationStore.templateMatchingParams?.templateImageSrc;
+        
+        if (!templateSource) {
+          console.log('没有可用的模板数据源');
+          return false;
+        }
+        
+        console.log('找到模板数据，长度:', templateSource.length);
+        
+        // 同步到所有位置
+        templateMatchingParams.value.templateImage = templateSource;
+        roiStore.capturedTemplateDataUrl = templateSource;
+        
+        if (calibrationStore.templateMatchingParams) {
+          calibrationStore.templateMatchingParams.templateImageSrc = templateSource;
+        } else {
+          calibrationStore.templateMatchingParams = {
+            templateImageSrc: templateSource,
+            threshold: 0.7
+          };
+        }
+        
+        console.log('模板数据已同步到所有存储位置');
+        return true;
+      },
+      
+      // 显示/隐藏模板
+      toggle: () => {
+        if (!roiStore.templateDataUrlForOverlay && !roiStore.isDrawingTemplateOnOverlay) {
+          // 尝试从可用源显示
+          let source = templateMatchingParams.value.templateImage || 
+                      roiStore.capturedTemplateDataUrl ||
+                      calibrationStore.templateMatchingParams?.templateImageSrc;
+                      
+          if (source) {
+            roiStore.toggleTemplateDrawingOnOverlay(source);
+            return true;
+          }
+          return false;
+        } else {
+          // 已显示则隐藏
+          roiStore.toggleTemplateDrawingOnOverlay(null);
+          return true;
+        }
+      }
+    };
+    
+    // 添加重新显示模板的调试方法
+    window._debug_showTemplate = () => {
+      console.log('模板检查 - templateMatchingParams:', !!templateMatchingParams.value.templateImage);
+      console.log('模板检查 - roiStore模板:', !!roiStore.capturedTemplateDataUrl);
+    };
+  });
+  
+  // 组件卸载时清理
+  onUnmounted(() => {
+    // 移除事件监听器
+    window.removeEventListener('template-captured', () => {
+      console.log('移除template-captured事件监听器');
+    });
+  });
+
+  function handleTemplateImageUpload(event) {
+    // This function is now obsolete for ROI capture, but kept for reference or future file input needs.
+    // For ROI capture, templateImage will be set directly with a data URL.
+    const file = event.target.files[0];
+    if (file) {
+      templateMatchingParams.value.templateImage = URL.createObjectURL(file);
+      showMessage(`已选择模板图片: ${file.name}`, 'info');
+    }
+  }
+
+  async function captureTemplateFromROI() {
+    showMessage('请在相机画面中绘制模板区域 (ROI)。', 'info');
+    try {
+      // 备份现有模板数据（如果有）
+      const existingTemplate = templateMatchingParams.value.templateImage;
+      
+      // 清除现有ROI
+      if (roiStore.roiEnabled) {
+        roiStore.clearROI();
+        await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟确保UI更新
+      }
+      
+      // 如果清除ROI后，模板被意外清除，恢复它
+      if (existingTemplate && !templateMatchingParams.value.templateImage) {
+        console.log('恢复备份的模板数据');
+        templateMatchingParams.value.templateImage = existingTemplate;
+      }
+      
+      // 启动ROI选择模式，指定用途为"template"
+      roiStore.startRoiSelection('template');
+      
+      console.log('已启动模板ROI选择模式');
+    } catch (error) {
+      showMessage(`截取模板ROI失败: ${error.message}`, 'error');
+      console.error('启动模板ROI截取时出错:', error);
+      roiStore.stopDrawingROI(); // 确保退出ROI绘制模式
+    }
+  }
+
+  // Watch for the template image data URL from the roiStore
+  // This assumes roiStore will have a property like `capturedTemplateDataUrl`
+  // which is set when an ROI is confirmed for template capture.
+  watch(() => roiStore.capturedTemplateDataUrl, (newDataUrl) => {
+    if (newDataUrl) {
+      console.log('ROI模板捕获 - 接收到新的模板数据URL，长度:', newDataUrl.length);
+      
+      // 更新本地模板数据
+      templateMatchingParams.value.templateImage = newDataUrl;
+      
+      // 同步到calibrationStore
+      if (calibrationStore.templateMatchingParams) {
+        console.log('同步模板数据到calibrationStore');
+        calibrationStore.templateMatchingParams.templateImageSrc = newDataUrl;
+        calibrationStore.templateMatchingParams.threshold = templateMatchingParams.value.threshold;
+      } else {
+        console.log('初始化calibrationStore模板参数');
+        calibrationStore.templateMatchingParams = {
+          templateImageSrc: newDataUrl,
+          threshold: templateMatchingParams.value.threshold
+        };
+      }
+      
+      showMessage('模板已从ROI截取成功。', 'success');
+      
+      // 额外的检查和调试信息
+      setTimeout(() => {
+        console.log('确认模板数据同步状态:');
+        console.log('- 本地模板:', !!templateMatchingParams.value.templateImage);
+        console.log('- calibrationStore模板:', !!calibrationStore.templateMatchingParams?.templateImageSrc);
+      }, 100);
+    }
+  }, { immediate: true });
+
+  async function detectMarkWithTemplate() {
+    if (!templateMatchingParams.value.templateImage) {
+      showMessage('请先截取模板图片。', 'warn');
+      return;
+    }
+    if (!cameraStore.isConnected && !(selectedX.value && selectedY.value)) {
+      showMessage('相机未连接，无法执行模板匹配检测。如果标定X和Y轴，请确保已选择它们以使用静态图像。', 'error');
+      return;
+    }
+
+    showMessage('开始模板匹配检测...', 'info');
+    try {
+      const success = await calibrationStore.detectMarkWithTemplateMatching({
+        templateImageSrc: templateMatchingParams.value.templateImage,
+        threshold: templateMatchingParams.value.threshold,
+      });
+      if (success && calibrationStore.detectedTemplatedMarks.length > 0) {
+        showMessage(`模板匹配成功，检测到 ${calibrationStore.detectedTemplatedMarks.length} 个标记。`, 'success');
+      } else if (success) {
+        showMessage('模板匹配完成，但未检测到标记。', 'warn');
+      } else {
+        showMessage('模板匹配检测失败。请检查控制台获取更多信息。', 'error');
+      }
+    } catch (error) {
+      showMessage(`模板匹配检测出错: ${error.message}`, 'error');
+      console.error('Error in detectMarkWithTemplate:', error);
+    }
+  }
+  // --- End of MarkPointControl related script ---
+
   // 步进选项
   const stepOptions = computed(() => {
     if (displayUnit.value === 'mm') {
@@ -700,8 +955,6 @@
     if (!canStartCalibration.value) return '请选择至少X和Y轴';
     if (isCalibrating.value) return '标定中';
     if (hasCalibrationResult.value) return '已完成';
-    if (markCentered.value) return '已居中Mark点';
-    if (markDetected.value) return '已检测Mark点';
     return '未开始';
   });
   
@@ -766,39 +1019,25 @@
     await axisStore.jogAxis(uAxisName.value, direction, step, uSpeed.value, uUnitMode.value);
   }
   
-  // 检测Mark点
-  async function detectMarkPoint() {
-    if (!isConnected.value || isCalibrating.value || !canStartCalibration.value) return;
-    
-    showMessage('正在检测Mark点...', 'info');
-    
-    const result = await calibrationStore.detectMarkPoint();
-    
-    if (result) {
-      showMessage('Mark点检测成功', 'success');
-    } else {
-      showMessage('Mark点检测失败', 'error');
-    }
-  }
-  
-  // 居中Mark点
-  async function centerMarkPoint() {
-    if (!isConnected.value || !markDetected.value || isCalibrating.value || !canStartCalibration.value) return;
-    
-    showMessage('正在居中Mark点...', 'info');
-    
-    const result = await calibrationStore.centerMarkPoint();
-    
-    if (result) {
-      showMessage('Mark点已居中', 'success');
-    } else {
-      showMessage('居中Mark点失败', 'error');
-    }
-  }
-  
   // 开始标定
   async function startCalibration() {
-    if (!isConnected.value || !markCentered.value || isCalibrating.value || !canStartCalibration.value) return;
+    if (!isConnected.value || isCalibrating.value || !canStartCalibration.value) return;
+    
+    // 如果有ROI设置，使用它，但不再强制要求
+    if (roiStore.roiEnabled && roiStore.roiCoords) {
+      console.log('使用已设置的ROI区域进行标定');
+    } else {
+      console.log('未设置ROI区域，将在整个图像上进行标定');
+    }
+    
+    // 确保templateMatchingParams存在
+    if (!calibrationStore.templateMatchingParams) {
+      console.log('创建calibrationStore.templateMatchingParams');
+      calibrationStore.templateMatchingParams = {
+        templateImageSrc: null,
+        threshold: 0.7
+      };
+    }
     
     // 设置选中的轴和对应的ID
     const axisMapping = {
@@ -853,6 +1092,38 @@
   // Mark点方式变更处理
   function onMarkMethodChange(e) {
     calibrationStore.setMarkMethod(e.target.value);
+  }
+
+  // 绘制/隐藏模板
+  function drawTemplate() {
+    if (!templateMatchingParams.value.templateImage) {
+      showMessage('没有可用的模板图片。', 'warn');
+      return;
+    }
+
+    // 切换模板的显示/隐藏状态
+    try {
+      // 如果当前正在显示此模板，则隐藏它；否则显示它
+      if (roiStore.isDrawingTemplateOnOverlay && 
+          roiStore.templateDataUrlForOverlay === templateMatchingParams.value.templateImage) {
+        roiStore.toggleTemplateDrawingOnOverlay(null); // 传null来关闭显示
+        showMessage('模板已隐藏。', 'info');
+      } else {
+        roiStore.toggleTemplateDrawingOnOverlay(templateMatchingParams.value.templateImage);
+        showMessage('模板已绘制在ROI区域上。', 'info');
+      }
+    } catch (error) {
+      showMessage(`模板绘制出错: ${error.message}`, 'error');
+      console.error('Error toggling template drawing:', error);
+    }
+  }
+
+  // 重置标定结果
+  function resetCalibration() {
+    if (!isConnected.value || isCalibrating.value) return;
+    
+    calibrationStore.resetCalibration();
+    showMessage('标定结果已重置', 'info');
   }
   </script>
   
@@ -1086,4 +1357,64 @@
     border: none;
     border-top: 1px solid #444;
   }
+
+  /* Styles from MarkPointControl, adapted */
+.parameters-group {
+  border: 1px solid #444;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 4px;
+  background-color: #2e2e2e; /* Slightly different background for the group */
+}
+
+.parameters-title {
+  font-size: 0.9em;
+  color: #c5c5c5;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.template-preview-container {
+  display: flex;
+  align-items: center;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.template-preview-container label {
+  margin-right: 8px; /* Adjust as needed */
+  min-width: 70px; /* Ensure label alignment */
+}
+
+.template-preview-img {
+  max-width: 100px; /* Adjust as needed */
+  max-height: 50px; /* Adjust as needed */
+  border: 1px solid #555;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.button-group-inline {
+  display: flex;
+  gap: 10px; /* Spacing between buttons */
+  margin-top: 5px;
+  justify-content: flex-start; /* Align buttons to the start */
+}
+
+.button-group-inline .secondary-button {
+  padding: 6px 10px; /* Adjust padding for potentially smaller buttons */
+  font-size: 0.85em;
+}
+
+/* Ensure compact-input style is applied if the button takes its place */
+.compact-input {
+  padding: 6px 8px;
+  font-size: 0.9em;
+  border-radius: 3px;
+  background-color: #333;
+  color: #ddd;
+  border: 1px solid #555;
+  flex-grow: 1; /* Allow input/button to take available space */
+  min-width: 0; /* Prevent overflow in flex containers */
+}
   </style>

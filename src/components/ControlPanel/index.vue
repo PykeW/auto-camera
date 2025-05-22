@@ -16,5 +16,4 @@
   import CameraProperties from './CameraProperties.vue';
   import FocusControl from './FocusControl.vue';
   import CalibrationControl from './CalibrationControl.vue';
-  import MarkPointControl from './MarkPointControl.vue';
   </script>

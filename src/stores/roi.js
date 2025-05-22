@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useCameraStore } from './camera';
+import { useCalibrationStore } from './calibration'; // Added for static image check
 
 export const useRoiStore = defineStore('roi', () => {
   // 状态
@@ -12,14 +13,24 @@ export const useRoiStore = defineStore('roi', () => {
   const polygonPoints = ref([]);
   const activeShapeTool = ref('rect');
   const activeDrawMode = ref('draw');
-  
+  const selectionPurpose = ref(null); // e.g., 'template', 'measurement'
+  const capturedTemplateDataUrl = ref(null);
+  const isDrawingTemplateOnOverlay = ref(false); // New state for template drawing
+  const templateDataUrlForOverlay = ref(null); // New state for template data URL for overlay
+
   // 方法
-  // 开始绘制ROI
-  function startDrawingROI() {
+  // 开始选择ROI，并指定用途
+  function startRoiSelection(purpose) {
     const cameraStore = useCameraStore();
-    if (!cameraStore.isConnected) return false;
+    if (!cameraStore.isConnected && purpose !== 'template') { // Allow template selection on static image
+        console.warn('Camera not connected, cannot start ROI selection unless for template on static image.');
+        return false;
+    }
     
+    selectionPurpose.value = purpose;
     isDrawingROI.value = true;
+    roiEnabled.value = false; // Disable existing ROI while drawing a new one
+    console.log(`ROI selection started for purpose: ${purpose}`);
     return true;
   }
   
@@ -30,12 +41,184 @@ export const useRoiStore = defineStore('roi', () => {
   }
   
   // 确认ROI
-  function confirmROI() {
+  async function confirmROI() {
     if (!isDrawingROI.value) return false;
     
     roiEnabled.value = true;
     isDrawingROI.value = false;
+    
+    console.log('ROI确认 - ROI用途:', selectionPurpose.value);
+
+    if (selectionPurpose.value === 'template') {
+      const cameraStore = useCameraStore();
+      const calibrationStore = useCalibrationStore();
+      
+      try {
+        // 获取当前图像源
+        let imageSrc = cameraStore.cameraImageUrl;
+
+        // 检查是否应该使用静态9点图像
+        const isStaticImageMode = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
+        if (isStaticImageMode) {
+          imageSrc = '/9dian/12_161833.png'; // 使用标定图片
+        }
+        
+        if (!imageSrc) {
+          console.error('没有可用的图像源进行模板截取');
+          selectionPurpose.value = null;
+          return false;
+        }
+
+        console.log('尝试从图像截取模板:', imageSrc.substring(0, 50) + '...');
+        console.log('ROI坐标:', roiCoords.value);
+        
+        // 截取模板图像
+        const croppedData = await cropImage(imageSrc, roiCoords.value);
+        
+        if (croppedData) {
+          console.log('模板截取成功，DataURL设置完成，长度:', croppedData.length);
+          
+          // 设置模板数据
+          capturedTemplateDataUrl.value = croppedData;
+          
+          // 直接同步到calibrationStore
+          if (calibrationStore.templateMatchingParams) {
+            console.log('直接同步模板数据到calibrationStore');
+            calibrationStore.templateMatchingParams.templateImageSrc = croppedData;
+          }
+          
+          // 自动显示模板在ROI上
+          toggleTemplateDrawingOnOverlay(croppedData);
+          
+          // 触发一个自定义事件，确保所有监听者都能接收到更新
+          try {
+            window.dispatchEvent(new CustomEvent('template-captured', { 
+              detail: { templateDataUrl: croppedData } 
+            }));
+            console.log('已触发template-captured事件');
+          } catch (err) {
+            console.warn('触发自定义事件失败:', err);
+          }
+        } else {
+          console.error('模板截取失败，没有返回数据');
+        }
+      } catch (error) {
+        console.error('模板截取过程中出错:', error);
+      }
+    }
+    
+    selectionPurpose.value = null;
     return true;
+  }
+
+  // 图像截取函数
+  async function cropImage(imageSrc, cropRect) {
+    return new Promise((resolve, reject) => {
+      // 创建一个新图像对象来加载源图像
+      const img = new Image();
+      img.crossOrigin = 'Anonymous'; // 处理可能的CORS问题
+      
+      img.onload = () => {
+        try {
+          console.log('图像已加载，尺寸:', img.width, 'x', img.height);
+          
+          // 创建一个Canvas元素
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // 计算实际裁剪区域（确保在图像边界内）
+          const cropX = Math.max(0, Math.floor(cropRect.l));
+          const cropY = Math.max(0, Math.floor(cropRect.t));
+          const cropWidth = Math.min(img.width - cropX, Math.floor(cropRect.r - cropRect.l));
+          const cropHeight = Math.min(img.height - cropY, Math.floor(cropRect.b - cropRect.t));
+          
+          console.log('裁剪区域:', cropX, cropY, cropWidth, cropHeight);
+          
+          // 验证裁剪尺寸
+          if (cropWidth <= 0 || cropHeight <= 0) {
+            console.error('无效的裁剪尺寸:', cropWidth, cropHeight);
+            reject(new Error('无效的裁剪尺寸'));
+            return;
+          }
+          
+          // 设置Canvas尺寸为裁剪区域大小
+          canvas.width = cropWidth;
+          canvas.height = cropHeight;
+          
+          // 将裁剪区域绘制到Canvas上
+          ctx.drawImage(
+            img,
+            cropX, cropY, cropWidth, cropHeight, // 源图像裁剪区域
+            0, 0, cropWidth, cropHeight          // 目标Canvas区域
+          );
+          
+          // 转换Canvas为DataURL
+          // 尝试使用高质量无损PNG格式
+          const dataURL = canvas.toDataURL('image/png', 1.0);
+          
+          // 验证输出
+          if (!dataURL || dataURL.length < 100 || !dataURL.startsWith('data:image/')) {
+            console.error('生成的DataURL无效');
+            reject(new Error('生成的DataURL无效'));
+            return;
+          }
+          
+          console.log('模板截取成功，DataURL长度:', dataURL.length);
+          resolve(dataURL);
+        } catch (err) {
+          console.error('Canvas操作错误:', err);
+          reject(err);
+        }
+      };
+      
+      img.onerror = (err) => {
+        console.error('图像加载失败:', err);
+        reject(new Error('图像加载失败'));
+      };
+      
+      // 开始加载图像
+      if (!imageSrc) {
+        console.error('图像源为空');
+        reject(new Error('图像源为空'));
+        return;
+      }
+      
+      // 设置图像源，开始加载
+      img.src = imageSrc;
+    });
+  }
+
+  function clearCapturedTemplateDataUrl() {
+    capturedTemplateDataUrl.value = null;
+    // Also stop drawing it on overlay if it's cleared
+    if (isDrawingTemplateOnOverlay.value && templateDataUrlForOverlay.value === null) { // Or check against the old value
+        isDrawingTemplateOnOverlay.value = false;
+    }
+    console.log('Captured template data URL cleared.');
+  }
+
+  // Action to toggle template drawing on the overlay
+  function toggleTemplateDrawingOnOverlay(templateDataUrl) {
+    // 如果模板已显示，则隐藏它
+    if (isDrawingTemplateOnOverlay.value) {
+      console.log('关闭模板显示');
+      isDrawingTemplateOnOverlay.value = false;
+      templateDataUrlForOverlay.value = null;
+    } 
+    // 如果提供了新模板，则显示它
+    else if (templateDataUrl) {
+      console.log('开始显示模板，DataURL长度:', templateDataUrl.length);
+      isDrawingTemplateOnOverlay.value = true;
+      templateDataUrlForOverlay.value = templateDataUrl;
+      
+      // 确保ROI已启用，以便显示模板
+      if (!roiEnabled.value && roiCoords.value) {
+        console.log('自动启用ROI显示以支持模板显示');
+        roiEnabled.value = true;
+      }
+    } else {
+      console.warn('无法显示模板：未提供模板数据');
+    }
   }
   
   // 清除ROI
@@ -43,10 +226,47 @@ export const useRoiStore = defineStore('roi', () => {
     const cameraStore = useCameraStore();
     if (!cameraStore.isConnected) return false;
     
+    // 备份模板数据 - 在任何操作前先保存
+    const templateDataBackup = capturedTemplateDataUrl.value;
+    const templateOverlayBackup = templateDataUrlForOverlay.value;
+    const wasDrawingTemplate = isDrawingTemplateOnOverlay.value;
+    
+    console.log('清除ROI - 备份模板数据状态:');
+    console.log('- 模板数据:', !!templateDataBackup);
+    console.log('- 显示模板:', !!templateOverlayBackup);
+    console.log('- 模板显示状态:', wasDrawingTemplate);
+    
+    // 清除ROI相关的状态
     roiEnabled.value = false;
     isDrawingROI.value = false;
     roiCoords.value = { l: 150, t: 100, r: 450, b: 400 };
     polygonPoints.value = [];
+    
+    // 如果正在绘制模板，先关闭绘制（但保留模板数据）
+    if (isDrawingTemplateOnOverlay.value) {
+      console.log('停止模板绘制，但保留模板数据');
+      isDrawingTemplateOnOverlay.value = false;
+    }
+    
+    // 保证模板数据不丢失
+    if (templateDataBackup) {
+      console.log('恢复模板数据 (长度:', templateDataBackup.length, ')');
+      capturedTemplateDataUrl.value = templateDataBackup;
+    }
+    
+    // 在短暂延迟后恢复模板显示（如果之前在显示）
+    if (wasDrawingTemplate && templateOverlayBackup) {
+      console.log('计划恢复模板显示');
+      setTimeout(() => {
+        console.log('恢复模板显示');
+        isDrawingTemplateOnOverlay.value = true;
+        templateDataUrlForOverlay.value = templateOverlayBackup;
+        
+        // 启用ROI来支持模板显示
+        roiEnabled.value = true;
+      }, 200);
+    }
+    
     return true;
   }
   
@@ -93,6 +313,7 @@ export const useRoiStore = defineStore('roi', () => {
     
     roiType.value = 'polygon';
     roiEnabled.value = true;
+    isDrawingROI.value = false;
     
     return true;
   }
@@ -118,9 +339,13 @@ export const useRoiStore = defineStore('roi', () => {
     polygonPoints,
     activeShapeTool,
     activeDrawMode,
+    selectionPurpose,
+    capturedTemplateDataUrl,
+    isDrawingTemplateOnOverlay, // expose new state
+    templateDataUrlForOverlay, // expose new state
     
     // 方法
-    startDrawingROI,
+    startRoiSelection, // Renamed from startDrawingROI
     stopDrawingROI,
     confirmROI,
     clearROI,
@@ -129,6 +354,7 @@ export const useRoiStore = defineStore('roi', () => {
     addPolygonPoint,
     finishPolygon,
     switchROITool,
-    switchDrawMode
+    clearCapturedTemplateDataUrl,
+    toggleTemplateDrawingOnOverlay, // expose new action
   };
 });
