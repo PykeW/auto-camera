@@ -450,4 +450,24 @@
   .axis-position-control .position-display-container input {
     border-radius: 0;
   }
+
+  /* 对焦控制按钮样式 */
+  .focus-controls {
+    display: flex;
+    flex-direction: row !important;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .focus-controls button {
+    flex: 1;
+  }
+
+  /* 调整focus-section-container的底部边距 */
+  .focus-section-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
   </style>

@@ -10,26 +10,7 @@
     />
     
     <!-- 隐藏ROI信息面板 -->
-    <!-- <div v-if="showInfo" class="roi-info">
-      <div v-if="roiCoords" class="roi-coords">
-        <div class="roi-coord-item">
-          <span class="roi-coord-label">左:</span>
-          <span class="roi-coord-value">{{ Math.round(roiCoords.l) }}</span>
-        </div>
-        <div class="roi-coord-item">
-          <span class="roi-coord-label">上:</span>
-          <span class="roi-coord-value">{{ Math.round(roiCoords.t) }}</span>
-        </div>
-        <div class="roi-coord-item">
-          <span class="roi-coord-label">宽:</span>
-          <span class="roi-coord-value">{{ Math.round(roiCoords.r - roiCoords.l) }}</span>
-        </div>
-        <div class="roi-coord-item">
-          <span class="roi-coord-label">高:</span>
-          <span class="roi-coord-value">{{ Math.round(roiCoords.b - roiCoords.t) }}</span>
-        </div>
-      </div>
-    </div> -->
+    <!-- <div v-if="showInfo" class="roi-info"><div v-if="roiCoords" class="roi-coords"><div class="roi-coord-item"><span class="roi-coord-label">左:</span><span class="roi-coord-value">{{ Math.round(roiCoords.l) }}</span></div><div class="roi-coord-item"><span class="roi-coord-label">上:</span><span class="roi-coord-value">{{ Math.round(roiCoords.t) }}</span></div><div class="roi-coord-item"><span class="roi-coord-label">宽:</span><span class="roi-coord-value">{{ Math.round(roiCoords.r - roiCoords.l) }}</span></div><div class="roi-coord-item"><span class="roi-coord-label">高:</span><span class="roi-coord-value">{{ Math.round(roiCoords.b - roiCoords.t) }}</span></div></div></div> -->
     
     <slot></slot>
   </div>
@@ -106,7 +87,7 @@ function confirmRoi() {
 
 <style scoped>
 .roi-control-panel {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .shape-tools {
