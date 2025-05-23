@@ -14,32 +14,34 @@
             <ZAxisSelector
               label="X轴选择"
               selectId="x-axis-select"
-              v-model="selectedX"
+              :modelValue="assignedX"
+              @update:modelValue="val => handleAxisSelection('x', val)"
               :axes="availableXAxes"
               :disabled="isCalibrating"
             />
             <ZAxisSelector
               label="Y轴选择"
               selectId="y-axis-select"
-              v-model="selectedY"
+              :modelValue="assignedY"
+              @update:modelValue="val => handleAxisSelection('y', val)"
               :axes="availableYAxes"
               :disabled="isCalibrating"
             />
             <ZAxisSelector
               label="U轴选择"
               selectId="u-axis-select"
-              v-model="selectedU"
+              :modelValue="assignedU"
+              @update:modelValue="val => handleAxisSelection('u', val)"
               :axes="availableUAxes"
               :disabled="isCalibrating"
-            >
-              <option value="">无</option>
-            </ZAxisSelector>
+              placeholder="无"
+            />
           </div>
           
           <!-- 轴参数区域 -->
           <div class="axes-params-section">
             <!-- X轴参数区域 -->
-            <div v-if="selectedX" class="axis-params">
+            <div v-if="assignedX" class="axis-params">
               <!-- X轴位置显示、点动、步进选择合并一行 -->
               <div class="axis-control-row">
                 <label for="x-axis-position">X轴位置:</label>
@@ -96,7 +98,7 @@
             </div>
             
             <!-- Y轴参数区域 -->
-            <div v-if="selectedY" class="axis-params">
+            <div v-if="assignedY" class="axis-params">
               <div class="axis-control-row">
                 <label for="y-axis-position">Y轴位置:</label>
                 <div class="axis-position-control">
@@ -152,7 +154,7 @@
             </div>
             
             <!-- U轴参数区域 -->
-            <div v-if="selectedU" class="axis-params">
+            <div v-if="assignedU" class="axis-params">
               <div class="axis-control-row">
                 <label for="u-axis-position">U轴位置:</label>
                 <div class="axis-position-control">
@@ -224,7 +226,7 @@
         </div>
         
         <!-- Mark点方式选择和参数 -->
-        <div class="control-item side-by-side" v-if="selectedX && selectedY">
+        <div class="control-item side-by-side" v-if="assignedX && assignedY">
           <label for="mark-method">Mark点方式:</label>
           <select id="mark-method" class="compact-select" v-model="calibrationStore.markMethod" @change="onMarkMethodChange">
             <option value="template">模板匹配</option>
@@ -236,7 +238,7 @@
         </div>
 
         <!-- Parameters for Template Matching -->
-        <div v-if="calibrationStore.markMethod === 'template' && selectedX && selectedY" class="parameters-group control-group">
+        <div v-if="calibrationStore.markMethod === 'template' && assignedX && assignedY" class="parameters-group control-group">
           <h5 class="parameters-title">模板匹配参数</h5>
           <div class="control-item side-by-side">
             <label for="capture-template-roi-btn">模板图片:</label>
@@ -264,7 +266,7 @@
         </div>
 
         <!-- Parameters for Contour Extraction -->
-        <div v-if="calibrationStore.markMethod === 'contourExtraction' && selectedX && selectedY" class="parameters-group control-group">
+        <div v-if="calibrationStore.markMethod === 'contourExtraction' && assignedX && assignedY" class="parameters-group control-group">
           <h5 class="parameters-title">轮廓提取参数</h5>
           <div class="control-item side-by-side">
             <label for="contour-min-area">最小面积:</label>
@@ -377,6 +379,23 @@
   const hasCalibrationResult = computed(() => !!calibrationStore.calibrationResult);
   const plcAxes = computed(() => axisStore.plcAxes);
   const displayUnit = computed(() => axisStore.displayUnit);
+  
+  // Get assigned axes from store for readability
+  const assignedX = computed(() => axisStore.assignedCalibrationAxesIds.x);
+  const assignedY = computed(() => axisStore.assignedCalibrationAxesIds.y);
+  const assignedU = computed(() => axisStore.assignedCalibrationAxesIds.u);
+
+  // Handler for axis selection
+  function handleAxisSelection(role, axisId) {
+    // Prevent assigning an ID that is the current focus axis
+    if (axisId && axisId === axisStore.selectedAxisId) {
+      showMessage('该轴已在对焦模块中使用，请先解除绑定。', 'warning');
+      // Revert to previous value if possible or handle appropriately
+      // This might require the ZAxisSelector to emit old value or for us to temporarily store it
+      return;
+    }
+    axisStore.setAssignedCalibrationAxis(role, axisId);
+  }
   
   // 绘制模板按钮文字
   const drawTemplateButtonText = computed(() => {
@@ -623,7 +642,7 @@
       showMessage('请先截取模板图片。', 'warn');
       return;
     }
-    if (!cameraStore.isConnected && !(selectedX.value && selectedY.value)) {
+    if (!cameraStore.isConnected && !(assignedX.value && assignedY.value)) {
       showMessage('相机未连接，无法执行模板匹配检测。如果标定X和Y轴，请确保已选择它们以使用静态图像。', 'error');
       return;
     }
@@ -689,27 +708,31 @@
     }
   });
   
-  // 本地状态
-  const selectedX = ref('');
-  const selectedY = ref('');
-  const selectedU = ref('');
-  
   // 可用的轴选择（确保不重复选择）
   const availableXAxes = computed(() => {
+    const otherSelectedCalibrationAxes = [assignedY.value, assignedU.value].filter(id => id !== '');
+    const focusAxisId = axisStore.selectedAxisId;
     return plcAxes.value.filter(axis => 
-      axis.id !== selectedY.value && axis.id !== selectedU.value
+      axis.id !== focusAxisId && 
+      !otherSelectedCalibrationAxes.includes(axis.id)
     );
   });
   
   const availableYAxes = computed(() => {
+    const otherSelectedCalibrationAxes = [assignedX.value, assignedU.value].filter(id => id !== '');
+    const focusAxisId = axisStore.selectedAxisId;
     return plcAxes.value.filter(axis => 
-      axis.id !== selectedX.value && axis.id !== selectedU.value
+      axis.id !== focusAxisId && 
+      !otherSelectedCalibrationAxes.includes(axis.id)
     );
   });
   
   const availableUAxes = computed(() => {
+    const otherSelectedCalibrationAxes = [assignedX.value, assignedY.value].filter(id => id !== '');
+    const focusAxisId = axisStore.selectedAxisId;
     return plcAxes.value.filter(axis => 
-      axis.id !== selectedX.value && axis.id !== selectedY.value
+      axis.id !== focusAxisId && 
+      !otherSelectedCalibrationAxes.includes(axis.id)
     );
   });
   
@@ -723,7 +746,7 @@
   
   // X轴相关计算属性
   const xAxisName = computed(() => {
-    return selectedX.value ? axisStore.getAxisNameById(selectedX.value) : '';
+    return assignedX.value ? axisStore.getAxisNameById(assignedX.value) : '';
   });
   
   const xPosition = computed(() => {
@@ -778,7 +801,7 @@
   
   // Y轴相关计算属性
   const yAxisName = computed(() => {
-    return selectedY.value ? axisStore.getAxisNameById(selectedY.value) : '';
+    return assignedY.value ? axisStore.getAxisNameById(assignedY.value) : '';
   });
   
   const yPosition = computed(() => {
@@ -833,7 +856,7 @@
   
   // U轴相关计算属性
   const uAxisName = computed(() => {
-    return selectedU.value ? axisStore.getAxisNameById(selectedU.value) : '';
+    return assignedU.value ? axisStore.getAxisNameById(assignedU.value) : '';
   });
   
   const uPosition = computed(() => {
@@ -888,16 +911,16 @@
   
   const canStartCalibration = computed(() => {
     // 至少需要选择X和Y轴，且不能选择相同的轴
-    return selectedX.value && selectedY.value && selectedX.value !== selectedY.value &&
-           (!selectedU.value || (selectedU.value !== selectedX.value && selectedU.value !== selectedY.value));
+    return assignedX.value && assignedY.value && assignedX.value !== assignedY.value &&
+           (!assignedU.value || (assignedU.value !== assignedX.value && assignedU.value !== assignedY.value));
   });
   
   // 监听轴选择变化
-  watch([selectedX, selectedY, selectedU], () => {
+  watch(() => [assignedX.value, assignedY.value, assignedU.value], () => {
     const axes = [];
-    if (selectedX.value) axes.push('X');
-    if (selectedY.value) axes.push('Y');
-    if (selectedU.value) axes.push('U');
+    if (assignedX.value) axes.push('X');
+    if (assignedY.value) axes.push('Y');
+    if (assignedU.value) axes.push('U');
     calibrationStore.setSelectedAxes(axes);
   });
   
@@ -1042,9 +1065,9 @@
     
     // 设置选中的轴和对应的ID
     const axisMapping = {
-      X: selectedX.value,
-      Y: selectedY.value,
-      U: selectedU.value
+      X: assignedX.value,
+      Y: assignedY.value,
+      U: assignedU.value
     };
     calibrationStore.setSelectedAxes(Object.keys(axisMapping).filter(key => axisMapping[key]));
     calibrationStore.setAxisMapping(axisMapping);

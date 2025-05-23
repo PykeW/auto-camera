@@ -8,6 +8,7 @@
         :value="modelValue" 
         @change="$emit('update:modelValue', $event.target.value)"
       >
+        <option v-if="placeholder" value="">{{ placeholder }}</option>
         <option v-for="axis in axes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
       </select>
     </div>
@@ -34,6 +35,10 @@ const props = defineProps({
   label: { // New prop for the label text
     type: String,
     default: 'Z轴选择' // Default value if not provided
+  },
+  placeholder: { // Optional placeholder for the select
+    type: String,
+    default: ''
   }
 });
 

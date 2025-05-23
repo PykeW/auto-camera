@@ -9,47 +9,72 @@ export const useAxisStore = defineStore('axis', () => {
     X: 0.0,
     Y: 0.0,
     Z: 0.0,
-    U: 0.0
+    U: 0.0,
+    V: 0.0,
+    W: 0.0,
+    Q: 0.0
   });
   
   const positionsEncoder = ref({
     X: 0,
     Y: 0,
     Z: 0,
-    U: 0
+    U: 0,
+    V: 0,
+    W: 0,
+    Q: 0
   });
   
   const axisLimits = ref({
     X: { min: 0.0, max: 200.0 },
     Y: { min: 0.0, max: 200.0 },
     Z: { min: 0.0, max: 50.0 },
-    U: { min: 0.0, max: 360.0 }
+    U: { min: 0.0, max: 360.0 },
+    V: { min: 0.0, max: 100.0 },
+    W: { min: 0.0, max: 100.0 },
+    Q: { min: 0.0, max: 100.0 }
   });
   
   const axisLimitsEncoder = ref({
     X: { min: 0, max: 200000 },
     Y: { min: 0, max: 200000 },
     Z: { min: 0, max: 50000 },
-    U: { min: 0, max: 360000 }
+    U: { min: 0, max: 360000 },
+    V: { min: 0, max: 100000 },
+    W: { min: 0, max: 100000 },
+    Q: { min: 0, max: 100000 }
   });
   
   const axisMapping = ref({
     '1': 'X',
     '2': 'Y',
     '3': 'Z',
-    '4': 'U'
+    '4': 'U',
+    '5': 'V',
+    '6': 'W',
+    '7': 'Q'
   });
   
   const plcAxes = ref([
     { id: '1', name: '轴1', range_min: 0.0, range_max: 200.0 },
     { id: '2', name: '轴2', range_min: 0.0, range_max: 200.0 },
     { id: '3', name: '轴3', range_min: 0.0, range_max: 50.0 },
-    { id: '4', name: '轴4', range_min: 0.0, range_max: 360.0 }
+    { id: '4', name: '轴4', range_min: 0.0, range_max: 360.0 },
+    { id: '5', name: '轴5', range_min: 0.0, range_max: 100.0 },
+    { id: '6', name: '轴6', range_min: 0.0, range_max: 100.0 },
+    { id: '7', name: '轴7', range_min: 0.0, range_max: 100.0 }
   ]);
   
   const selectedAxisId = ref('3'); // 默认选择Z轴
   const displayUnit = ref('um'); // 默认单位为微米
   const currentUnitScale = ref(1); // 1表示um, 1000表示mm
+  
+  // New ref to store IDs of axes assigned for calibration (X, Y, U)
+  const assignedCalibrationAxesIds = ref({
+    x: '',
+    y: '',
+    u: ''
+  });
   
   // 计算属性
   const selectedAxisName = computed(() => {
@@ -63,13 +88,16 @@ export const useAxisStore = defineStore('axis', () => {
     positions.value.Y = 6.0; // 6000um
     positions.value.Z = 7.0; // 7000um
     positions.value.U = 7.0; // 7000um（如需角度可再调整）
+    positions.value.V = 1.0; // Example initial position for V
+    positions.value.W = 2.0; // Example initial position for W
+    positions.value.Q = 3.0; // Example initial position for Q
     
     // 初始化编码器值
     updateEncoderPositions();
   }
   
   function updateEncoderPositions() {
-    for (const axis of ['X', 'Y', 'Z', 'U']) {
+    for (const axis of ['X', 'Y', 'Z', 'U', 'V', 'W', 'Q']) {
       positionsEncoder.value[axis] = Math.round(positions.value[axis] * 1000);
     }
   }
@@ -140,6 +168,23 @@ export const useAxisStore = defineStore('axis', () => {
     return axisMapping.value[axisId] || axisId;
   }
 
+  // New action to update assigned calibration axes
+  function setAssignedCalibrationAxis(role, axisId) {
+    if (Object.prototype.hasOwnProperty.call(assignedCalibrationAxesIds.value, role)) {
+      // Prevent assigning an already assigned axis (even to a different role for now)
+      // or an axis that is currently the focusAxis (selectedAxisId)
+      const allAssignedIds = Object.values(assignedCalibrationAxesIds.value).filter(id => id !== '');
+      if (axisId && (allAssignedIds.includes(axisId) || axisId === selectedAxisId.value)) {
+        // If trying to assign an ID that's already in use elsewhere in calibration OR is the focus axis
+        // and it's not for clearing the current role's assignment.
+        // This simple check might need refinement based on exact UX for swapping.
+        // For now, let's assume direct assignment if valid.
+        // A more robust logic would handle swapping or clearing other roles if an axis is reassigned.
+      }
+      assignedCalibrationAxesIds.value[role] = axisId;
+    }
+  }
+
   return {
     // 状态
     positions,
@@ -149,6 +194,7 @@ export const useAxisStore = defineStore('axis', () => {
     axisMapping,
     plcAxes,
     selectedAxisId,
+    assignedCalibrationAxesIds,
     displayUnit,
     currentUnitScale,
     
@@ -161,6 +207,7 @@ export const useAxisStore = defineStore('axis', () => {
     jogAxis,
     toggleUnit,
     getAxisIdByName,
-    getAxisNameById
+    getAxisNameById,
+    setAssignedCalibrationAxis
   };
 });

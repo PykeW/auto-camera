@@ -4,7 +4,12 @@
       <hr class="separator">
       <h4>Z轴控制 / 对焦</h4>
       <div class="focus-section-container">
-        <ZAxisSelector v-model="selectedAxisId" :axes="plcAxes" selectId="focus-axis-select" />
+        <ZAxisSelector 
+          label="对焦轴选择" 
+          v-model="selectedFocusAxisId" 
+          :axes="availableFocusAxes" 
+          selectId="focus-axis-select" 
+        />
         
         <!-- 当前轴位置显示和点动控制 -->
         <div class="control-item side-by-side">
@@ -175,7 +180,6 @@
   const roiStore = useRoiStore();
   
   // 本地状态
-  const selectedAxisId = ref('3'); // 默认Z轴
   const stepValue = ref(100); // 默认100um步进
   const rangeValue = ref(5000); // 默认5000um范围
   const focusStepValue = ref(500); // 默认500um步进
@@ -185,7 +189,6 @@
   const isConnected = computed(() => cameraStore.isConnected);
   const isFocusing = computed(() => focusStore.isFocusing);
   const displayUnit = computed(() => axisStore.displayUnit);
-  const plcAxes = computed(() => axisStore.plcAxes);
   const isDrawingROI = computed(() => roiStore.isDrawingROI);
   const roiEnabled = computed(() => roiStore.roiEnabled);
   
@@ -197,9 +200,30 @@
   const speedStep = computed(() => displayUnit.value === 'mm' ? '0.1' : '100');
   const speedMin = computed(() => displayUnit.value === 'mm' ? '0.1' : '10');
   
+  // Use a computed property to get and set the focus axis ID from the store
+  const selectedFocusAxisId = computed({
+    get: () => axisStore.selectedAxisId,
+    set: (id) => {
+      // Before setting, ensure it's not used by calibration axes
+      const calibrationIds = Object.values(axisStore.assignedCalibrationAxesIds);
+      if (id && calibrationIds.includes(id)) {
+        // Potentially show a message or prevent selection
+        showMessage('该轴已在标定模块中使用，请先解除绑定。', 'warning');
+        return; 
+      }
+      axisStore.selectedAxisId = id;
+    }
+  });
+
+  // Filtered axes for focus, excluding those used in calibration
+  const availableFocusAxes = computed(() => {
+    const calibrationIds = Object.values(axisStore.assignedCalibrationAxesIds).filter(id => id !== '');
+    return axisStore.plcAxes.filter(axis => !calibrationIds.includes(axis.id));
+  });
+  
   // 轴位置相关
   const selectedAxisName = computed(() => {
-    return axisStore.getAxisNameById(selectedAxisId.value) || 'Z';
+    return axisStore.getAxisNameById(selectedFocusAxisId.value) || 'Z'; // Use selectedFocusAxisId
   });
   
   const position = computed(() => {
