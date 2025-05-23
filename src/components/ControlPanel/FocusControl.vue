@@ -7,9 +7,11 @@
         <!-- 轴选择下拉列表 -->
         <div class="control-item side-by-side">
           <label for="focus-axis-select">Z轴选择:</label>
-          <select id="focus-axis-select" class="compact-select" v-model="selectedAxisId">
-            <option v-for="axis in plcAxes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
-          </select>
+          <div class="position-display-container">
+            <select id="focus-axis-select" class="compact-select" v-model="selectedAxisId">
+              <option v-for="axis in plcAxes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
+            </select>
+          </div>
         </div>
         
         <!-- 当前轴位置显示和点动控制 -->
@@ -418,5 +420,10 @@
   /* 输入框文字左对齐 */
   input[type="number"] {
     text-align: left;
+  }
+
+  /* 移除下拉框的左边距 */
+  .position-display-container .compact-select {
+    margin-left: 0;
   }
   </style>

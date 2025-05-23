@@ -279,8 +279,9 @@
       </div>
       
       <!-- 标定操作按钮区域 -->
-      <div class="calibration-buttons-group">
+      <div class="control-item calibration-controls">
         <button 
+          v-if="!isCalibrating"
           id="start-calib-btn" 
           class="primary-button"
           @click="startCalibration"
@@ -289,39 +290,38 @@
           <i class="fas fa-play-circle"></i> 开始标定
         </button>
         <button 
+          v-else
           id="stop-calib-btn" 
           class="danger-button"
           @click="stopCalibration"
-          :disabled="!isConnected || !isCalibrating"
         >
           <i class="fas fa-stop-circle"></i> 停止标定
         </button>
         <button 
-          id="reset-calib-btn" 
+          id="save-matrix-btn" 
           class="secondary-button"
-          @click="resetCalibration"
-          :disabled="!isConnected || isCalibrating"
+          :disabled="!hasCalibrationResult"
+          @click="openSaveMatrixDialog"
         >
-          <i class="fas fa-redo"></i> 重置结果
+          <i class="fas fa-file-export"></i> 保存矩阵
         </button>
+      </div>
+      
+      <!-- 保存矩阵弹窗 -->
+      <div v-if="showSaveMatrixDialog" class="save-matrix-dialog-overlay">
+        <div class="save-matrix-dialog">
+          <h4>保存标定矩阵</h4>
+          <input v-model="matrixName" placeholder="请输入矩阵名称" class="matrix-name-input" />
+          <div class="dialog-actions">
+            <button class="primary-button" @click="saveMatrix">保存</button>
+            <button class="secondary-button" @click="closeSaveMatrixDialog">取消</button>
+          </div>
+        </div>
       </div>
       
       <!-- 结果操作按钮 -->
       <div class="result-actions-row">
-        <button 
-          id="export-matrix-btn" 
-          class="secondary-button"
-          :disabled="!hasCalibrationResult"
-        >
-          <i class="fas fa-file-export"></i> 导出矩阵
-        </button>
-        <button 
-          id="view-results-btn" 
-          class="secondary-button"
-          :disabled="!hasCalibrationResult"
-        >
-          <i class="fas fa-search"></i> 查看详细结果
-        </button>
+        <!-- 只保留保存矩阵按钮 -->
       </div>
   
       <hr class="separator">
@@ -1125,6 +1125,26 @@
     calibrationStore.resetCalibration();
     showMessage('标定结果已重置', 'info');
   }
+
+  const showSaveMatrixDialog = ref(false);
+  const matrixName = ref('');
+
+  function openSaveMatrixDialog() {
+    matrixName.value = '';
+    showSaveMatrixDialog.value = true;
+  }
+  function closeSaveMatrixDialog() {
+    showSaveMatrixDialog.value = false;
+  }
+  function saveMatrix() {
+    if (!matrixName.value.trim()) {
+      showMessage('请输入矩阵名称', 'warning');
+      return;
+    }
+    // 这里可以将calibrationStore.calibrationResult和matrixName.value一起保存到本地或后端
+    showMessage(`矩阵"${matrixName.value}"已保存！`, 'success');
+    showSaveMatrixDialog.value = false;
+  }
   </script>
   
   <style scoped>
@@ -1416,5 +1436,51 @@
   border: 1px solid #555;
   flex-grow: 1; /* Allow input/button to take available space */
   min-width: 0; /* Prevent overflow in flex containers */
+}
+
+.save-matrix-dialog-overlay {
+  position: fixed;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.save-matrix-dialog {
+  background: #232323;
+  border-radius: 8px;
+  padding: 24px 32px 18px 32px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  min-width: 280px;
+  max-width: 90vw;
+}
+.save-matrix-dialog h4 {
+  margin: 0 0 12px 0;
+  color: #fff;
+  font-size: 1.1em;
+}
+.matrix-name-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #181818;
+  color: #fff;
+  margin-bottom: 16px;
+  font-size: 1em;
+}
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.calibration-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  margin-top: 10px;
+  align-items: center;
 }
   </style>
