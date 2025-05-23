@@ -52,3 +52,237 @@ alwaysApply: false
 ### 示例参考
 参考[FocusControl.vue](mdc:src/components/ControlPanel/FocusControl.vue)中的实现作为标准示例。
 
+## 按钮组件规范 (ActionButton)
+
+按钮组件 (`ActionButton.vue`) 用于执行操作。
+
+### Props
+- `text`: (String, required) 按钮上显示的文本。
+- `type`: (String, default: 'default') 按钮类型，可选值为 'default', 'primary', 'secondary', 'danger'。
+- `iconClass`: (String, default: '') 按钮图标的CSS类名。
+- `disabled`: (Boolean, default: false) 是否禁用按钮。
+
+### 样式
+- **默认样式**: 
+    - 边框: `1px solid var(--border-dark)`
+    - 圆角: `var(--border-radius)`
+    - 高度: `32px`
+    - 内边距: `var(--spacing-small) var(--spacing-medium)`
+- **Hover效果 (未禁用时)**:
+    - 背景色: `#4a4a4a`
+    - 边框颜色: `var(--border-medium)`
+    - 阴影: `0 2px 4px rgba(0, 0, 0, .2)`
+    - 垂直位移: `transform: translateY(-1px)`
+- **Primary Button (`primary-button`)**:
+    - 背景色: `var(--accent-blue)`
+    - 边框颜色: `var(--accent-blue)`
+    - 文字颜色: `#fff`
+    - Hover背景色 (未禁用时): `#157acf`
+- **Secondary Button (`secondary-button`)**:
+    - 背景色: `#4a90e2`
+    - 边框颜色: `#4a90e2`
+    - 文字颜色: `#fff`
+    - Hover背景色 (未禁用时): `#3a80d2`
+- **Danger Button (`danger-button`)**:
+    - 背景色: `var(--accent-red)`
+    - 边框颜色: `var(--accent-red)`
+    - 文字颜色: `#fff`
+    - Hover背景色 (未禁用时): `#d9363e`
+- **禁用状态 (`disabled`)**:
+    - 背景色: `#4a4a4a`
+    - 边框颜色: `var(--border-dark)`
+    - 文字颜色: `var(--text-medium)`
+    - 透明度: `.7`
+    - 鼠标指针: `not-allowed`
+- **图标**: 如果提供了 `iconClass`，图标会显示在文本左侧，并有 `var(--spacing-small)` 的右边距。
+
+### 使用
+```html
+<ActionButton 
+  text="点击我" 
+  type="primary" 
+  iconClass="fas fa-check" 
+  @click="handleClick" 
+/>
+```
+
+## 图标按钮 (IconButton)
+
+图标按钮 (`IconButton.vue`) 用于仅显示图标的按钮，通常用于空间有限的场景。
+
+### Props
+- `iconClass`: (String, required) 图标的CSS类名。
+- `tooltip`: (String, default: '') 鼠标悬停时显示的提示文本。
+- `disabled`: (Boolean, default: false) 是否禁用按钮。
+- `size`: (String, default: 'medium') 按钮尺寸，可选值为 'small', 'medium', 'large'。
+- `variant`: (String, default: 'default') 按钮变体，可选值为 'default', 'outline', 'ghost'。
+
+### 样式
+- **基础样式**:
+    - 背景色: `transparent`
+    - 边框: `none`
+    - 内边距: 根据 `size` 调整
+    - 圆角: `var(--border-radius)`
+- **Hover/Focus效果 (未禁用时)**:
+    - 背景色: `var(--bg-light-hover)`
+- **禁用状态 (`disabled`)**:
+    - 透明度: `0.5`
+    - G鼠标指针: `not-allowed`
+- **变体 (variant)**:
+    - `outline`: 带有边框 `1px solid var(--border-medium)`
+    - `ghost`: 背景色在hover时更明显
+
+### 使用
+```html
+<IconButton 
+  iconClass="fas fa-cog" 
+  tooltip="设置" 
+  @click="openSettings" 
+/>
+```
+
+## 带标签的输入行 (LabeledInputRow)
+
+`LabeledInputRow.vue` 用于创建一个包含标签和任意内容（通常是输入控件）的行。
+
+### Props
+- `label`: (String, required) 显示的标签文本。
+
+### 插槽
+- `default`: 用于放置输入控件或其他内容。
+
+### 结构与样式
+- 标签和内容水平排列。
+- 标签具有固定的右边距 `var(--spacing-medium)`。
+- 整体垂直居中对齐。
+
+### 使用
+```html
+<LabeledInputRow label="名称:">
+  <input type="text" />
+</LabeledInputRow>
+```
+
+## 值输入控件 (ValueInputControl)
+
+`ValueInputControl.vue` 是一个复合组件，用于输入和调整数值，通常带有单位和步进按钮。
+
+### Props
+- `modelValue`: (Number, required) 绑定的数值。
+- `label`: (String, default: '') 可选的标签。
+- `unit`: (String, default: '') 数值的单位。
+- `min`: (Number, default: -Infinity) 最小值。
+- `max`: (Number, default: Infinity) 最大值。
+- `step`: (Number, default: 1) 调整的步长。
+- `readonly`: (Boolean, default: false) 输入框是否只读。
+- `showButtons`: (Boolean, default: true) 是否显示增减按钮。
+
+### 样式与行为
+- 如果提供了 `label`，会使用 `LabeledInputRow` 进行布局。
+- 包含一个显示当前值的输入框，右侧可显示单位。
+- 如果 `showButtons` 为 true，输入框两侧会显示增减按钮。
+- 增减按钮会根据 `step` 调整 `modelValue`，并受 `min` 和 `max` 限制。
+
+### 使用
+```html
+<ValueInputControl 
+  v-model="currentValue"
+  label="温度:"
+  unit="°C"
+  :min="0"
+  :max="100"
+  :step="0.5"
+/>
+```
+
+## 简单输入控件 (SimpleInputControl)
+
+`SimpleInputControl.vue` 是一个基础的文本输入字段，可以配置类型、占位符等。
+
+### Props
+- `modelValue`: (String | Number, required) 绑定的值。
+- `type`: (String, default: 'text') 输入框类型 (e.g., 'text', 'number', 'password')。
+- `placeholder`: (String, default: '') 占位符文本。
+- `readonly`: (Boolean, default: false) 是否只读。
+- `disabled`: (Boolean, default: false) 是否禁用。
+
+### 样式
+- 遵循标准输入框样式。
+- 高度: `32px` (通常与其他输入控件保持一致)。
+- 边框: `1px solid var(--border-dark)`。
+
+### 使用
+```html
+<SimpleInputControl 
+  v-model="username"
+  type="text"
+  placeholder="请输入用户名"
+/>
+```
+
+## 下拉选择控件 (SelectControl)
+
+`SelectControl.vue` 用于创建下拉选择菜单。
+
+### Props
+- `modelValue`: (any, required) 绑定的选中值。
+- `options`: (Array, required) 选项列表，每个选项是一个对象，至少包含 `value` 和 `label` 字段，例如 `{ value: 'opt1', label: '选项1' }`。
+- `placeholder`: (String, default: '请选择') 占位符文本。
+- `disabled`: (Boolean, default: false) 是否禁用。
+
+### 样式
+- 整体外观类似标准输入框，以便与其他表单元素对齐。
+- 右侧带有下拉箭头。
+
+### 使用
+```html
+<SelectControl 
+  v-model="selectedOption"
+  :options="[{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]"
+  placeholder="选择一个字母"
+/>
+```
+
+## 组件样式覆盖与对齐问题案例 (`ZAxisSelector.vue`)
+
+### 问题描述
+在将 "Z轴选择" 功能从 `FocusControl.vue` 抽离为独立的 `ZAxisSelector.vue` ([ZAxisSelector.vue](mdc:src/components/ControlPanel/ZAxisSelector.vue)) 组件后，出现了该组件的标签（“Z轴选择:”）与其在 `FocusControl.vue` ([FocusControl.vue](mdc:src/components/ControlPanel/FocusControl.vue)) 中的同级表单行（如“Z轴位置:”、“Z轴速度:”等）左侧对齐不一致的问题。具体表现为 `ZAxisSelector.vue` 组件看起来比其他行要窄一些，导致视觉上的缩进。
+
+### 原因分析
+经过排查，发现根本原因在于全局样式表 `styles.css` ([styles.css](mdc:src/assets/styles.css)) 中为 `.compact-select` 类定义了 `margin-left: 8px;`。当 `ZAxisSelector.vue` 组件内部的 `<select>` 元素应用了这个类时，这个左边距导致了其在父容器 `div.position-display-container` 内的偏移。
+
+原先在 `FocusControl.vue` 中，存在一个 scoped CSS 规则：
+```css
+/* FocusControl.vue <style scoped> */
+.position-display-container .compact-select {
+  margin-left: 0;
+}
+```
+这条规则有效地抵消了全局样式的 `margin-left`。但当相关HTML结构被移入 `ZAxisSelector.vue` 后，由于Vue的样式作用域机制，这条位于 `FocusControl.vue` 中的 scoped 规则不再对 `ZAxisSelector.vue` 内部的元素生效。
+
+### 解决方案
+为了解决这个问题，并在 `ZAxisSelector.vue` 组件内部保持正确的对齐，我们在 `ZAxisSelector.vue` 的 `<style scoped>` 中添加了针对 `.compact-select` 的样式覆盖规则：
+
+```vue
+<!-- src/components/ControlPanel/ZAxisSelector.vue -->
+// ... template and script ...
+<style scoped>
+/* ... other styles for label and .position-display-container ... */
+
+/* This rule is crucial to override the global margin-left: 8px on .compact-select */
+.compact-select {
+  margin-left: 0;
+}
+</style>
+```
+通过这个 scoped 样式，我们确保了 `ZAxisSelector.vue` 组件内部的 `.compact-select` 不会受到全局 `margin-left` 的影响，从而恢复了与其他表单行的正确对齐。
+
+### 结论与建议
+在将通用UI模式或重复的HTML结构封装成独立组件时，需要特别注意：
+1.  **全局样式的潜在影响**：全局CSS类（如本例中的 `.compact-select`）可能会对组件内部元素的布局和外观产生非预期的副作用。
+2.  **Scoped CSS 的局限性**：父组件的 scoped CSS 规则通常不会穿透到子组件的内部元素（除非使用了 `:deep()` 或类似机制，但这应谨慎使用）。
+3.  **组件内部样式调整**：当遇到对齐或样式不一致问题时，应首先检查组件自身的 props、插槽内容以及其内部的 scoped CSS。如此例所示，通过在组件的 scoped CSS 中精确覆盖或调整特定全局类的样式，是解决此类问题的有效方法。
+4.  **保持一致性**：在进行此类修复时，应参考原始上下文中（如此例中的 `FocusControl.vue`）是如何处理这些样式问题的，以确保新组件的行为和外观与预期一致。
+
+
+

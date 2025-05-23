@@ -4,15 +4,7 @@
       <hr class="separator">
       <h4>Z轴控制 / 对焦</h4>
       <div class="focus-section-container">
-        <!-- 轴选择下拉列表 -->
-        <div class="control-item side-by-side">
-          <label for="focus-axis-select">Z轴选择:</label>
-          <div class="position-display-container">
-            <select id="focus-axis-select" class="compact-select" v-model="selectedAxisId">
-              <option v-for="axis in plcAxes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
-            </select>
-          </div>
-        </div>
+        <ZAxisSelector v-model="selectedAxisId" :axes="plcAxes" selectId="focus-axis-select" />
         
         <!-- 当前轴位置显示和点动控制 -->
         <div class="control-item side-by-side">
@@ -175,6 +167,7 @@
   import { useFocusStore } from '../../stores/focus';
   import { useRoiStore } from '../../stores/roi';
   import { showMessage } from '../../utils/helpers';
+  import ZAxisSelector from './ZAxisSelector.vue';
   
   const cameraStore = useCameraStore();
   const axisStore = useAxisStore();
