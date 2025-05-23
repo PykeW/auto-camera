@@ -13,6 +13,12 @@
       @mouseleave="endRoiDraw"
       @dblclick="finishPolygon"
     >
+      <!-- 添加ROI工具面板 -->
+      <RoiToolsPanel
+        @shape-change="handleShapeChange"
+        @confirm="handleRoiConfirm"
+      />
+      
       <!-- ROI矩形 -->
       <div 
         v-if="roiCoords && (roiType === 'rect' || !roiType) && (roiEnabled || currentRoiRect) && !roiStore.isDrawingTemplateOnOverlay"
@@ -40,6 +46,31 @@
           stroke-width="2"
           :stroke-dasharray="isDrawingROI ? '5,5' : ''"
         ></polygon>
+        
+        <!-- 多边形绘制中的点和线 -->
+        <template v-if="roiType === 'polygon' && isDrawingROI && polygonPoints.length > 0">
+          <!-- 绘制已添加的点 -->
+          <circle
+            v-for="(point, index) in polygonPoints"
+            :key="index"
+            :cx="point.x"
+            :cy="point.y"
+            r="4"
+            fill="#FF5722"
+            stroke="#FFF"
+            stroke-width="1"
+          ></circle>
+          
+          <!-- 绘制点之间的线段 -->
+          <polyline
+            v-if="polygonPoints.length >= 2"
+            :points="polygonPointsString"
+            fill="none"
+            stroke="#FF5722"
+            stroke-width="2"
+            stroke-dasharray="5,5"
+          ></polyline>
+        </template>
         
         <!-- 椭圆 -->
         <ellipse
@@ -96,17 +127,6 @@
           <span class="detected-mark-score">{{ mark.score.toFixed(2) }}</span>
         </div>
       </template>
-
-      <!-- ROI信息显示 -->
-      <div 
-        v-if="showRoiInfo"
-        class="roi-info"
-        :style="{
-          display: showRoiInfo ? 'block' : 'none'
-        }"
-      >
-        {{ roiInfoText }}
-      </div>
     </div>
   </template>
   
@@ -114,6 +134,10 @@
   import { ref, computed, watch } from 'vue';
   import { useRoiStore } from '../../stores/roi';
   import { useCalibrationStore } from '../../stores/calibration'; // Import calibration store
+  import RoiToolsPanel from './RoiToolsPanel.vue'; // 导入ROI工具面板组件
+  
+  // 添加emit定义
+  const emit = defineEmits(['roi-confirm', 'shape-change']);
   
   const roiStore = useRoiStore();
   const calibrationStore = useCalibrationStore(); // Initialize calibration store
@@ -154,12 +178,12 @@
         l: startX.value,
         t: startY.value,
         r: startX.value,
-        b: startY.value
+        b: startX.value
       };
       
-      // 显示ROI信息
+      // 更新ROI信息但不显示
       updateRoiInfo(startX.value, startY.value, startX.value, startY.value);
-      showRoiInfo.value = true;
+      // showRoiInfo.value = true; // 注释掉，不显示ROI信息
 
       // 实时更新store中的ROI信息
       roiStore.setROICoords(currentRoiRect.value);
@@ -168,25 +192,47 @@
       // 多边形绘制 - 添加新点
       roiStore.addPolygonPoint(startX.value, startY.value);
       
-      // 如果有至少3个点，显示信息并更新ROI
-      if (polygonPoints.value.length >= 3) {
-        const minX = Math.min(...polygonPoints.value.map(p => p.x));
-        const minY = Math.min(...polygonPoints.value.map(p => p.y));
-        const maxX = Math.max(...polygonPoints.value.map(p => p.x));
-        const maxY = Math.max(...polygonPoints.value.map(p => p.y));
+      // 从第一个点开始就更新ROI
+      if (polygonPoints.value.length >= 1) {
+        // 计算当前多边形的边界框
+        const points = [...polygonPoints.value];
         
-        updateRoiInfo(minX, minY, maxX, maxY);
-        showRoiInfo.value = true;
+        // 如果只有一个点，使用点的坐标作为边界
+        if (points.length === 1) {
+          const point = points[0];
+          updateRoiInfo(point.x, point.y, point.x, point.y);
+          // showRoiInfo.value = true; // 注释掉，不显示ROI信息
+          
+          // 更新store中的ROI信息
+          roiStore.setROICoords({
+            l: point.x,
+            t: point.y,
+            r: point.x,
+            b: point.y,
+            type: 'polygon',
+            points: [...points]
+          });
+        } else {
+          // 两个或更多点时，计算边界框
+          const minX = Math.min(...points.map(p => p.x));
+          const minY = Math.min(...points.map(p => p.y));
+          const maxX = Math.max(...points.map(p => p.x));
+          const maxY = Math.max(...points.map(p => p.y));
+          
+          updateRoiInfo(minX, minY, maxX, maxY);
+          // showRoiInfo.value = true; // 注释掉，不显示ROI信息
 
-        // 实时更新store中的ROI多边形信息
-        roiStore.setROICoords({
-          l: minX,
-          t: minY,
-          r: maxX,
-          b: maxY,
-          type: 'polygon',
-          points: [...polygonPoints.value]
-        });
+          // 实时更新store中的ROI多边形信息
+          roiStore.setROICoords({
+            l: minX,
+            t: minY,
+            r: maxX,
+            b: maxY,
+            type: 'polygon',
+            points: [...points]
+          });
+        }
+        
         roiStore.roiType = 'polygon';
       }
     }
@@ -197,14 +243,14 @@
         l: startX.value,
         t: startY.value,
         r: startX.value,
-        b: startY.value,
+        b: startX.value,
         center: { x: startX.value, y: startY.value },
         radius: { x: 0, y: 0 }
       };
       
-      // 显示ROI信息
+      // 更新ROI信息但不显示
       updateRoiInfo(startX.value, startY.value, startX.value, startY.value);
-      showRoiInfo.value = true;
+      // showRoiInfo.value = true; // 注释掉，不显示ROI信息
 
       // 实时更新store中的ROI信息
       roiStore.setROICoords(currentRoiRect.value);
@@ -233,27 +279,36 @@
         b: top + height
       };
       
-      // 更新ROI坐标信息
+      // 更新ROI坐标信息，但不显示
       updateRoiInfo(left, top, left + width, top + height);
 
       // 实时更新store中的ROI信息
       roiStore.setROICoords(currentRoiRect.value);
     }
     else if (activeShapeTool.value === 'polygon') {
-      // 多边形绘制 - 只更新信息位置
-      if (showRoiInfo.value) {
+      // 多边形绘制 - 只更新信息不显示
+      // if (showRoiInfo.value) { // 注释掉，不以showRoiInfo为条件
         roiInfoText.value = `多边形 (${polygonPoints.value.length}点)`;
         
-        // 如果有至少3个点，更新多边形信息
-        if (polygonPoints.value.length >= 3) {
-          const minX = Math.min(...polygonPoints.value.map(p => p.x));
-          const minY = Math.min(...polygonPoints.value.map(p => p.y));
-          const maxX = Math.max(...polygonPoints.value.map(p => p.x));
-          const maxY = Math.max(...polygonPoints.value.map(p => p.y));
+        // 从第一个点开始就更新多边形信息
+        if (polygonPoints.value.length >= 1) {
+          const points = [...polygonPoints.value];
           
-          updateRoiInfo(minX, minY, maxX, maxY);
+          // 如果只有一个点，使用点的坐标作为边界
+          if (points.length === 1) {
+            const point = points[0];
+            updateRoiInfo(point.x, point.y, point.x, point.y);
+          } else {
+            // 两个或更多点时，计算边界框
+            const minX = Math.min(...points.map(p => p.x));
+            const minY = Math.min(...points.map(p => p.y));
+            const maxX = Math.max(...points.map(p => p.x));
+            const maxY = Math.max(...points.map(p => p.y));
+            
+            updateRoiInfo(minX, minY, maxX, maxY);
+          }
         }
-      }
+      // } // 注释掉，不以showRoiInfo为条件
     }
     else if (activeShapeTool.value === 'ellipse' && isDrawing.value) {
       // 椭圆绘制更新
@@ -271,7 +326,7 @@
         radius: { x: rx, y: ry }
       };
       
-      // 更新ROI坐标信息
+      // 更新ROI坐标信息但不显示
       updateRoiInfo(cx - rx, cy - ry, cx + rx, cy + ry);
 
       // 实时更新store中的ROI椭圆信息
@@ -306,10 +361,16 @@
   }
   
   function finishPolygon() {
+    // 如果是多边形工具且至少有3个点，才完成多边形
     if (activeShapeTool.value === 'polygon' && polygonPoints.value.length >= 3) {
       roiStore.finishPolygon();
       showRoiInfo.value = false;
-      roiStore.roiEnabled = true;
+    }
+    // 如果点数不足3个，提示用户
+    else if (activeShapeTool.value === 'polygon' && polygonPoints.value.length > 0) {
+      // 这里可以添加提示逻辑，例如显示一个提示信息
+      roiInfoText.value = "需要至少3个点才能完成多边形";
+      // 不清除已有的点，让用户继续添加
     }
   }
   
@@ -326,6 +387,19 @@
       showRoiInfo.value = false;
     }
   });
+
+  // 修改处理ROI工具面板事件的方法
+  function handleShapeChange(tool) {
+    // 工具已经在roiStore中更新，同时向父组件发送事件
+    emit('shape-change', tool);
+  }
+
+  function handleRoiConfirm() {
+    // 关闭ROI信息显示
+    showRoiInfo.value = false;
+    // 向父组件发送确认事件
+    emit('roi-confirm');
+  }
   </script>
 
 <style scoped>
@@ -378,5 +452,10 @@
   font-weight: bold;
   border-radius: 3px;
   text-shadow: 1px 1px 1px #000; /* 添加文字阴影 */
+}
+
+/* 隐藏ROI信息框 */
+.roi-info {
+  display: none !important;
 }
 </style>

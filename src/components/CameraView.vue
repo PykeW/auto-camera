@@ -5,7 +5,11 @@
         <!-- 单张图片显示模式 -->
         <div v-if="!showAllCalibrationImages" class="camera-image">
           <img id="camera-feed" :src="cameraImageUrl" alt="相机画面" style="width: 100%; height: 100%; object-fit: contain;">
-          <RoiOverlay v-if="cameraStore.isConnected" />
+          <RoiOverlay 
+            v-if="cameraStore.isConnected" 
+            @roi-confirm="handleRoiConfirm"
+            @shape-change="handleShapeChange"
+          />
           <div class="camera-info-overlay">
             <div class="info-item" id="focus-info">
               <span class="info-label">清晰度:</span>
@@ -272,6 +276,17 @@
       clearInterval(pollingInterval);
     }
   });
+
+  // 添加ROI相关处理方法
+  function handleRoiConfirm() {
+    console.log('ROI已确认');
+    // 可以在这里添加其他处理逻辑
+  }
+
+  function handleShapeChange(tool) {
+    console.log('ROI形状工具已切换:', tool);
+    // 可以在这里添加其他处理逻辑
+  }
   </script>
   
   <style scoped>

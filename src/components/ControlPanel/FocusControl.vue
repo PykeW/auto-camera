@@ -98,39 +98,16 @@
         </div>
   
         <!-- Focus ROI Controls -->
-        <div class="roi-header-line">
-          <h4 class="roi-heading">对焦ROI区域</h4>
-          <div id="focus-roi-button-group" class="roi-button-group">
-            <button 
-              id="toggle-focus-roi-visibility-btn" 
-              class="roi-button icon-button" 
-              title="显示/隐藏"
-              @click="toggleROIVisibility"
-              :disabled="!isConnected || isFocusing"
-            >
-              <i :class="[roiEnabled ? 'fas fa-eye-slash' : 'fas fa-eye']"></i>
-            </button>
-            <button 
-              id="edit-roi-focus-btn" 
-              class="roi-button icon-button" 
-              title="编辑"
-              @click="editROI"
-              :disabled="!isConnected || isFocusing"
-              :class="{ active: isDrawingROI }"
-            >
-              <i class="fas fa-edit"></i>
-            </button>
-            <button 
-              id="clear-roi-focus-btn" 
-              class="roi-button icon-button danger-icon" 
-              title="删除"
-              @click="clearROI"
-              :disabled="!isConnected || isFocusing"
-            >
-              <i class="fas fa-trash-alt"></i>
-            </button>
-          </div>
-        </div>
+        <ROIControl 
+          title="对焦ROI区域"
+          purpose="focus"
+          :disabled="!isConnected || isFocusing"
+          @visibility-toggle="handleRoiVisibilityToggle"
+          @edit="handleRoiEdit"
+          @clear="handleRoiClear"
+          @shape-change="handleShapeChange"
+          @confirm="handleRoiConfirm"
+        />
   
         <div class="control-item focus-controls">
           <button 
@@ -173,6 +150,7 @@
   import { useRoiStore } from '../../stores/roi';
   import { showMessage } from '../../utils/helpers';
   import ZAxisSelector from './ZAxisSelector.vue';
+  import ROIControl from './ROIControl.vue';
   
   const cameraStore = useCameraStore();
   const axisStore = useAxisStore();
@@ -388,33 +366,31 @@
   }
   
   // ROI相关操作
-  function editROI() {
+  function handleRoiEdit(isDrawing) {
     if (!isConnected.value || isFocusing.value) return;
-    
-    if (roiStore.isDrawingROI) {
-      roiStore.stopDrawingROI();
-    } else {
-      roiStore.startDrawingROI();
-    }
+    // 消息显示已在ROIControl组件中处理
   }
-  
-  function clearROI() {
+
+  function handleRoiClear() {
     if (!isConnected.value || isFocusing.value) return;
-    
-    const result = roiStore.clearROI();
-    
-    if (result) {
-      showMessage('ROI区域已删除', 'info');
-    }
+    // 消息显示已在ROIControl组件中处理
   }
-  
-  function toggleROIVisibility() {
+
+  function handleRoiVisibilityToggle(isVisible) {
     if (!isConnected.value || isFocusing.value) return;
-    
-    roiStore.toggleROIVisibility();
-    showMessage(`ROI区域已${roiEnabled.value ? '隐藏' : '显示'}`, 'info');
+    // 消息显示已在ROIControl组件中处理
   }
-  
+
+  function handleShapeChange(tool) {
+    if (!isConnected.value || isFocusing.value) return;
+    showMessage(`已切换ROI形状工具: ${tool}`, 'info');
+  }
+
+  function handleRoiConfirm() {
+    if (!isConnected.value || isFocusing.value) return;
+    showMessage('ROI区域已确认', 'success');
+  }
+
   // 监听单位变更，调整步进和范围值
   watch(() => axisStore.displayUnit, (newUnit) => {
     if (newUnit === 'mm') {

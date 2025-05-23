@@ -44,6 +44,12 @@ export const useRoiStore = defineStore('roi', () => {
   async function confirmROI() {
     if (!isDrawingROI.value) return false;
     
+    // 检查如果是多边形，确保有足够的点
+    if (roiType.value === 'polygon' && polygonPoints.value.length < 3) {
+      console.warn('多边形需要至少3个点才能确认');
+      return false;
+    }
+    
     roiEnabled.value = true;
     isDrawingROI.value = false;
     
