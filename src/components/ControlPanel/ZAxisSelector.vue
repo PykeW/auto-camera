@@ -1,6 +1,6 @@
 <template>
   <div class="control-item side-by-side">
-    <label :for="selectId">Z轴选择:</label>
+    <label :for="selectId">{{ label }}:</label>
     <div class="position-display-container">
       <select 
         :id="selectId" 
@@ -30,6 +30,10 @@ const props = defineProps({
   selectId: { // Optional ID for label and select
     type: String,
     default: 'focus-axis-select'
+  },
+  label: { // New prop for the label text
+    type: String,
+    default: 'Z轴选择' // Default value if not provided
   }
 });
 

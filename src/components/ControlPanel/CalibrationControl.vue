@@ -11,29 +11,29 @@
         <div class="axis-control-section">
           <!-- 轴选择区域 - 一行显示 -->
           <div class="axes-selection-row">
-            <div class="control-item side-by-side">
-              <label for="x-axis-select">X轴选择:</label>
-              <select id="x-axis-select" class="compact-select" v-model="selectedX" :disabled="isCalibrating">
-                <option value="">请选择</option>
-                <option v-for="axis in availableXAxes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
-              </select>
-            </div>
-            
-            <div class="control-item side-by-side">
-              <label for="y-axis-select">Y轴选择:</label>
-              <select id="y-axis-select" class="compact-select" v-model="selectedY" :disabled="isCalibrating">
-                <option value="">请选择</option>
-                <option v-for="axis in availableYAxes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
-              </select>
-            </div>
-            
-            <div class="control-item side-by-side">
-              <label for="u-axis-select">U轴选择:</label>
-              <select id="u-axis-select" class="compact-select" v-model="selectedU" :disabled="isCalibrating">
-                <option value="">无</option>
-                <option v-for="axis in availableUAxes" :key="axis.id" :value="axis.id">{{ axis.name }}</option>
-              </select>
-            </div>
+            <ZAxisSelector
+              label="X轴选择"
+              selectId="x-axis-select"
+              v-model="selectedX"
+              :axes="availableXAxes"
+              :disabled="isCalibrating"
+            />
+            <ZAxisSelector
+              label="Y轴选择"
+              selectId="y-axis-select"
+              v-model="selectedY"
+              :axes="availableYAxes"
+              :disabled="isCalibrating"
+            />
+            <ZAxisSelector
+              label="U轴选择"
+              selectId="u-axis-select"
+              v-model="selectedU"
+              :axes="availableUAxes"
+              :disabled="isCalibrating"
+            >
+              <option value="">无</option>
+            </ZAxisSelector>
           </div>
           
           <!-- 轴参数区域 -->
@@ -359,6 +359,7 @@
   import { useAxisStore } from '../../stores/axis';
   import { useRoiStore } from '../../stores/roi'; // Import ROI store
   import { showMessage } from '../../utils/helpers';
+  import ZAxisSelector from './ZAxisSelector.vue'; // Import the ZAxisSelector component
   
   const cameraStore = useCameraStore();
   const focusStore = useFocusStore();
