@@ -1,0 +1,130 @@
+---
+description: CSS样式指南
+globs: 
+alwaysApply: false
+---
+# CSS样式指南
+
+## 样式组织原则
+
+### 1. 变量优先
+- 所有颜色、尺寸、间距等应使用CSS变量定义在`:root`选择器中
+- 变量命名应遵循`--category-name`格式，如`--bg-dark`、`--spacing-medium`
+
+### 2. 样式分层
+- 全局样式：定义在[styles.css](mdc:src/assets/styles.css)中
+- 组件样式：使用Vue的`scoped`样式，定义在各组件文件中
+- 覆盖样式：针对特定场景的覆盖应明确注释目的
+
+### 3. 命名规范
+- 使用kebab-case命名CSS类（如`position-display-container`）
+- 功能性类名应描述其用途而非外观（如用`primary-button`而非`blue-button`）
+- 避免使用内联样式
+
+## 控件样式规范
+
+### 输入框
+```css
+.position-display-container input {
+  width: 100%;
+  height: 32px;
+  padding: 0 30px 0 8px;
+  text-align: left;
+  background-color: var(--bg-medium);
+  color: var(--text-light);
+  border: 1px solid var(--border-dark);
+  border-radius: 4px;
+  font-size: 13px;
+}
+```
+
+### 按钮
+```css
+.jog-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: 1px solid var(--border-dark);
+  background-color: var(--bg-medium);
+  color: var(--accent-blue);
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0;
+  line-height: 30px;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+```
+
+### 下拉框
+```css
+.compact-select {
+  border: 1px solid var(--border-medium);
+  border-radius: 3px;
+  font-size: .9em;
+  max-width: 100%;
+  padding: 4px 8px;
+  width: 100%;
+  height: 32px;
+  background-color: var(--bg-medium);
+  color: var(--text-light);
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg...");
+  background-position: right 4px center;
+  background-repeat: no-repeat;
+  background-size: .65em auto;
+}
+```
+
+## 布局样式规范
+
+### 控制项布局
+```css
+.control-item.side-by-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin-bottom: 8px;
+  width: 100%;
+  flex-wrap: nowrap;
+}
+
+.control-item.side-by-side label {
+  flex-shrink: 0;
+  min-width: 80px;
+  width: 80px;
+  color: var(--text-medium);
+  font-size: .9em;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+```
+
+### 数值调节控件布局
+```css
+.axis-position-control {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  height: 32px;
+}
+
+.position-display-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: 32px;
+}
+```
+
+## 响应式设计指南
+
+- 移动设备断点：`@media (max-width: 480px)`
+- 平板设备断点：`@media (max-width: 768px)`
+- 在移动设备上，控制面板应调整为垂直布局
+- 标签应放置在控件上方而非左侧
+- 控件应占满可用宽度
+

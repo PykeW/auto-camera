@@ -426,4 +426,35 @@
   .position-display-container .compact-select {
     margin-left: 0;
   }
+
+  /* 使加减号按钮更贴近数字查看框 */
+  .axis-position-control {
+    gap: 0 !important;
+  }
+
+  .axis-position-control .jog-btn {
+    border-radius: 0;
+  }
+
+  .axis-position-control .jog-btn.minus {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-right: none;
+  }
+
+  .axis-position-control .jog-btn.plus {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-left: none;
+  }
+
+  .axis-position-control .position-display-container {
+    border-left: none;
+    border-right: none;
+  }
+
+  /* 去掉输入框的圆角 */
+  .axis-position-control .position-display-container input {
+    border-radius: 0;
+  }
   </style>

@@ -1,0 +1,54 @@
+---
+description: 组件设计规范
+globs: 
+alwaysApply: false
+---
+# 组件设计规范
+
+## 原子化设计原则
+本项目采用原子化设计方法，将UI组件分解为最小可复用单元，以减少代码重复并保持样式一致性。
+
+## 输入控件规范
+
+### 基础输入框
+- 所有基础输入框应使用统一的样式和结构
+- 输入框应包含在`.position-display-container`容器内
+- 标准高度为32px
+- 边框颜色使用`var(--border-dark)`
+- 背景色使用`var(--bg-medium)`
+- 文字颜色使用`var(--text-light)`
+
+### 数值调节控件
+数值调节控件由三部分组成：减号按钮、输入框、加号按钮，应使用以下结构：
+```html
+<div class="axis-position-control">
+  <button class="jog-btn minus">-</button>
+  <div class="position-display-container">
+    <input type="text" readonly>
+    <span class="unit-display">单位</span>
+  </div>
+  <button class="jog-btn plus">+</button>
+</div>
+```
+
+样式要点：
+- 三个元素应无缝连接（无间隙）
+- 只有左侧按钮左边和右侧按钮右边保留圆角
+- 输入框不应有圆角
+- 单位显示应位于输入框内右侧
+
+### 下拉选择框
+- 下拉框应使用`.compact-select`类
+- 下拉框应包含在`.position-display-container`容器内以保持与输入框宽度一致
+- 下拉框不应有左边距（`margin-left: 0`）
+
+## 布局规范
+
+### 控制面板项
+- 使用`.control-item.side-by-side`类实现标签和控件的水平排列
+- 标签宽度统一为80px
+- 控件应占据剩余空间
+
+### 示例参考
+参考[FocusControl.vue](mdc:src/components/ControlPanel/FocusControl.vue)中的实现作为标准示例。
+

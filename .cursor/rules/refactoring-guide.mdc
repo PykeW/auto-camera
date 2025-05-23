@@ -1,0 +1,122 @@
+---
+description: 重构指南
+globs: 
+alwaysApply: false
+---
+# 重构指南
+
+为了减少代码重复并提高样式统一性，应将常用UI元素重构为可复用组件。
+
+## 需要重构的组件
+
+### 1. 数值输入控件 (ValueInputControl)
+
+当前项目中有多处使用类似的数值输入控件（带加减按钮的输入框），应提取为独立组件：
+
+```vue
+<!-- 建议实现: src/components/common/ValueInputControl.vue -->
+<template>
+  <div class="axis-position-control">
+    <button 
+      class="jog-btn minus" 
+      :disabled="disabled || isMinLimitReached"
+      @click="handleDecrement"
+    >-</button>
+    <div class="position-display-container">
+      <input 
+        :type="readonly ? 'text' : 'number'" 
+        :value="displayValue" 
+        :readonly="readonly"
+        @input="handleInput"
+      >
+      <span class="unit-display" @click="onUnitClick">{{ unit }}</span>
+    </div>
+    <button 
+      class="jog-btn plus" 
+      :disabled="disabled || isMaxLimitReached"
+      @click="handleIncrement"
+    >+</button>
+  </div>
+</template>
+```
+
+### 2. 下拉选择控件 (SelectControl)
+
+将下拉选择框封装为独立组件：
+
+```vue
+<!-- 建议实现: src/components/common/SelectControl.vue -->
+<template>
+  <div class="position-display-container">
+    <select class="compact-select" :value="modelValue" @change="handleChange">
+      <option v-for="option in options" :key="option.value" :value="option.value">
+        {{ option.label }}
+      </option>
+    </select>
+  </div>
+</template>
+```
+
+### 3. 标签输入行 (LabeledInputRow)
+
+将带标签的输入行封装为可复用组件：
+
+```vue
+<!-- 建议实现: src/components/common/LabeledInputRow.vue -->
+<template>
+  <div class="control-item side-by-side">
+    <label :for="id">{{ label }}:</label>
+    <slot></slot>
+  </div>
+</template>
+```
+
+## 重构步骤
+
+1. 创建上述共用组件
+2. 在[FocusControl.vue](mdc:src/components/ControlPanel/FocusControl.vue)中使用这些组件替换现有代码
+3. 将样式从全局CSS文件移至各组件的scoped样式中
+4. 在其他控制面板组件中也采用相同的组件
+
+## 重构后的示例
+
+重构后的FocusControl.vue应类似于：
+
+```vue
+<template>
+  <div class="panel-section requires-connection">
+    <hr class="separator">
+    <h4>Z轴控制 / 对焦</h4>
+    <div class="focus-section-container">
+      <!-- 使用共用组件 -->
+      <LabeledInputRow label="Z轴选择" id="focus-axis-select">
+        <SelectControl 
+          v-model="selectedAxisId" 
+          :options="axisOptions"
+        />
+      </LabeledInputRow>
+      
+      <LabeledInputRow label="Z轴位置" id="focus-axis-position">
+        <ValueInputControl 
+          :value="position" 
+          :step="stepValue"
+          :unit="displayUnit"
+          readonly
+          @increment="performJog(1)"
+          @decrement="performJog(-1)"
+          @unit-click="toggleUnit"
+        />
+        <SelectControl 
+          v-model="stepValue" 
+          :options="stepOptions"
+        />
+      </LabeledInputRow>
+      
+      <!-- 其他控件也类似替换 -->
+    </div>
+  </div>
+</template>
+```
+
+这种重构将大幅减少代码重复，并确保所有控件具有一致的外观和行为。
+
