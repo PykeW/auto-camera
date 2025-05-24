@@ -690,66 +690,77 @@ input:checked+.slider:before {
 }
 
 .focus-controls {
-    gap: var(--spacing-medium)
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin-top: 8px
 }
 
 .focus-controls button {
-    flex-grow: 1;
-    font-size: 13px;
-    padding: 0 10px;
-    white-space: nowrap
+    border: none;
+    border-radius: 4px;
+    height: 32px;
+    align-items: center;
+    display: flex;
+    flex: 1;
+    font-weight: 400;
+    justify-content: center;
+    transition: all .2s ease
 }
 
 .focus-controls .secondary-button {
-    background-color: #2c6e91
+    background-color: #4a90e2;
+    color: #fff
 }
 
 .focus-controls .secondary-button:hover:not(:disabled) {
-    background-color: #3588b2
+    background-color: #3a80d2
 }
 
 .focus-status label {
-    display: inline-block;
-    margin-bottom: 0
+    margin-bottom: 0;
+    min-width: 80px
 }
 
 #focus-status-text {
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
     border-radius: var(--border-radius);
-    display: inline-block;
-    font-weight: 700;
-    margin-left: var(--spacing-small);
-    padding: 2px 6px
+    color: var(--text-light);
+    padding: 4px 8px
 }
 
 .status-未连接,
-.status-空闲 {
-    background-color: var(--bg-medium);
-    color: var(--text-medium)
+.status-初始化中,
+.status-对焦失败 {
+    background-color: var(--accent-red)!important;
+    color: #fff!important
 }
 
 .status-保存参数中,
-.status-初始化-检查,
-.status-请求Z轴控制权 {
-    background-color: var(--accent-blue);
-    color: var(--text-light)
+.status-编辑中,
+.status-未对焦 {
+    background-color: var(--accent-yellow)!important;
+    color: #000!important
 }
 
 .status-对焦中,
-.status-当量计算-模拟-,
-.status-移动到最佳位置 {
-    background-color: var(--accent-yellow);
-    color: var(--text-dark)
+.status-连接中,
+.status-准备中 {
+    background-color: var(--accent-blue)!important;
+    color: #fff!important
 }
 
 .status-已对焦 {
-    background-color: var(--accent-green);
-    color: var(--text-dark)
+    background-color: var(--accent-green)!important;
+    color: #fff!important
 }
 
 .status-已停止,
-.status-错误 {
-    background-color: var(--accent-red);
-    color: var(--text-light)
+.status-已连接,
+.status-空闲 {
+    background-color: #555!important;
+    color: #eee!important
 }
 
 .axis-config-group {
@@ -2067,30 +2078,21 @@ input:checked+.slider:before {
 
 .focus-controls {
     display: flex;
+    flex-direction: row;
     gap: 8px;
-    margin-bottom: 10px;
-    margin-top: 10px
+    margin-top: 8px
 }
 
 .focus-controls button {
-    align-items: center;
     border: none;
     border-radius: 4px;
+    height: 32px;
+    align-items: center;
     display: flex;
     flex: 1;
     font-weight: 400;
-    height: 32px;
     justify-content: center;
     transition: all .2s ease
-}
-
-.focus-controls button i {
-    margin-right: 5px
-}
-
-.focus-controls .primary-button {
-    background-color: var(--accent-blue);
-    color: #fff
 }
 
 .focus-controls .secondary-button {
@@ -2098,23 +2100,54 @@ input:checked+.slider:before {
     color: #fff
 }
 
-.focus-controls .danger-button {
-    background-color: var(--accent-red);
-    color: #fff
-}
-
-.focus-controls button:hover:not(:disabled) {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
-    transform: translateY(-1px)
-}
-
-.focus-controls .primary-button:hover:not(:disabled),
 .focus-controls .secondary-button:hover:not(:disabled) {
     background-color: #3a80d2
 }
 
-.focus-controls .danger-button:hover:not(:disabled) {
-    background-color: #d94c4c
+.focus-status label {
+    margin-bottom: 0;
+    min-width: 80px
+}
+
+#focus-status-text {
+    background-color: var(--bg-medium);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--border-radius);
+    color: var(--text-light);
+    padding: 4px 8px
+}
+
+.status-未连接,
+.status-初始化中,
+.status-对焦失败 {
+    background-color: var(--accent-red)!important;
+    color: #fff!important
+}
+
+.status-保存参数中,
+.status-编辑中,
+.status-未对焦 {
+    background-color: var(--accent-yellow)!important;
+    color: #000!important
+}
+
+.status-对焦中,
+.status-连接中,
+.status-准备中 {
+    background-color: var(--accent-blue)!important;
+    color: #fff!important
+}
+
+.status-已对焦 {
+    background-color: var(--accent-green)!important;
+    color: #fff!important
+}
+
+.status-已停止,
+.status-已连接,
+.status-空闲 {
+    background-color: #555!important;
+    color: #eee!important
 }
 
 .axis-position-control {

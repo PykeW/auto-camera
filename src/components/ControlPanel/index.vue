@@ -6,7 +6,6 @@
       <CameraProperties />
       <FocusControl />
       <CalibrationControl />
-      <MarkPointControl />
     </aside>
   </template>
   

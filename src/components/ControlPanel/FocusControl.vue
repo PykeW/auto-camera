@@ -60,7 +60,9 @@
             <input 
               type="number" 
               id="focus-axis-speed" 
-              v-model="selectedSpeed"
+              :value="formattedSpeed"
+              @input="selectedSpeed = $event.target.value"
+              @blur="validateSpeedValue"
               :step="speedStep" 
               :min="speedMin"
               :disabled="!isConnected || isFocusing"
@@ -76,24 +78,31 @@
             <input 
               type="number" 
               id="focus-range" 
-              v-model="rangeValue"
+              :value="formattedRangeValue"
+              @input="rangeValue = $event.target.value"
+              @blur="validateRangeValue"
               :step="rangeStep" 
               :min="rangeMin"
+              :disabled="!isConnected || isFocusing"
             >
-            <span class="unit-display" id="range-unit-display">{{ displayUnit }}</span>
+            <span class="unit-display">{{ displayUnit }}</span>
           </div>
         </div>
+        
         <div class="control-item side-by-side">
           <label for="focus-step">对焦步进:</label>
           <div class="position-display-container">
             <input 
               type="number" 
               id="focus-step" 
-              v-model="focusStepValue"
+              :value="formattedFocusStepValue"
+              @input="focusStepValue = $event.target.value"
+              @blur="validateFocusStepValue"
               :step="focusStepStep" 
               :min="focusStepMin"
+              :disabled="!isConnected || isFocusing"
             >
-            <span class="unit-display" id="step-unit-display">{{ displayUnit }}</span>
+            <span class="unit-display">{{ displayUnit }}</span>
           </div>
         </div>
   
@@ -110,33 +119,30 @@
         />
   
         <div class="control-item focus-controls">
-          <button 
-            id="start-focus-btn" 
-            class="primary-button"
+          <ActionButton 
+            v-if="!isFocusing"
+            text="开始自动对焦"
+            type="primary"
+            iconClass="fas fa-crosshairs"
+            :disabled="!isConnected || isFocusing"
             @click="startAutoFocus"
-            :disabled="!isConnected || isFocusing"
-            v-show="!isFocusing"
-          >
-            <i class="fas fa-crosshairs"></i> 开始自动对焦
-          </button>
-          <button 
-            id="stop-focus-btn" 
-            class="danger-button"
-            @click="stopAutoFocus"
+          />
+          <ActionButton 
+            v-else
+            text="停止自动对焦"
+            type="danger"
+            iconClass="fas fa-stop-circle"
             :disabled="!isConnected || !isFocusing"
-            v-show="isFocusing"
-          >
-            <i class="fas fa-stop-circle"></i> 停止自动对焦
-          </button>
-          <button 
-            id="save-focus-position-btn" 
-            class="secondary-button"
-            @click="saveFocusPosition"
+            @click="stopAutoFocus"
+          />
+          <ActionButton 
+            v-if="!isFocusing"
+            text="保存对焦位置"
+            type="secondary"
+            iconClass="fas fa-save"
             :disabled="!isConnected || isFocusing"
-            v-show="!isFocusing"
-          >
-            <i class="fas fa-save"></i> 保存对焦位置
-          </button>
+            @click="saveFocusPosition"
+          />
         </div>
       </div>
     </div>
@@ -149,8 +155,16 @@
   import { useFocusStore } from '../../stores/focus';
   import { useRoiStore } from '../../stores/roi';
   import { showMessage } from '../../utils/helpers';
+  import { 
+    formatByUnit, 
+    validateNumericInput, 
+    isAxisLimitReached, 
+    adjustValuesByUnit 
+  } from '../../utils/inputHelpers';
   import ZAxisSelector from './ZAxisSelector.vue';
   import ROIControl from './ROIControl.vue';
+  import ValueInputControl from '../common/ValueInputControl.vue';
+  import ActionButton from '../common/ActionButton.vue';
   
   const cameraStore = useCameraStore();
   const axisStore = useAxisStore();
@@ -212,15 +226,16 @@
     return axisStore.positionsEncoder[selectedAxisName.value] || 0;
   });
   
+  // 使用通用格式化函数
   const formattedPosition = computed(() => {
     if (!isConnected.value) return '--';
-    
-    if (displayUnit.value === 'mm') {
-      return Math.abs(position.value).toFixed(3);
-    } else {
-      return Math.abs(Math.round(positionEncoder.value));
-    }
+    const value = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
+    return formatByUnit(Math.abs(value), displayUnit.value);
   });
+  
+  const formattedRangeValue = computed(() => formatByUnit(rangeValue.value, displayUnit.value));
+  const formattedFocusStepValue = computed(() => formatByUnit(focusStepValue.value, displayUnit.value));
+  const formattedSpeed = computed(() => formatByUnit(selectedSpeed.value, displayUnit.value));
   
   // 步进选项
   const stepOptions = computed(() => {
@@ -249,7 +264,7 @@
   const focusStepStep = computed(() => displayUnit.value === 'mm' ? '0.01' : '10');
   const focusStepMin = computed(() => displayUnit.value === 'mm' ? '0.001' : '1');
   
-  // 轴限制
+  // 轴限制相关
   const axisLimits = computed(() => {
     return axisStore.axisLimits[selectedAxisName.value] || { min: 0, max: 100 };
   });
@@ -258,41 +273,48 @@
     return axisStore.axisLimitsEncoder[selectedAxisName.value] || { min: 0, max: 100000 };
   });
   
+  // 使用工具函数计算轴限制
   const isMinLimitReached = computed(() => {
-    if (!isConnected.value) return true;
-    
-    if (displayUnit.value === 'mm') {
-      return position.value - stepValue.value < axisLimits.value.min;
-    } else {
-      return positionEncoder.value - stepValue.value < axisLimitsEncoder.value.min;
-    }
+    const currentPos = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
+    const limits = displayUnit.value === 'mm' ? axisLimits.value : axisLimitsEncoder.value;
+    return isAxisLimitReached(isConnected.value, currentPos, stepValue.value, limits, -1);
   });
   
   const isMaxLimitReached = computed(() => {
-    if (!isConnected.value) return true;
-    
-    if (displayUnit.value === 'mm') {
-      return position.value + stepValue.value > axisLimits.value.max;
-    } else {
-      return positionEncoder.value + stepValue.value > axisLimitsEncoder.value.max;
-    }
+    const currentPos = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
+    const limits = displayUnit.value === 'mm' ? axisLimits.value : axisLimitsEncoder.value;
+    return isAxisLimitReached(isConnected.value, currentPos, stepValue.value, limits, 1);
   });
+  
+  // 使用工具函数验证输入
+  function validateRangeValue(event) {
+    validateNumericInput(event, rangeValue, parseFloat(rangeMin.value));
+  }
+  
+  function validateFocusStepValue(event) {
+    validateNumericInput(event, focusStepValue, parseFloat(focusStepMin.value));
+  }
+  
+  function validateSpeedValue(event) {
+    validateNumericInput(event, selectedSpeed, parseFloat(speedMin.value));
+  }
   
   // 方法  
   // 点动控制  
   async function performJog(direction) {    
     if (!isConnected.value) return;        
     
-    // 确保从DOM中获取最新选择的步进值    
-    const stepSelect = document.getElementById('focus-step-select');    
-    const step = stepSelect ? parseFloat(stepSelect.value) : stepValue.value;        
+    // 获取当前位置和限制
+    const currentPos = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
+    const limits = displayUnit.value === 'mm' ? axisLimits.value : axisLimitsEncoder.value;
     
-    // 检查是否会超出限制    
-    if (direction < 0 && isMinLimitReached.value) return;    
-    if (direction > 0 && isMaxLimitReached.value) return;        
+    // 检查是否会超出限制
+    if (isAxisLimitReached(isConnected.value, currentPos, stepValue.value, limits, direction)) {
+      return;
+    }
     
     // 执行点动，传递速度参数
-    await axisStore.jogAxis(selectedAxisName.value, direction, step, selectedSpeed.value);        
+    await axisStore.jogAxis(selectedAxisName.value, direction, stepValue.value, selectedSpeed.value);        
     
     // 更新清晰度    
     if (selectedAxisName.value === 'Z') {      
@@ -391,64 +413,189 @@
     showMessage('ROI区域已确认', 'success');
   }
 
-  // 监听单位变更，调整步进和范围值
+  // 监听单位变更，使用工具函数调整步进和范围值
   watch(() => axisStore.displayUnit, (newUnit) => {
-    if (newUnit === 'mm') {
-      // 从um转到mm
-      stepValue.value = 0.1;
-      rangeValue.value = Number((parseFloat(rangeValue.value) / 1000).toFixed(3));
-      focusStepValue.value = Number((parseFloat(focusStepValue.value) / 1000).toFixed(3));
-      selectedSpeed.value = Number((parseFloat(selectedSpeed.value) / 1000).toFixed(3));
-    } else {
-      // 从mm转到um
-      stepValue.value = 100;
-      rangeValue.value = Math.round(parseFloat(rangeValue.value) * 1000);
-      focusStepValue.value = Math.round(parseFloat(focusStepValue.value) * 1000);
-      selectedSpeed.value = Math.round(parseFloat(selectedSpeed.value) * 1000);
-    }
+    // 设置默认值
+    const defaults = {
+      stepValue: { mm: 0.1, um: 100 },
+      rangeValue: { mm: 5.0, um: 5000 },
+      focusStepValue: { mm: 0.5, um: 500 },
+      selectedSpeed: { mm: 1.0, um: 1000 }
+    };
+    
+    // 获取当前值
+    const currentValues = {
+      stepValue: stepValue.value,
+      rangeValue: rangeValue.value,
+      focusStepValue: focusStepValue.value,
+      selectedSpeed: selectedSpeed.value
+    };
+    
+    // 调整值
+    const newValues = adjustValuesByUnit(currentValues, newUnit, defaults);
+    
+    // 更新各个值
+    stepValue.value = newValues.stepValue;
+    rangeValue.value = newValues.rangeValue;
+    focusStepValue.value = newValues.focusStepValue;
+    selectedSpeed.value = newValues.selectedSpeed;
   });
   </script>
   
   <style scoped>
+  /* 这些样式已从全局样式表(styles.css)中提取，实现了组件样式的模块化 */
+
   /* 输入框文字左对齐 */
   input[type="number"] {
     text-align: left;
   }
 
-  /* 移除下拉框的左边距 */
-  .position-display-container .compact-select {
-    margin-left: 0;
+  /* 焦点控制部分容器 */
+  .focus-section-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
   }
 
-  /* 使加减号按钮更贴近数字查看框 */
+  /* 控制项行样式 */
+  .control-item.side-by-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    margin-bottom: 8px;
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow: visible;
+  }
+
+  .control-item.side-by-side label {
+    flex-shrink: 0;
+    min-width: 80px;
+    width: 80px;
+    color: var(--text-medium);
+    font-size: .9em;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  /* 轴位置控制相关样式 */
   .axis-position-control {
+    display: flex;
+    align-items: center;
     gap: 0 !important;
+    flex: 1;
+    height: 32px;
+    background: none;
+    border: none;
+    margin-right: 8px;
   }
 
-  .axis-position-control .jog-btn {
+  .position-display-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    height: 32px;
+    border-left: none;
+    border-right: none;
+  }
+
+  .position-display-container input {
+    width: 100%;
+    height: 32px;
+    padding: 0 30px 0 8px;
+    text-align: left;
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    border: 1px solid var(--border-dark);
     border-radius: 0;
+    font-size: 13px;
+    box-sizing: border-box;
   }
 
-  .axis-position-control .jog-btn.minus {
+  .unit-display {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #bbb;
+    background-color: rgba(61, 61, 61, .8);
+    border-radius: 3px;
+    padding: 1px 4px;
+    cursor: pointer;
+    z-index: 1;
+    user-select: none;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .unit-display:hover {
+    color: #fff;
+    background-color: #555;
+  }
+
+  /* 点动按钮样式 */
+  .jog-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 0;
+    border: 1px solid var(--border-dark);
+    background-color: var(--bg-medium);
+    color: var(--accent-blue);
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0;
+    line-height: 30px;
+    flex-shrink: 0;
+    font-size: 16px;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .jog-btn:hover:not(:disabled) {
+    background-color: #4a4a4a;
+    color: #fff;
+  }
+
+  .jog-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    color: var(--text-medium);
+  }
+
+  .jog-btn.plus {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-left: 1px solid var(--border-dark);
+  }
+
+  .jog-btn.minus {
     border-top-left-radius: 4px;
     border-bottom-left-radius: 4px;
     border-right: none;
   }
 
-  .axis-position-control .jog-btn.plus {
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-    border-left: none;
+  /* 下拉选择框样式 */
+  .compact-select {
+    border: 1px solid var(--border-medium);
+    border-radius: 3px;
+    font-size: .9em;
+    padding: 4px 8px;
+    height: 32px;
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23b0b0b0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-position: right 4px center;
+    background-repeat: no-repeat;
+    background-size: .65em auto;
+    margin-left: 8px;
   }
 
-  .axis-position-control .position-display-container {
-    border-left: none;
-    border-right: none;
-  }
-
-  /* 去掉输入框的圆角 */
-  .axis-position-control .position-display-container input {
-    border-radius: 0;
+  /* 移除下拉框的左边距 */
+  .position-display-container .compact-select {
+    margin-left: 0;
   }
 
   /* 对焦控制按钮样式 */
@@ -460,14 +607,53 @@
   }
 
   .focus-controls button {
+    align-items: center;
+    border: none;
+    border-radius: 4px;
+    display: flex;
     flex: 1;
+    font-weight: 400;
+    height: 32px;
+    justify-content: center;
+    transition: all .2s ease;
   }
 
-  /* 调整focus-section-container的底部边距 */
-  .focus-section-container {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 8px;
+  .focus-controls button i {
+    margin-right: 5px;
+  }
+
+  .focus-controls .primary-button {
+    background-color: var(--accent-blue);
+    color: #fff;
+  }
+
+  .focus-controls .secondary-button {
+    background-color: #4a90e2;
+    color: #fff;
+  }
+
+  .focus-controls .danger-button {
+    background-color: var(--accent-red);
+    color: #fff;
+  }
+
+  .focus-controls button:hover:not(:disabled) {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+    transform: translateY(-1px);
+  }
+
+  .focus-controls .primary-button:hover:not(:disabled),
+  .focus-controls .secondary-button:hover:not(:disabled) {
+    background-color: #3a80d2;
+  }
+
+  .focus-controls .danger-button:hover:not(:disabled) {
+    background-color: #d94c4c;
+  }
+
+  /* 只读输入框样式 */
+  input:read-only {
+    background-color: #4a4a4a;
+    cursor: default;
   }
   </style>

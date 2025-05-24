@@ -1,13 +1,19 @@
 <!-- src/components/ControlPanel/CameraConnection.vue -->
 <template>
     <div class="panel-section requires-connection">
-      <label for="serial-number">相机序列号：</label>
-      <div class="input-group">
-        <input type="text" id="serial-number" v-model="serialNumber" readonly>
-        <button id="connect-btn" class="connect-button" :class="{ connected: isConnected }" @click="toggleConnection">
-          {{ isConnected ? '断开' : '连接' }}
-        </button>
-      </div>
+      <LabeledInputRow label="相机序列号：">
+        <div class="connection-group">
+          <SimpleInputControl 
+            v-model="serialNumber" 
+            :readonly="true"
+          />
+          <ActionButton 
+            :text="isConnected ? '断开' : '连接'" 
+            :type="isConnected ? 'danger' : 'primary'"
+            @click="toggleConnection"
+          />
+        </div>
+      </LabeledInputRow>
     </div>
   </template>
   
@@ -15,6 +21,9 @@
   import { ref, computed, onMounted } from 'vue';
   import { useCameraStore } from '../../stores/camera';
   import { useAxisStore } from '../../stores/axis';
+  import SimpleInputControl from '../common/SimpleInputControl.vue';
+  import ActionButton from '../common/ActionButton.vue';
+  import LabeledInputRow from '../common/LabeledInputRow.vue';
   
   const cameraStore = useCameraStore();
   const axisStore = useAxisStore();
@@ -47,3 +56,15 @@
     }
   });
   </script>
+
+<style scoped>
+.panel-section {
+  margin-bottom: 16px;
+}
+
+.connection-group {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+</style>

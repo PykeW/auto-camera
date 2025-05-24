@@ -994,55 +994,72 @@
     return `${result.ratio.toFixed(2)} px/mm`;
   });
   
-  // 方法
-  // X轴点动控制
+  // 通用轴点动控制函数
+  async function performAxisJog(axisRole, direction) {
+    // 根据轴角色确定轴名称、步进值和速度
+    let axisName, stepValue, speed;
+    let isMinLimitReached = false;
+    let isMaxLimitReached = false;
+    
+    if (axisRole === 'x') {
+      if (!isConnected.value || !xAxisName.value) return;
+      axisName = xAxisName.value;
+      stepValue = xStepValue.value;
+      speed = xSpeed.value;
+      isMinLimitReached = isXMinLimitReached.value;
+      isMaxLimitReached = isXMaxLimitReached.value;
+    } else if (axisRole === 'y') {
+      if (!isConnected.value || !yAxisName.value) return;
+      axisName = yAxisName.value;
+      stepValue = yStepValue.value;
+      speed = ySpeed.value;
+      isMinLimitReached = isYMinLimitReached.value;
+      isMaxLimitReached = isYMaxLimitReached.value;
+    } else if (axisRole === 'u') {
+      if (!isConnected.value || !uAxisName.value) return;
+      axisName = uAxisName.value;
+      stepValue = uStepValue.value;
+      speed = uSpeed.value;
+      isMinLimitReached = isUMinLimitReached.value;
+      isMaxLimitReached = isUMaxLimitReached.value;
+    } else {
+      return; // 未知轴类型
+    }
+    
+    // 检查是否会超出限制
+    if (direction < 0 && isMinLimitReached) return;
+    if (direction > 0 && isMaxLimitReached) return;
+    
+    // 获取DOM中的步进值（如有必要）
+    const stepSelectId = `${axisRole}-step-select`;
+    const stepSelect = document.getElementById(stepSelectId);
+    if (stepSelect) {
+      stepValue = parseFloat(stepSelect.value);
+    }
+    
+    // 执行点动，对U轴特殊处理
+    if (axisRole === 'u') {
+      await axisStore.jogAxis(axisName, direction, stepValue, speed, uUnitMode.value);
+    } else {
+      await axisStore.jogAxis(axisName, direction, stepValue, speed);
+    }
+  }
+  
+  // X轴点动控制 - 调用通用函数
   async function performXJog(direction) {
-    if (!isConnected.value || !xAxisName.value) return;
-    
-    // 确保从DOM中获取最新选择的步进值
-    const stepSelect = document.getElementById('x-step-select');
-    const step = stepSelect ? parseFloat(stepSelect.value) : xStepValue.value;
-    
-    // 检查是否会超出限制
-    if (direction < 0 && isXMinLimitReached.value) return;
-    if (direction > 0 && isXMaxLimitReached.value) return;
-    
-    // 执行点动，传递速度参数
-    await axisStore.jogAxis(xAxisName.value, direction, step, xSpeed.value);
+    performAxisJog('x', direction);
   }
   
-  // Y轴点动控制
+  // Y轴点动控制 - 调用通用函数
   async function performYJog(direction) {
-    if (!isConnected.value || !yAxisName.value) return;
-    
-    // 确保从DOM中获取最新选择的步进值
-    const stepSelect = document.getElementById('y-step-select');
-    const step = stepSelect ? parseFloat(stepSelect.value) : yStepValue.value;
-    
-    // 检查是否会超出限制
-    if (direction < 0 && isYMinLimitReached.value) return;
-    if (direction > 0 && isYMaxLimitReached.value) return;
-    
-    // 执行点动，传递速度参数
-    await axisStore.jogAxis(yAxisName.value, direction, step, ySpeed.value);
+    performAxisJog('y', direction);
   }
   
-  // U轴点动控制
+  // U轴点动控制 - 调用通用函数
   async function performUJog(direction) {
-    if (!isConnected.value || !uAxisName.value) return;
-    
-    // 确保从DOM中获取最新选择的步进值
-    const stepSelect = document.getElementById('u-step-select');
-    const step = stepSelect ? parseFloat(stepSelect.value) : uStepValue.value;
-    
-    // 检查是否会超出限制
-    if (direction < 0 && isUMinLimitReached.value) return;
-    if (direction > 0 && isUMaxLimitReached.value) return;
-    
-    // 执行点动，传递速度参数
-    await axisStore.jogAxis(uAxisName.value, direction, step, uSpeed.value, uUnitMode.value);
+    performAxisJog('u', direction);
   }
-  
+
   // 开始标定
   async function startCalibration() {
     if (!isConnected.value || isCalibrating.value || !canStartCalibration.value) return;
