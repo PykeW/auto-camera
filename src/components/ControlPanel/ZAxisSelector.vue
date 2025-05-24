@@ -48,6 +48,11 @@ const emit = defineEmits(['update:modelValue']);
    are expected to be available globally from styles.css or a common stylesheet.
    Add component-specific styles here if needed. */
 
+/* 组件整体外边距 */
+.control-item.side-by-side {
+  margin-bottom: 8px; /* 确保底部间距一致 */
+}
+
 /* Targeting the label within this component specifically */
 label {
   min-width: 80px; /* Consistent with global .control-item.side-by-side label */

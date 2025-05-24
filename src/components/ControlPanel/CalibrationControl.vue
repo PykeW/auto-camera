@@ -134,26 +134,36 @@
           </div>
         </div>
         
-        <div class="control-item side-by-side">
-          <label for="matrix-size">矩阵大小:</label>
-          <div class="position-display-container">
-            <select id="matrix-size" class="compact-select" v-model="matrixSize">
-              <option value="3" selected>3×3</option>
-              <option value="5">5×5</option>
-              <option value="7">7×7</option>
-              <option value="9">9×9</option>
-            </select>
-          </div>
-        </div>
-        <div class="control-item side-by-side">
-          <label for="point-offset">点位偏移(mm):</label>
-          <div class="position-display-container">
-            <input type="number" id="point-offset" v-model="pointOffset" step="0.1" min="0.1" class="standard-input">
+        <ZAxisSelector
+          label="矩阵大小"
+          selectId="matrix-size"
+          :modelValue="matrixSize.toString()"
+          @update:modelValue="val => matrixSize = parseInt(val)"
+          :axes="matrixSizeOptions"
+          :disabled="isCalibrating"
+        />
+        
+        <!-- 创建一个输入控件包装点位偏移 -->
+        <div class="z-axis-selector-like">
+          <div class="control-item side-by-side">
+            <label for="point-offset" style="min-width: 80px;">点位偏移:</label>
+            <div class="position-display-container">
+              <input 
+                type="number" 
+                id="point-offset" 
+                v-model="pointOffset" 
+                step="0.1" 
+                min="0.1" 
+                :disabled="isCalibrating"
+                class="compact-input"
+              >
+              <span class="unit-display">mm</span>
+            </div>
           </div>
         </div>
         
         <!-- Mark点方式选择和参数 -->
-        <div class="control-item side-by-side" v-if="assignedX && assignedY">
+        <div class="control-item side-by-side" v-if="assignedX && assignedY" style="margin-top: 8px;">
           <label for="mark-method">Mark点方式:</label>
           <select id="mark-method" class="compact-select" v-model="calibrationStore.markMethod" @change="onMarkMethodChange">
             <option value="template">模板匹配</option>
@@ -341,6 +351,14 @@
   // U轴单位控制（度/弧度）
   const uUnitMode = ref('deg'); // 'deg' 或 'rad'
   const uDisplayUnit = computed(() => uUnitMode.value === 'deg' ? '°' : 'rad');
+  
+  // 矩阵大小选项
+  const matrixSizeOptions = computed(() => [
+    { id: '3', name: '3×3' },
+    { id: '5', name: '5×5' },
+    { id: '7', name: '7×7' },
+    { id: '9', name: '9×9' }
+  ]);
   
   // 切换X、Y轴显示单位
   function toggleDisplayUnit() {
@@ -1160,7 +1178,7 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     gap: 8px;
   }
   
@@ -1496,5 +1514,26 @@ input[type="number"].standard-input::-webkit-inner-spin-button,
 input[type="number"].standard-input::-webkit-outer-spin-button { 
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* 为点位偏移添加ZAxisSelector样式 */
+.z-axis-selector-like {
+  margin-bottom: 8px;
+  margin-top: 8px;
+}
+.z-axis-selector-like .control-item.side-by-side label {
+  min-width: 80px;
+  flex-shrink: 0;
+  margin-bottom: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.z-axis-selector-like .position-display-container {
+  flex-grow: 1;
+}
+.z-axis-selector-like .compact-input {
+  margin-left: 0;
+  width: 65px;
+  height: 28px;
 }
   </style>
