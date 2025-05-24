@@ -98,8 +98,8 @@ import { ref, computed, watch } from 'vue';
 import { useAxisStore } from '../../stores/axis';
 import { useCameraStore } from '../../stores/camera';
 import { formatByUnit, validateNumericInput } from '../../utils/inputHelpers';
-import AxisPositionControl from '../common/AxisPositionControl.vue';
-import AxisSpeedControl from '../common/AxisSpeedControl.vue';
+import AxisPositionControl from '../ui/AxisPositionControl.vue';
+import AxisSpeedControl from '../ui/AxisSpeedControl.vue';
 
 const props = defineProps({
   assignedX: {

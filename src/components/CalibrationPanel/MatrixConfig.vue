@@ -34,7 +34,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useCalibrationStore } from '../../stores/calibration';
-import ZAxisSelector from './ZAxisSelector.vue';
+import ZAxisSelector from '../FocusPanel/ZAxisSelector.vue';
 
 const props = defineProps({
   isCalibrating: {

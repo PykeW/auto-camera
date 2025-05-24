@@ -10,9 +10,9 @@
   </template>
   
   <script setup>
-  import CameraConnection from './CameraConnection.vue';
-  import CameraInfo from './CameraInfo.vue';
-  import CameraProperties from './CameraProperties.vue';
-  import FocusControl from './FocusControl.vue';
-  import CalibrationControl from './CalibrationControl.vue';
+  import CameraConnection from '../CameraPanel/CameraConnection.vue';
+  import CameraInfo from '../CameraPanel/CameraInfo.vue';
+  import CameraProperties from '../CameraPanel/CameraProperties.vue';
+  import FocusControl from '../FocusPanel/FocusControl.vue';
+  import CalibrationControl from '../CalibrationPanel/CalibrationControl.vue';
   </script>

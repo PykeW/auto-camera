@@ -1,4 +1,4 @@
-<!-- src/components/ControlPanel/CalibrationControl.vue -->
+<!-- src/components/CalibrationPanel/CalibrationControl.vue -->
 <template>
     <div class="panel-section requires-connection">
       <hr class="separator">

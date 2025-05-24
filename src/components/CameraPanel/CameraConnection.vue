@@ -22,7 +22,7 @@
   import { useCameraStore } from '../../stores/camera';
   import { useAxisStore } from '../../stores/axis';
   import SimpleInputControl from '../common/SimpleInputControl.vue';
-  import ActionButton from '../common/ActionButton.vue';
+  import ActionButton from '../ui/ActionButton.vue';
   import LabeledInputRow from '../common/LabeledInputRow.vue';
   
   const cameraStore = useCameraStore();

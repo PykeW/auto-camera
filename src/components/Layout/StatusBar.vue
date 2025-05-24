@@ -12,8 +12,8 @@
   
   <script setup>
   import { ref, computed, onMounted, onUnmounted } from 'vue';
-  import { useCameraStore } from '../stores/camera';
-  import { useFocusStore } from '../stores/focus';
+  import { useCameraStore } from '../../stores/camera';
+  import { useFocusStore } from '../../stores/focus';
   
   const cameraStore = useCameraStore();
   const focusStore = useFocusStore();

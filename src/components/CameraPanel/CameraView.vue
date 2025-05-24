@@ -91,17 +91,17 @@
   
   <script setup>
   import { computed, watch, onMounted, ref } from 'vue';
-  import { useCameraStore } from '../stores/camera';
-  import { useFocusStore } from '../stores/focus';
-  import { useAxisStore } from '../stores/axis';
-  import { useCalibrationStore } from '../stores/calibration'; // 新增导入
-  import RoiOverlay from './common/RoiOverlay.vue';
-  import FocusThumbnails from './common/FocusThumbnails.vue';
+  import { useCameraStore } from '../../stores/camera';
+  import { useFocusStore } from '../../stores/focus';
+  import { useAxisStore } from '../../stores/axis';
+  import { useCalibrationStore } from '../../stores/calibration';
+  import RoiOverlay from '../common/RoiOverlay.vue';
+  import FocusThumbnails from '../common/FocusThumbnails.vue';
   
   const cameraStore = useCameraStore();
   const focusStore = useFocusStore();
   const axisStore = useAxisStore();
-  const calibrationStore = useCalibrationStore(); // 新增
+  const calibrationStore = useCalibrationStore();
   
   // 是否显示所有标定图片
   const showAllCalibrationImages = computed(() => {

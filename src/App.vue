@@ -11,9 +11,9 @@
   </template>
   
   <script setup>
-  import AppHeader from './components/AppHeader.vue';
-  import StatusBar from './components/StatusBar.vue';
-  import CameraView from './components/CameraView.vue';
+  import AppHeader from './components/Layout/AppHeader.vue';
+  import StatusBar from './components/Layout/StatusBar.vue';
+  import CameraView from './components/CameraPanel/CameraView.vue';
   import ControlPanel from './components/ControlPanel/index.vue';
   </script>
   

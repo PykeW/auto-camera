@@ -27,7 +27,7 @@
   
   <script setup>
   import { computed } from 'vue';
-  import { useCameraStore } from '../stores/camera';
+  import { useCameraStore } from '../../stores/camera';
   
   const cameraStore = useCameraStore();
   const isConnected = computed(() => cameraStore.isConnected);

@@ -130,11 +130,11 @@
     adjustValuesByUnit 
   } from '../../utils/inputHelpers';
   import ZAxisSelector from './ZAxisSelector.vue';
-  import ROIControl from './ROIControl.vue';
+  import ROIControl from '../CameraPanel/ROIControl.vue';
   import ValueInputControl from '../common/ValueInputControl.vue';
-  import ActionButton from '../common/ActionButton.vue';
-  import AxisPositionControl from '../common/AxisPositionControl.vue';
-  import AxisSpeedControl from '../common/AxisSpeedControl.vue';
+  import ActionButton from '../ui/ActionButton.vue';
+  import AxisPositionControl from '../ui/AxisPositionControl.vue';
+  import AxisSpeedControl from '../ui/AxisSpeedControl.vue';
   
   const cameraStore = useCameraStore();
   const axisStore = useAxisStore();

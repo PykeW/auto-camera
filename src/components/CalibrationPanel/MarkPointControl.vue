@@ -1,4 +1,4 @@
-<!-- src/components/ControlPanel/MarkPointControl.vue -->
+<!-- src/components/CalibrationPanel/MarkPointControl.vue -->
 <template>
   <div>
     <!-- Mark点方式选择和参数 -->
