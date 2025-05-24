@@ -18,6 +18,7 @@
               @update:modelValue="val => handleAxisSelection('x', val)"
               :axes="availableXAxes"
               :disabled="isCalibrating"
+              placeholder="请选择"
             />
             <ZAxisSelector
               label="Y轴选择"
@@ -26,6 +27,7 @@
               @update:modelValue="val => handleAxisSelection('y', val)"
               :axes="availableYAxes"
               :disabled="isCalibrating"
+              placeholder="请选择"
             />
             <ZAxisSelector
               label="U轴选择"
@@ -42,187 +44,112 @@
           <div class="axes-params-section">
             <!-- X轴参数区域 -->
             <div v-if="assignedX" class="axis-params">
-              <!-- X轴位置显示、点动、步进选择合并一行 -->
-              <div class="axis-control-row">
-                <label for="x-axis-position">X轴位置:</label>
-                <div class="axis-position-control">
-                  <button 
-                    class="jog-btn minus" 
-                    id="x-jog-minus" 
-                    :disabled="!isConnected || isXMinLimitReached"
-                    @click="performXJog(-1)"
-                  >-</button>
-                  <div class="position-display-container">
-                    <input 
-                      type="text" 
-                      id="x-axis-position" 
-                      :value="formattedXPosition" 
-                      readonly
-                    >
-                    <span class="unit-display" title="点击切换单位" @click="toggleDisplayUnit">{{ displayUnit }}</span>
-                  </div>
-                  <button 
-                    class="jog-btn plus" 
-                    id="x-jog-plus" 
-                    :disabled="!isConnected || isXMaxLimitReached"
-                    @click="performXJog(1)"
-                  >+</button>
-                  <select 
-                    id="x-step-select" 
-                    class="compact-select step-select"
-                    v-model="xStepValue"
-                  >
-                    <option v-for="option in stepOptions" :key="option.value" :value="option.value">
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </div>
-              </div>
+              <!-- 使用新组件进行X轴位置控制 -->
+              <AxisPositionControl
+                axisName="X"
+                :formattedPosition="formattedXPosition"
+                :unitDisplay="displayUnit"
+                :isConnected="isConnected"
+                :isMinLimitReached="isXMinLimitReached"
+                :isMaxLimitReached="isXMaxLimitReached"
+                :stepValue="xStepValue"
+                :stepOptions="stepOptions"
+                @jog="performXJog"
+                @toggle-unit="toggleDisplayUnit"
+                @update:stepValue="xStepValue = $event"
+              />
               
-              <!-- X轴速度显示 -->
-              <div class="control-item side-by-side">
-                <label for="x-axis-speed">X轴速度:</label>
-                <div class="position-display-container">
-                  <input 
-                    type="number" 
-                    id="x-axis-speed" 
-                    v-model="xSpeed"
-                    :step="speedStep" 
-                    :min="speedMin"
-                    :disabled="!isConnected || isCalibrating"
-                    class="speed-input"
-                  >
-                  <span class="unit-display speed-unit">{{ speedUnit }}</span>
-                </div>
-              </div>
+              <!-- 使用新组件进行X轴速度控制 -->
+              <AxisSpeedControl
+                axisName="X"
+                :formattedSpeed="formattedXSpeed"
+                :unitDisplay="speedUnit"
+                :stepValue="speedStep"
+                :minValue="speedMin"
+                :disabled="!isConnected || isCalibrating"
+                @update:speed="xSpeed = $event"
+                @validate-speed="validateXSpeedValue"
+              />
             </div>
             
             <!-- Y轴参数区域 -->
             <div v-if="assignedY" class="axis-params">
-              <div class="axis-control-row">
-                <label for="y-axis-position">Y轴位置:</label>
-                <div class="axis-position-control">
-                  <button 
-                    class="jog-btn minus" 
-                    id="y-jog-minus" 
-                    :disabled="!isConnected || isYMinLimitReached"
-                    @click="performYJog(-1)"
-                  >-</button>
-                  <div class="position-display-container">
-                    <input 
-                      type="text" 
-                      id="y-axis-position" 
-                      :value="formattedYPosition" 
-                      readonly
-                    >
-                    <span class="unit-display" title="点击切换单位" @click="toggleDisplayUnit">{{ displayUnit }}</span>
-                  </div>
-                  <button 
-                    class="jog-btn plus" 
-                    id="y-jog-plus" 
-                    :disabled="!isConnected || isYMaxLimitReached"
-                    @click="performYJog(1)"
-                  >+</button>
-                  <select 
-                    id="y-step-select" 
-                    class="compact-select step-select"
-                    v-model="yStepValue"
-                  >
-                    <option v-for="option in stepOptions" :key="option.value" :value="option.value">
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </div>
-              </div>
+              <!-- 使用新组件进行Y轴位置控制 -->
+              <AxisPositionControl
+                axisName="Y"
+                :formattedPosition="formattedYPosition"
+                :unitDisplay="displayUnit"
+                :isConnected="isConnected"
+                :isMinLimitReached="isYMinLimitReached"
+                :isMaxLimitReached="isYMaxLimitReached"
+                :stepValue="yStepValue"
+                :stepOptions="stepOptions"
+                @jog="performYJog"
+                @toggle-unit="toggleDisplayUnit"
+                @update:stepValue="yStepValue = $event"
+              />
               
-              <!-- Y轴速度显示 -->
-              <div class="control-item side-by-side">
-                <label for="y-axis-speed">Y轴速度:</label>
-                <div class="position-display-container">
-                  <input 
-                    type="number" 
-                    id="y-axis-speed" 
-                    v-model="ySpeed"
-                    :step="speedStep" 
-                    :min="speedMin"
-                    :disabled="!isConnected || isCalibrating"
-                    class="speed-input"
-                  >
-                  <span class="unit-display speed-unit">{{ speedUnit }}</span>
-                </div>
-              </div>
+              <!-- 使用新组件进行Y轴速度控制 -->
+              <AxisSpeedControl
+                axisName="Y"
+                :formattedSpeed="formattedYSpeed"
+                :unitDisplay="speedUnit"
+                :stepValue="speedStep"
+                :minValue="speedMin"
+                :disabled="!isConnected || isCalibrating"
+                @update:speed="ySpeed = $event"
+                @validate-speed="validateYSpeedValue"
+              />
             </div>
             
             <!-- U轴参数区域 -->
             <div v-if="assignedU" class="axis-params">
-              <div class="axis-control-row">
-                <label for="u-axis-position">U轴位置:</label>
-                <div class="axis-position-control">
-                  <button 
-                    class="jog-btn minus" 
-                    id="u-jog-minus" 
-                    :disabled="!isConnected || isUMinLimitReached"
-                    @click="performUJog(-1)"
-                  >-</button>
-                  <div class="position-display-container">
-                    <input 
-                      type="text" 
-                      id="u-axis-position" 
-                      :value="formattedUPosition" 
-                      readonly
-                    >
-                    <span class="unit-display" title="点击切换单位" @click="toggleUDisplayUnit">{{ uDisplayUnit }}</span>
-                  </div>
-                  <button 
-                    class="jog-btn plus" 
-                    id="u-jog-plus" 
-                    :disabled="!isConnected || isUMaxLimitReached"
-                    @click="performUJog(1)"
-                  >+</button>
-                  <select 
-                    id="u-step-select" 
-                    class="compact-select step-select"
-                    v-model="uStepValue"
-                  >
-                    <option v-for="option in uStepOptions" :key="option.value" :value="option.value">
-                      {{ option.label }}
-                    </option>
-                  </select>
-                </div>
-              </div>
+              <!-- 使用新组件进行U轴位置控制 -->
+              <AxisPositionControl
+                axisName="U"
+                :formattedPosition="formattedUPosition"
+                :unitDisplay="uDisplayUnit"
+                :isConnected="isConnected"
+                :isMinLimitReached="isUMinLimitReached"
+                :isMaxLimitReached="isUMaxLimitReached"
+                :stepValue="uStepValue"
+                :stepOptions="uStepOptions"
+                @jog="performUJog"
+                @toggle-unit="toggleUDisplayUnit"
+                @update:stepValue="uStepValue = $event"
+              />
               
-              <!-- U轴速度显示 -->
-              <div class="control-item side-by-side">
-                <label for="u-axis-speed">U轴速度:</label>
-                <div class="position-display-container">
-                  <input 
-                    type="number" 
-                    id="u-axis-speed" 
-                    v-model="uSpeed"
-                    :step="uSpeedStep" 
-                    :min="uSpeedMin"
-                    :disabled="!isConnected || isCalibrating"
-                    class="speed-input"
-                  >
-                  <span class="unit-display speed-unit">{{ uSpeedUnit }}</span>
-                </div>
-              </div>
+              <!-- 使用新组件进行U轴速度控制 -->
+              <AxisSpeedControl
+                axisName="U"
+                :formattedSpeed="formattedUSpeed"
+                :unitDisplay="uSpeedUnit"
+                :stepValue="uSpeedStep"
+                :minValue="uSpeedMin"
+                :disabled="!isConnected || isCalibrating"
+                @update:speed="uSpeed = $event"
+                @validate-speed="validateUSpeedValue"
+              />
             </div>
           </div>
         </div>
         
         <div class="control-item side-by-side">
           <label for="matrix-size">矩阵大小:</label>
-          <select id="matrix-size" class="compact-select" v-model="matrixSize">
-            <option value="3" selected>3×3</option>
-            <option value="5">5×5</option>
-            <option value="7">7×7</option>
-            <option value="9">9×9</option>
-          </select>
+          <div class="position-display-container">
+            <select id="matrix-size" class="compact-select" v-model="matrixSize">
+              <option value="3" selected>3×3</option>
+              <option value="5">5×5</option>
+              <option value="7">7×7</option>
+              <option value="9">9×9</option>
+            </select>
+          </div>
         </div>
         <div class="control-item side-by-side">
           <label for="point-offset">点位偏移(mm):</label>
-          <input type="number" id="point-offset" v-model="pointOffset" step="0.1" min="0.1">
+          <div class="position-display-container">
+            <input type="number" id="point-offset" v-model="pointOffset" step="0.1" min="0.1" class="standard-input">
+          </div>
         </div>
         
         <!-- Mark点方式选择和参数 -->
@@ -340,7 +267,7 @@
       </div>
       
       <!-- 当量校准按钮 -->
-      <div class="control-item">
+      <div class="control-item calibration-controls">
         <button 
           id="debug-calib-btn" 
           class="primary-button"
@@ -361,7 +288,14 @@
   import { useAxisStore } from '../../stores/axis';
   import { useRoiStore } from '../../stores/roi'; // Import ROI store
   import { showMessage } from '../../utils/helpers';
+  import { 
+    formatByUnit, 
+    validateNumericInput, 
+    isAxisLimitReached 
+  } from '../../utils/inputHelpers';
   import ZAxisSelector from './ZAxisSelector.vue'; // Import the ZAxisSelector component
+  import AxisPositionControl from '../common/AxisPositionControl.vue';
+  import AxisSpeedControl from '../common/AxisSpeedControl.vue';
   
   const cameraStore = useCameraStore();
   const focusStore = useFocusStore();
@@ -762,11 +696,8 @@
   const formattedXPosition = computed(() => {
     if (!isConnected.value || !xAxisName.value) return '--';
     
-    if (displayUnit.value === 'mm') {
-      return Math.abs(xPosition.value).toFixed(3);
-    } else {
-      return Math.abs(Math.round(xPositionEncoder.value));
-    }
+    const value = displayUnit.value === 'mm' ? xPosition.value : xPositionEncoder.value;
+    return formatByUnit(Math.abs(value), displayUnit.value);
   });
   
   const xAxisLimits = computed(() => {
@@ -817,11 +748,8 @@
   const formattedYPosition = computed(() => {
     if (!isConnected.value || !yAxisName.value) return '--';
     
-    if (displayUnit.value === 'mm') {
-      return Math.abs(yPosition.value).toFixed(3);
-    } else {
-      return Math.abs(Math.round(yPositionEncoder.value));
-    }
+    const value = displayUnit.value === 'mm' ? yPosition.value : yPositionEncoder.value;
+    return formatByUnit(Math.abs(value), displayUnit.value);
   });
   
   const yAxisLimits = computed(() => {
@@ -872,11 +800,8 @@
   const formattedUPosition = computed(() => {
     if (!isConnected.value || !uAxisName.value) return '--';
     
-    if (displayUnit.value === 'mm') {
-      return Math.abs(uPosition.value).toFixed(3);
-    } else {
-      return Math.abs(Math.round(uPositionEncoder.value));
-    }
+    const value = displayUnit.value === 'mm' ? uPosition.value : uPositionEncoder.value;
+    return formatByUnit(Math.abs(value), displayUnit.value);
   });
   
   const uAxisLimits = computed(() => {
@@ -993,6 +918,30 @@
     if (!result || !result.ratio) return '-- px/mm';
     return `${result.ratio.toFixed(2)} px/mm`;
   });
+  
+  // 格式化X轴速度
+  const formattedXSpeed = computed(() => formatByUnit(xSpeed.value, displayUnit.value));
+  
+  // 格式化Y轴速度
+  const formattedYSpeed = computed(() => formatByUnit(ySpeed.value, displayUnit.value));
+  
+  // 格式化U轴速度
+  const formattedUSpeed = computed(() => formatByUnit(uSpeed.value, uUnitMode.value === 'deg' ? 'deg' : 'rad'));
+
+  // 验证X轴速度输入
+  function validateXSpeedValue(event) {
+    validateNumericInput(event, xSpeed, parseFloat(speedMin.value));
+  }
+  
+  // 验证Y轴速度输入
+  function validateYSpeedValue(event) {
+    validateNumericInput(event, ySpeed, parseFloat(speedMin.value));
+  }
+  
+  // 验证U轴速度输入
+  function validateUSpeedValue(event) {
+    validateNumericInput(event, uSpeed, parseFloat(uSpeedMin.value));
+  }
   
   // 通用轴点动控制函数
   async function performAxisJog(axisRole, direction) {
@@ -1523,5 +1472,29 @@
   margin-bottom: 10px;
   margin-top: 10px;
   align-items: center;
+}
+
+.standard-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  text-align: left;
+  background-color: var(--bg-medium);
+  color: var(--text-light);
+  border: 1px solid var(--border-dark);
+  border-radius: var(--border-radius);
+  font-size: 13px;
+}
+
+/* 数字输入框 */
+input[type="number"].standard-input {
+  -moz-appearance: textfield; /* Firefox */
+  appearance: textfield; /* 标准属性 */
+}
+
+input[type="number"].standard-input::-webkit-inner-spin-button, 
+input[type="number"].standard-input::-webkit-outer-spin-button { 
+  -webkit-appearance: none;
+  margin: 0;
 }
   </style>

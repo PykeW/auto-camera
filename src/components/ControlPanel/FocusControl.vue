@@ -9,67 +9,35 @@
           v-model="selectedFocusAxisId" 
           :axes="availableFocusAxes" 
           selectId="focus-axis-select" 
+          placeholder="请选择"
         />
         
-        <!-- 当前轴位置显示和点动控制 -->
-        <div class="control-item side-by-side">
-          <label for="focus-axis-position">Z轴位置:</label>
-          <div class="axis-position-control">
-            <button 
-              class="jog-btn minus" 
-              id="focus-jog-minus" 
-              :disabled="!isConnected || isMinLimitReached"
-              @click="performJog(-1)"
-            >-</button>
-            <div class="position-display-container">
-              <input 
-                type="text" 
-                id="focus-axis-position" 
-                :value="formattedPosition" 
-                readonly
-              >
-              <span 
-                id="unit-display" 
-                class="unit-display" 
-                title="点击切换单位"
-                @click="toggleUnit"
-              >{{ displayUnit }}</span>
-            </div>
-            <button 
-              class="jog-btn plus" 
-              id="focus-jog-plus" 
-              :disabled="!isConnected || isMaxLimitReached"
-              @click="performJog(1)"
-            >+</button>
-          </div>
-          <select 
-            id="focus-step-select" 
-            class="compact-select"
-            v-model="stepValue"
-          >
-            <option v-for="option in stepOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </div>
+        <!-- 使用新组件进行Z轴位置控制 -->
+        <AxisPositionControl
+          axisName="Z"
+          :formattedPosition="formattedPosition"
+          :unitDisplay="displayUnit"
+          :isConnected="isConnected"
+          :isMinLimitReached="isMinLimitReached"
+          :isMaxLimitReached="isMaxLimitReached"
+          :stepValue="stepValue"
+          :stepOptions="stepOptions"
+          @jog="performJog"
+          @toggle-unit="toggleUnit"
+          @update:stepValue="stepValue = $event"
+        />
 
-        <!-- Z轴速度显示 -->
-        <div class="control-item side-by-side">
-          <label for="focus-axis-speed">Z轴速度:</label>
-          <div class="position-display-container">
-            <input 
-              type="number" 
-              id="focus-axis-speed" 
-              :value="formattedSpeed"
-              @input="selectedSpeed = $event.target.value"
-              @blur="validateSpeedValue"
-              :step="speedStep" 
-              :min="speedMin"
-              :disabled="!isConnected || isFocusing"
-            >
-            <span class="unit-display">{{ speedUnit }}</span>
-          </div>
-        </div>
+        <!-- 使用新组件进行Z轴速度控制 -->
+        <AxisSpeedControl
+          axisName="Z"
+          :formattedSpeed="formattedSpeed"
+          :unitDisplay="speedUnit"
+          :stepValue="speedStep"
+          :minValue="speedMin"
+          :disabled="!isConnected || isFocusing"
+          @update:speed="selectedSpeed = $event"
+          @validate-speed="validateSpeedValue"
+        />
         
         <!-- 搜索范围和对焦步进输入框 -->
         <div class="control-item side-by-side">
@@ -165,6 +133,8 @@
   import ROIControl from './ROIControl.vue';
   import ValueInputControl from '../common/ValueInputControl.vue';
   import ActionButton from '../common/ActionButton.vue';
+  import AxisPositionControl from '../common/AxisPositionControl.vue';
+  import AxisSpeedControl from '../common/AxisSpeedControl.vue';
   
   const cameraStore = useCameraStore();
   const axisStore = useAxisStore();
@@ -206,36 +176,6 @@
       axisStore.selectedAxisId = id;
     }
   });
-
-  // Filtered axes for focus, excluding those used in calibration
-  const availableFocusAxes = computed(() => {
-    const calibrationIds = Object.values(axisStore.assignedCalibrationAxesIds).filter(id => id !== '');
-    return axisStore.plcAxes.filter(axis => !calibrationIds.includes(axis.id));
-  });
-  
-  // 轴位置相关
-  const selectedAxisName = computed(() => {
-    return axisStore.getAxisNameById(selectedFocusAxisId.value) || 'Z'; // Use selectedFocusAxisId
-  });
-  
-  const position = computed(() => {
-    return axisStore.positions[selectedAxisName.value] || 0;
-  });
-  
-  const positionEncoder = computed(() => {
-    return axisStore.positionsEncoder[selectedAxisName.value] || 0;
-  });
-  
-  // 使用通用格式化函数
-  const formattedPosition = computed(() => {
-    if (!isConnected.value) return '--';
-    const value = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
-    return formatByUnit(Math.abs(value), displayUnit.value);
-  });
-  
-  const formattedRangeValue = computed(() => formatByUnit(rangeValue.value, displayUnit.value));
-  const formattedFocusStepValue = computed(() => formatByUnit(focusStepValue.value, displayUnit.value));
-  const formattedSpeed = computed(() => formatByUnit(selectedSpeed.value, displayUnit.value));
   
   // 步进选项
   const stepOptions = computed(() => {
@@ -258,70 +198,108 @@
     }
   });
   
-  // 搜索范围和步进参数
-  const rangeStep = computed(() => displayUnit.value === 'mm' ? '0.1' : '100');
-  const rangeMin = computed(() => displayUnit.value === 'mm' ? '0.1' : '100');
-  const focusStepStep = computed(() => displayUnit.value === 'mm' ? '0.01' : '10');
-  const focusStepMin = computed(() => displayUnit.value === 'mm' ? '0.001' : '1');
+  // Axis limits and positions
+  const selectedAxisName = computed(() => {
+    return axisStore.selectedAxisId ? axisStore.getAxisNameById(axisStore.selectedAxisId) : '';
+  });
   
-  // 轴限制相关
+  const axisPosition = computed(() => {
+    if (!selectedAxisName.value) return 0;
+    return axisStore.positions[selectedAxisName.value] || 0;
+  });
+  
+  const axisPositionEncoder = computed(() => {
+    if (!selectedAxisName.value) return 0;
+    return axisStore.positionsEncoder[selectedAxisName.value] || 0;
+  });
+  
+  const formattedPosition = computed(() => {
+    if (!isConnected.value || !selectedAxisName.value) return '--';
+    
+    const value = displayUnit.value === 'mm' ? axisPosition.value : axisPositionEncoder.value;
+    return formatByUnit(value, displayUnit.value);
+  });
+  
+  const formattedSpeed = computed(() => {
+    return formatByUnit(selectedSpeed.value, displayUnit.value === 'mm' ? 'mm' : 'um');
+  });
+  
+  const formattedRangeValue = computed(() => {
+    return formatByUnit(rangeValue.value, displayUnit.value);
+  });
+  
+  const formattedFocusStepValue = computed(() => {
+    return formatByUnit(focusStepValue.value, displayUnit.value);
+  });
+  
+  // Range and focus step min/step values
+  const rangeMin = computed(() => displayUnit.value === 'mm' ? 0.1 : 100);
+  const rangeStep = computed(() => displayUnit.value === 'mm' ? 0.1 : 100);
+  const focusStepMin = computed(() => displayUnit.value === 'mm' ? 0.01 : 10);
+  const focusStepStep = computed(() => displayUnit.value === 'mm' ? 0.01 : 10);
+  
+  // Axis limits
   const axisLimits = computed(() => {
+    if (!selectedAxisName.value) return { min: 0, max: 100 };
     return axisStore.axisLimits[selectedAxisName.value] || { min: 0, max: 100 };
   });
   
   const axisLimitsEncoder = computed(() => {
+    if (!selectedAxisName.value) return { min: 0, max: 100000 };
     return axisStore.axisLimitsEncoder[selectedAxisName.value] || { min: 0, max: 100000 };
   });
   
-  // 使用工具函数计算轴限制
   const isMinLimitReached = computed(() => {
-    const currentPos = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
-    const limits = displayUnit.value === 'mm' ? axisLimits.value : axisLimitsEncoder.value;
-    return isAxisLimitReached(isConnected.value, currentPos, stepValue.value, limits, -1);
+    if (!isConnected.value || !selectedAxisName.value) return true;
+    
+    if (displayUnit.value === 'mm') {
+      return axisPosition.value - stepValue.value < axisLimits.value.min;
+    } else {
+      return axisPositionEncoder.value - stepValue.value < axisLimitsEncoder.value.min;
+    }
   });
   
   const isMaxLimitReached = computed(() => {
-    const currentPos = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
-    const limits = displayUnit.value === 'mm' ? axisLimits.value : axisLimitsEncoder.value;
-    return isAxisLimitReached(isConnected.value, currentPos, stepValue.value, limits, 1);
+    if (!isConnected.value || !selectedAxisName.value) return true;
+    
+    if (displayUnit.value === 'mm') {
+      return axisPosition.value + stepValue.value > axisLimits.value.max;
+    } else {
+      return axisPositionEncoder.value + stepValue.value > axisLimitsEncoder.value.max;
+    }
   });
   
-  // 使用工具函数验证输入
-  function validateRangeValue(event) {
-    validateNumericInput(event, rangeValue, parseFloat(rangeMin.value));
+  const availableFocusAxes = computed(() => {
+    const calibrationIds = Object.values(axisStore.assignedCalibrationAxesIds);
+    return axisStore.plcAxes.filter(axis => !calibrationIds.includes(axis.id));
+  });
+  
+  // 方法
+  async function performJog(direction) {
+    if (!isConnected.value || !selectedAxisName.value) return;
+    
+    // 检查是否达到限位
+    if ((direction < 0 && isMinLimitReached.value) || 
+        (direction > 0 && isMaxLimitReached.value)) {
+      return;
+    }
+    
+    await axisStore.jogAxis(selectedAxisName.value, direction, stepValue.value, selectedSpeed.value);
   }
   
-  function validateFocusStepValue(event) {
-    validateNumericInput(event, focusStepValue, parseFloat(focusStepMin.value));
-  }
-  
+  // 验证速度输入
   function validateSpeedValue(event) {
     validateNumericInput(event, selectedSpeed, parseFloat(speedMin.value));
   }
   
-  // 方法  
-  // 点动控制  
-  async function performJog(direction) {    
-    if (!isConnected.value) return;        
-    
-    // 获取当前位置和限制
-    const currentPos = displayUnit.value === 'mm' ? position.value : positionEncoder.value;
-    const limits = displayUnit.value === 'mm' ? axisLimits.value : axisLimitsEncoder.value;
-    
-    // 检查是否会超出限制
-    if (isAxisLimitReached(isConnected.value, currentPos, stepValue.value, limits, direction)) {
-      return;
-    }
-    
-    // 执行点动，传递速度参数
-    await axisStore.jogAxis(selectedAxisName.value, direction, stepValue.value, selectedSpeed.value);        
-    
-    // 更新清晰度    
-    if (selectedAxisName.value === 'Z') {      
-      const isEncoder = displayUnit.value === 'um';      
-      const z = isEncoder ? positionEncoder.value : position.value;      
-      focusStore.clarity = focusStore.calculateClarity(z, isEncoder);    
-    }  
+  // 验证搜索范围输入
+  function validateRangeValue(event) {
+    validateNumericInput(event, rangeValue, parseFloat(rangeMin.value));
+  }
+  
+  // 验证对焦步进输入
+  function validateFocusStepValue(event) {
+    validateNumericInput(event, focusStepValue, parseFloat(focusStepMin.value));
   }
   
   // 切换单位
@@ -329,117 +307,115 @@
     axisStore.toggleUnit();
   }
   
-  // 开始自动对焦
-  async function startAutoFocus() {
-    if (!isConnected.value || isFocusing.value) return;
+  // 监听单位变更
+  watch(() => axisStore.displayUnit, (newUnit, oldUnit) => {
+    if (newUnit === oldUnit) return;
     
-    const range = parseFloat(rangeValue.value);
-    const step = parseFloat(focusStepValue.value);
+    // 当单位切换时，自动调整步进和速度值
+    const oldStepValue = stepValue.value;
+    const oldRangeValue = rangeValue.value;
+    const oldFocusStepValue = focusStepValue.value;
+    const oldSpeedValue = selectedSpeed.value;
     
-    if (isNaN(range) || range <= 0) {
-      showMessage('搜索范围必须大于0', 'error');
+    if (newUnit === 'mm') {
+      // 从um到mm，除以1000
+      stepValue.value = oldStepValue * 0.001;
+      rangeValue.value = oldRangeValue * 0.001;
+      focusStepValue.value = oldFocusStepValue * 0.001;
+      selectedSpeed.value = oldSpeedValue * 0.001;
+    } else {
+      // 从mm到um，乘以1000
+      stepValue.value = oldStepValue * 1000;
+      rangeValue.value = oldRangeValue * 1000;
+      focusStepValue.value = oldFocusStepValue * 1000;
+      selectedSpeed.value = oldSpeedValue * 1000;
+    }
+  });
+  
+  // ROI相关方法
+  function handleRoiVisibilityToggle() {
+    roiStore.toggleRoiVisibility();
+  }
+  
+  function handleRoiEdit() {
+    if (isFocusing.value) {
+      showMessage('正在对焦，无法编辑ROI', 'warning');
       return;
     }
-    
-    if (isNaN(step) || step <= 0) {
-      showMessage('对焦步进必须大于0', 'error');
+    roiStore.startRoiSelection('focus');
+  }
+  
+  function handleRoiClear() {
+    if (isFocusing.value) {
+      showMessage('正在对焦，无法清除ROI', 'warning');
       return;
     }
-    
-    showMessage('自动对焦开始', 'info');
-    
-    // 创建一次性的watch来监听对焦状态
-    const unwatch = watch(() => focusStore.focusCompleted, (newVal, oldVal) => {
-      if (newVal && !oldVal) {
-        // 对焦完成时
-        showMessage('自动对焦已完成', 'success');
-        unwatch(); // 移除监听器
-      }
-    });
-
-    const result = await focusStore.startAutoFocus(range, step);
-    
-    if (!result) {
-      showMessage('无法开始自动对焦', 'error');
-      unwatch(); // 如果无法开始，也要移除监听器
+    roiStore.clearROI();
+  }
+  
+  function handleShapeChange(shape) {
+    roiStore.setRoiShape(shape);
+  }
+  
+  function handleRoiConfirm() {
+    if (roiStore.isDrawingROI) {
+      roiStore.confirmROI();
     }
   }
   
-  // 停止自动对焦
+  // 自动对焦相关方法
+  async function startAutoFocus() {
+    if (!isConnected.value || isFocusing.value || !selectedAxisName.value) return;
+    
+    const focusParams = {
+      axisName: selectedAxisName.value,
+      range: rangeValue.value,
+      stepSize: focusStepValue.value,
+      speed: selectedSpeed.value,
+      unit: displayUnit.value
+    };
+    
+    try {
+      const result = await focusStore.startAutoFocus(focusParams);
+      if (result) {
+        showMessage('自动对焦开始', 'success');
+      } else {
+        showMessage('开始自动对焦失败', 'error');
+      }
+    } catch (error) {
+      showMessage(`自动对焦错误: ${error.message}`, 'error');
+    }
+  }
+  
   async function stopAutoFocus() {
     if (!isConnected.value || !isFocusing.value) return;
     
-    const result = await focusStore.stopAutoFocus();
-    
-    if (result) {
-      showMessage('自动对焦已停止', 'warning');
+    try {
+      const result = await focusStore.stopAutoFocus();
+      if (result) {
+        showMessage('自动对焦已停止', 'warning');
+      } else {
+        showMessage('停止自动对焦失败', 'error');
+      }
+    } catch (error) {
+      showMessage(`停止自动对焦错误: ${error.message}`, 'error');
     }
   }
   
-  // 保存对焦位置
   async function saveFocusPosition() {
-    if (!isConnected.value || isFocusing.value) return;
+    if (!isConnected.value || isFocusing.value || !selectedAxisName.value) return;
     
-    const result = await focusStore.saveFocusPosition();
-    
-    if (result) {
-      showMessage('对焦位置已保存', 'success');
+    try {
+      const result = await focusStore.saveFocusPosition(selectedAxisName.value);
+      if (result) {
+        showMessage(`对焦位置已保存: ${formattedPosition.value} ${displayUnit.value}`, 'success');
+      } else {
+        showMessage('保存对焦位置失败', 'error');
+      }
+    } catch (error) {
+      showMessage(`保存对焦位置错误: ${error.message}`, 'error');
     }
   }
-  
-  // ROI相关操作
-  function handleRoiEdit(isDrawing) {
-    if (!isConnected.value || isFocusing.value) return;
-    // 消息显示已在ROIControl组件中处理
-  }
-
-  function handleRoiClear() {
-    if (!isConnected.value || isFocusing.value) return;
-    // 消息显示已在ROIControl组件中处理
-  }
-
-  function handleRoiVisibilityToggle(isVisible) {
-    if (!isConnected.value || isFocusing.value) return;
-    // 消息显示已在ROIControl组件中处理
-  }
-
-  function handleShapeChange(tool) {
-    if (!isConnected.value || isFocusing.value) return;
-    showMessage(`已切换ROI形状工具: ${tool}`, 'info');
-  }
-
-  function handleRoiConfirm() {
-    if (!isConnected.value || isFocusing.value) return;
-    showMessage('ROI区域已确认', 'success');
-  }
-
-  // 监听单位变更，使用工具函数调整步进和范围值
-  watch(() => axisStore.displayUnit, (newUnit) => {
-    // 设置默认值
-    const defaults = {
-      stepValue: { mm: 0.1, um: 100 },
-      rangeValue: { mm: 5.0, um: 5000 },
-      focusStepValue: { mm: 0.5, um: 500 },
-      selectedSpeed: { mm: 1.0, um: 1000 }
-    };
-    
-    // 获取当前值
-    const currentValues = {
-      stepValue: stepValue.value,
-      rangeValue: rangeValue.value,
-      focusStepValue: focusStepValue.value,
-      selectedSpeed: selectedSpeed.value
-    };
-    
-    // 调整值
-    const newValues = adjustValuesByUnit(currentValues, newUnit, defaults);
-    
-    // 更新各个值
-    stepValue.value = newValues.stepValue;
-    rangeValue.value = newValues.rangeValue;
-    focusStepValue.value = newValues.focusStepValue;
-    selectedSpeed.value = newValues.selectedSpeed;
-  });
   </script>
   
   <style scoped>
