@@ -115,10 +115,9 @@ const stepValueModel = computed({
 .control-group {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: var(--spacing-small);
   flex: 1;
   width: 100%;
-  justify-content: space-between;
 }
 
 .axis-position-control {
@@ -129,6 +128,10 @@ const stepValueModel = computed({
   height: 32px;
   background: none;
   border: none;
+  min-width: 0;
+  margin-right: 0;
+  border-radius: 0;
+  vertical-align: middle;
 }
 
 .position-display-container {
@@ -148,8 +151,13 @@ const stepValueModel = computed({
   text-align: left;
   background-color: var(--bg-medium);
   color: var(--text-light);
-  border: 1px solid var(--border-dark);
-  border-radius: 0;
+  border-top: 1px solid var(--border-dark) !important;
+  border-bottom: 1px solid var(--border-dark) !important;
+  border-left-style: none !important;
+  border-right-style: none !important;
+  border-left-width: 0 !important;
+  border-right-width: 0 !important;
+  border-radius: 0 !important;
   font-size: 13px;
   box-sizing: border-box;
 }
@@ -203,15 +211,21 @@ const stepValueModel = computed({
 }
 
 .jog-btn.plus {
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
-  border-left: 1px solid var(--border-dark);
+  border-top-right-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-left-width: 0 !important;
+  border-left-style: none !important;
 }
 
 .jog-btn.minus {
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
-  border-right: none;
+  border-top-left-radius: 4px !important;
+  border-bottom-left-radius: 4px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-right-width: 0 !important;
+  border-right-style: none !important;
 }
 
 .compact-select {
@@ -220,9 +234,9 @@ const stepValueModel = computed({
   font-size: .9em;
   padding: 4px 8px;
   height: 32px;
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
+  width: 55px;
+  min-width: 55px;
+  max-width: 55px;
   background-color: var(--bg-medium);
   color: var(--text-light);
   appearance: none;
@@ -231,6 +245,7 @@ const stepValueModel = computed({
   background-repeat: no-repeat;
   background-size: .65em auto;
   flex-shrink: 0;
-  margin-left: auto;
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 </style> 
