@@ -10,7 +10,6 @@
         <!-- <option value="circle">圆形检测</option> -->
         <!-- <option value="cross">十字检测</option> -->
       </select>
-      <img v-if="calibrationStore.markPreviewImg" :src="calibrationStore.markPreviewImg" alt="Mark点示例" style="height:32px;margin-left:8px;border-radius:4px;" />
     </div>
 
     <!-- Parameters for Template Matching -->

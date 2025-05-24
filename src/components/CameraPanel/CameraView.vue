@@ -176,7 +176,12 @@
   
   // 计算属性
   const cameraImageUrl = computed(() => {
-    // 首先检查是否正在标定，如果是则显示当前标定图片
+    // 首先检查是否有 Mark 点示例图片
+    if (calibrationStore.markPreviewImg) {
+      return calibrationStore.markPreviewImg;
+    }
+
+    // 其次检查是否正在标定，如果是则显示当前标定图片
     if (calibrationStore.isCalibrating && calibrationStore.currentCalibrationImageUrl) {
       return calibrationStore.currentCalibrationImageUrl;
     }
@@ -184,8 +189,10 @@
     // 检查是否满足切换图片的条件 (基于 calibrationStore)
     const xySelected = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
     if (xySelected) {
-      return '/9dian/12_161833.png';
+      // 当X和Y轴都被选择时，显示Mark点示例图片
+      return '/9dian/12_161825.png';
     }
+    
     // 如果正在查看缩略图，显示选中的缩略图
     if (focusStore.viewingThumbnail && 
         focusStore.currentDisplayedImageIndex !== null && 
@@ -225,11 +232,22 @@
   function startImagePolling() {
     if (pollingInterval) clearInterval(pollingInterval);
     
+    // 增加轮询间隔到2秒，减少图像获取频率
     pollingInterval = setInterval(() => {
-      if (cameraStore.isConnected && !cameraStore.isPollingPaused && !focusStore.viewingThumbnail) {
+      // 检查是否需要暂停轮询：
+      // 1. 如果相机未连接
+      // 2. 如果轮询被明确暂停
+      // 3. 如果正在查看缩略图
+      // 4. 如果X和Y轴都被选择 (显示静态Mark点图片时)
+      const xySelected = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
+      
+      if (cameraStore.isConnected && 
+          !cameraStore.isPollingPaused && 
+          !focusStore.viewingThumbnail &&
+          !xySelected) {  // 添加检查X和Y轴是否被选择
         cameraStore.fetchCameraImage();
       }
-    }, 500);
+    }, 2000);  // 轮询间隔从500ms增加到2000ms
   }
   
   // 监听连接状态变化
@@ -262,6 +280,21 @@
         cameraStore.fetchCameraImage();
     }
   }, { deep: true }); // 使用 deep: true 以侦听数组内部的变化
+  
+  // 监听 markPreviewImg 的变化，更新相机预览
+  watch(() => calibrationStore.markPreviewImg, (newMarkPreviewImg) => {
+    // 当 markPreviewImg 变化时，由于 cameraImageUrl 是计算属性，它会自动响应
+    // 但为了确保视图立即更新，可以添加额外的处理（如果需要）
+    console.log('Mark 点预览图变化:', newMarkPreviewImg);
+    
+    // 如果有特定的副作用需要触发，可以在这里添加
+    // 例如暂停相机图像轮询，可以在这里添加暂停逻辑
+    if (newMarkPreviewImg) {
+      cameraStore.pausePolling(); // 暂停相机图像轮询，减少资源占用
+    } else {
+      cameraStore.resumePolling(); // 如果 markPreviewImg 被清除，恢复轮询
+    }
+  });
   
   // 组件挂载时开始轮询
   onMounted(() => {
