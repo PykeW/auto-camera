@@ -59,6 +59,9 @@ const roiStore = useRoiStore();
 
 const isDrawingROI = computed(() => roiStore.isDrawingROI);
 const activeShapeTool = computed(() => roiStore.activeShapeTool);
+const hasTemplate = computed(() => roiStore.capturedTemplateDataUrl !== null);
+const isDrawingTemplateOnOverlay = computed(() => roiStore.isDrawingTemplateOnOverlay);
+const roiEnabled = computed(() => roiStore.roiEnabled);
 
 function switchShapeTool(tool) {
   if (props.disabled || !isDrawingROI.value) return;
@@ -72,6 +75,43 @@ function confirmRoi() {
   
   roiStore.confirmROI();
   emit('confirm');
+}
+
+// 以下函数保留用于在RoiControlHeader中使用
+function toggleTemplateOverlay() {
+  if (props.disabled) return;
+  
+  // 直接切换模板显示状态，不需要传参数，会自动使用capturedTemplateDataUrl
+  roiStore.toggleTemplateDrawingOnOverlay();
+}
+
+function clearTemplate() {
+  if (props.disabled) return;
+  
+  if (confirm('确定要删除当前模板吗？')) {
+    roiStore.clearCapturedTemplateDataUrl();
+  }
+}
+
+function startReDraw() {
+  if (props.disabled) return;
+  
+  // 保存当前模板状态
+  const hadTemplate = hasTemplate.value;
+  const wasShowingTemplate = isDrawingTemplateOnOverlay.value;
+  const templateDataUrl = roiStore.capturedTemplateDataUrl;
+  const currentPurpose = roiStore.selectionPurpose || 'measurement';
+  
+  // 如果正在显示模板，先隐藏它
+  if (wasShowingTemplate) {
+    roiStore.toggleTemplateDrawingOnOverlay(); // 隐藏模板
+  }
+  
+  // 开始ROI选择，用途保持与当前ROI相同
+  roiStore.startRoiSelection(currentPurpose);
+  
+  // 通知父组件
+  emit('shape-change', activeShapeTool.value);
 }
 </script>
 

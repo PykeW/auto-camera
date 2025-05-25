@@ -138,7 +138,7 @@
   </template>
   
   <script setup>
-  import { ref, computed, watch } from 'vue';
+  import { ref, computed, watch, onMounted } from 'vue';
   import { useRoiStore } from '../../stores/roi';
   import { useCalibrationStore } from '../../stores/calibration'; // Import calibration store
   import RoiToolsPanel from './RoiToolsPanel.vue'; // 导入ROI工具面板组件
@@ -189,6 +189,27 @@
   // 多边形点字符串
   const polygonPointsString = computed(() => {
     return polygonPoints.value.map(p => `${p.x},${p.y}`).join(' ');
+  });
+  
+  // 组件挂载时确保初始ROI坐标有效
+  onMounted(() => {
+    // 如果存在默认ROI坐标，保存一份作为有效坐标
+    if (roiCoords.value && 
+        roiCoords.value.l !== undefined && 
+        roiCoords.value.t !== undefined &&
+        roiCoords.value.r !== undefined && 
+        roiCoords.value.b !== undefined) {
+      const width = roiCoords.value.r - roiCoords.value.l;
+      const height = roiCoords.value.b - roiCoords.value.t;
+      
+      if (width > 0 && height > 0) {
+        console.log('组件挂载时保存初始有效ROI坐标');
+        // 保存初始有效坐标
+        if (!roiStore.lastValidRoiCoords) {
+          roiStore.lastValidRoiCoords = {...roiCoords.value};
+        }
+      }
+    }
   });
   
   // 绘制ROI相关函数
@@ -429,8 +450,53 @@
   function handleRoiConfirm() {
     // 关闭ROI信息显示
     showRoiInfo.value = false;
+    
+    // 保存当前ROI坐标的副本，以防确认过程中丢失
+    const currentRoiData = {
+      coords: {...roiCoords.value},
+      type: roiType.value,
+      points: [...polygonPoints.value]
+    };
+    
+    // 保存确认前的模板显示状态
+    const wasShowingTemplate = roiStore.isDrawingTemplateOnOverlay;
+    const templateDataUrl = roiStore.capturedTemplateDataUrl;
+    
     // 向父组件发送确认事件
     emit('roi-confirm');
+    
+    // 确保ROI在确认后依然可见，并恢复模板状态
+    setTimeout(() => {
+      // 确保ROI可见
+      if (!roiStore.roiEnabled && currentRoiData.coords) {
+        console.log('确保ROI在确认后依然可见');
+        roiStore.roiEnabled = true;
+        
+        // 如果坐标被重置，则恢复保存的坐标
+        const currentCoords = roiStore.roiCoords;
+        if (!currentCoords || 
+            (currentCoords.r - currentCoords.l <= 0) || 
+            (currentCoords.b - currentCoords.t <= 0)) {
+          console.log('ROI坐标已被重置，正在恢复');
+          roiStore.setROICoords(currentRoiData.coords);
+          roiStore.roiType = currentRoiData.type;
+          
+          // 如果是多边形，恢复点
+          if (currentRoiData.type === 'polygon' && currentRoiData.points.length > 0) {
+            // 清除现有点
+            roiStore.polygonPoints = [];
+            // 添加保存的点
+            currentRoiData.points.forEach(p => roiStore.addPolygonPoint(p.x, p.y));
+          }
+        }
+      }
+      
+      // 恢复模板显示状态（如果之前正在显示）
+      if (wasShowingTemplate && templateDataUrl) {
+        console.log('恢复模板显示');
+        roiStore.toggleTemplateDrawingOnOverlay(templateDataUrl);
+      }
+    }, 100);
   }
 
   // Watch for autoTarget props and update roiStore if active

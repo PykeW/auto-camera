@@ -17,6 +17,7 @@ export const useRoiStore = defineStore('roi', () => {
   const capturedTemplateDataUrl = ref(null);
   const isDrawingTemplateOnOverlay = ref(false); // New state for template drawing
   const templateDataUrlForOverlay = ref(null); // New state for template data URL for overlay
+  const lastValidRoiCoords = ref(null); // 新增：保存最后一次有效的ROI坐标
 
   // 用户定义的模板ROI尺寸
   const userDefinedTemplateRoiSize = ref(null); // { width, height }
@@ -33,9 +34,31 @@ export const useRoiStore = defineStore('roi', () => {
         return false;
     }
     
+    // 记录当前选择用途
     selectionPurpose.value = purpose;
+    
+    // 如果要重新绘制，先备份当前模板状态
+    const isTemplateSelection = purpose === 'template';
+    const templateDataBackup = isTemplateSelection ? capturedTemplateDataUrl.value : null;
+    const templateWasVisible = isDrawingTemplateOnOverlay.value;
+    
+    // 开始绘制模式
     isDrawingROI.value = true;
-    roiEnabled.value = false; // Disable existing ROI while drawing a new one
+    
+    // 暂时隐藏现有ROI以便重绘
+    roiEnabled.value = false;
+    
+    // 如果正在显示模板，先隐藏它以避免干扰绘制
+    if (isDrawingTemplateOnOverlay.value) {
+      isDrawingTemplateOnOverlay.value = false;
+      templateDataUrlForOverlay.value = null;
+    }
+    
+    // 对于非模板ROI，清除现有ROI坐标(模板需要保留原来的坐标作为参考)
+    if (!isTemplateSelection) {
+      // 清除多边形点
+      polygonPoints.value = [];
+    }
     
     console.log(`ROI selection started for purpose: ${purpose}`);
     return true;
@@ -50,6 +73,32 @@ export const useRoiStore = defineStore('roi', () => {
   // 确认ROI
   async function confirmROI() {
     if (!isDrawingROI.value) return false;
+    
+    // 检查ROI坐标有效性
+    if (roiCoords.value) {
+      const width = roiCoords.value.r - roiCoords.value.l;
+      const height = roiCoords.value.b - roiCoords.value.t;
+      
+      // 如果宽度或高度无效，不允许确认或恢复到最后有效值
+      if (width <= 0 || height <= 0) {
+        console.warn('无效的ROI尺寸，宽度或高度为0，尝试恢复有效值');
+        
+        // 如果有最后有效值，则恢复
+        if (lastValidRoiCoords.value) {
+          roiCoords.value = {...lastValidRoiCoords.value};
+          console.log('已恢复到最后有效的ROI坐标');
+        } else {
+          console.warn('无法确认ROI：尺寸无效且没有可恢复的有效坐标');
+          return false;
+        }
+      } else {
+        // 保存当前有效坐标作为最后有效值
+        lastValidRoiCoords.value = {...roiCoords.value};
+      }
+    } else {
+      console.warn('无法确认ROI：坐标不存在');
+      return false;
+    }
     
     // 检查如果是多边形，确保有足够的点
     if (roiType.value === 'polygon' && polygonPoints.value.length < 3) {
@@ -85,8 +134,14 @@ export const useRoiStore = defineStore('roi', () => {
         console.log('尝试从图像截取模板:', imageSrc.substring(0, 50) + '...');
         console.log('ROI坐标:', roiCoords.value);
         
+        // 保存截取前的ROI坐标
+        const roiCoordsBefore = {...roiCoords.value};
+        
         // 截取模板图像
         const croppedData = await cropImage(imageSrc, roiCoords.value);
+        
+        // 确保ROI坐标在截取后未被修改
+        roiCoords.value = roiCoordsBefore;
         
         if (croppedData) {
           console.log('模板截取成功，DataURL设置完成，长度:', croppedData.length);
@@ -213,42 +268,133 @@ export const useRoiStore = defineStore('roi', () => {
   }
 
   function clearCapturedTemplateDataUrl() {
-    capturedTemplateDataUrl.value = null;
-    // Also stop drawing it on overlay if it's cleared
-    if (isDrawingTemplateOnOverlay.value && templateDataUrlForOverlay.value === null) { // Or check against the old value
-        isDrawingTemplateOnOverlay.value = false;
+    if (!capturedTemplateDataUrl.value) {
+      console.log('没有模板数据需要清除');
+      return false;
     }
-    console.log('Captured template data URL cleared.');
+    
+    // 先停止模板显示
+    if (isDrawingTemplateOnOverlay.value) {
+      isDrawingTemplateOnOverlay.value = false;
+      templateDataUrlForOverlay.value = null;
+      console.log('停止模板显示');
+    }
+    
+    // 再清除模板数据
+    capturedTemplateDataUrl.value = null;
+    console.log('模板数据已清除');
+    
+    // 同步清除calibrationStore中的模板
+    try {
+      const calibrationStore = useCalibrationStore();
+      if (calibrationStore.templateMatchingParams && calibrationStore.templateMatchingParams.templateImageSrc) {
+        calibrationStore.templateMatchingParams.templateImageSrc = null;
+        console.log('已清除calibrationStore中的模板数据');
+      }
+    } catch (err) {
+      console.warn('清除calibrationStore模板数据失败:', err);
+    }
+    
+    // 触发自定义事件，通知模板已删除
+    try {
+      window.dispatchEvent(new CustomEvent('template-cleared', { 
+        detail: { timestamp: Date.now() } 
+      }));
+      console.log('已触发template-cleared事件');
+    } catch (err) {
+      console.warn('触发template-cleared事件失败:', err);
+    }
+    
+    // 清除用户定义的模板ROI尺寸
+    clearUserDefinedTemplateRoiSize();
+    
+    console.log('模板数据清除完成');
+    return true;
   }
 
   // Action to toggle template drawing on the overlay
-  function toggleTemplateDrawingOnOverlay(templateDataUrl) {
+  function toggleTemplateDrawingOnOverlay(templateDataUrl = null) {
     // 如果模板已显示，则隐藏它
     if (isDrawingTemplateOnOverlay.value) {
       console.log('关闭模板显示');
       isDrawingTemplateOnOverlay.value = false;
       templateDataUrlForOverlay.value = null;
     } 
-    // 如果提供了新模板，则显示它
+    // 如果提供了新模板，则使用新模板显示
     else if (templateDataUrl) {
       console.log('开始显示模板，DataURL长度:', templateDataUrl.length);
+      
+      // 确保有有效的ROI坐标
+      if (!roiCoords.value || 
+          (roiCoords.value.r - roiCoords.value.l <= 0) || 
+          (roiCoords.value.b - roiCoords.value.t <= 0)) {
+        
+        console.log('当前ROI坐标无效，尝试使用最后有效坐标');
+        if (lastValidRoiCoords.value) {
+          // 恢复有效坐标
+          roiCoords.value = {...lastValidRoiCoords.value};
+          console.log('已恢复使用有效ROI坐标:', roiCoords.value);
+        } else {
+          // 使用默认坐标
+          roiCoords.value = { l: 150, t: 100, r: 450, b: 400 };
+          console.log('使用默认ROI坐标');
+        }
+      }
+      
       isDrawingTemplateOnOverlay.value = true;
       templateDataUrlForOverlay.value = templateDataUrl;
       
       // 确保ROI已启用，以便显示模板
-      if (!roiEnabled.value && roiCoords.value) {
+      if (!roiEnabled.value) {
+        console.log('自动启用ROI显示以支持模板显示');
+        roiEnabled.value = true;
+      }
+    } 
+    // 如果没提供新模板但存在已捕获的模板，使用已有模板
+    else if (capturedTemplateDataUrl.value) {
+      console.log('使用现有模板显示，DataURL长度:', capturedTemplateDataUrl.value.length);
+      
+      // 同样确保有有效的ROI坐标
+      if (!roiCoords.value || 
+          (roiCoords.value.r - roiCoords.value.l <= 0) || 
+          (roiCoords.value.b - roiCoords.value.t <= 0)) {
+        
+        console.log('当前ROI坐标无效，尝试使用最后有效坐标');
+        if (lastValidRoiCoords.value) {
+          // 恢复有效坐标
+          roiCoords.value = {...lastValidRoiCoords.value};
+          console.log('已恢复使用有效ROI坐标:', roiCoords.value);
+        } else {
+          // 使用默认坐标
+          roiCoords.value = { l: 150, t: 100, r: 450, b: 400 };
+          console.log('使用默认ROI坐标');
+        }
+      }
+      
+      isDrawingTemplateOnOverlay.value = true;
+      templateDataUrlForOverlay.value = capturedTemplateDataUrl.value;
+      
+      // 确保ROI已启用，以便显示模板
+      if (!roiEnabled.value) {
         console.log('自动启用ROI显示以支持模板显示');
         roiEnabled.value = true;
       }
     } else {
-      console.warn('无法显示模板：未提供模板数据');
+      console.warn('无法显示模板：未提供模板数据且没有已捕获的模板');
     }
+    
+    // 返回当前显示状态
+    return isDrawingTemplateOnOverlay.value;
   }
   
   // 清除ROI
   function clearROI() {
     const cameraStore = useCameraStore();
-    if (!cameraStore.isConnected) return false;
+    // 如果相机未连接且没有模板数据，不允许清除操作
+    if (!cameraStore.isConnected && !capturedTemplateDataUrl.value) {
+      console.warn('相机未连接，且无模板数据，无需清除ROI');
+      return false;
+    }
     
     // 备份模板数据 - 在任何操作前先保存
     const templateDataBackup = capturedTemplateDataUrl.value;
@@ -260,9 +406,15 @@ export const useRoiStore = defineStore('roi', () => {
     console.log('- 显示模板:', !!templateOverlayBackup);
     console.log('- 模板显示状态:', wasDrawingTemplate);
     
+    // 停止绘制模式(如果正在绘制)
+    if (isDrawingROI.value) {
+      isDrawingROI.value = false;
+    }
+    
     // 清除ROI相关的状态
     roiEnabled.value = false;
-    isDrawingROI.value = false;
+    
+    // 重置ROI坐标到默认值
     roiCoords.value = { l: 150, t: 100, r: 450, b: 400 };
     polygonPoints.value = [];
     // Do NOT clear userDefinedTemplateRoiSize here, as it should persist
@@ -272,6 +424,7 @@ export const useRoiStore = defineStore('roi', () => {
     if (isDrawingTemplateOnOverlay.value) {
       console.log('停止模板绘制，但保留模板数据');
       isDrawingTemplateOnOverlay.value = false;
+      templateDataUrlForOverlay.value = null;
     }
     
     // 保证模板数据不丢失
@@ -284,15 +437,25 @@ export const useRoiStore = defineStore('roi', () => {
     if (wasDrawingTemplate && templateOverlayBackup) {
       console.log('计划恢复模板显示');
       setTimeout(() => {
-        console.log('恢复模板显示');
-        isDrawingTemplateOnOverlay.value = true;
-        templateDataUrlForOverlay.value = templateOverlayBackup;
-        
-        // 启用ROI来支持模板显示
-        roiEnabled.value = true;
+        // 重新检查是否真的需要恢复模板显示
+        if (capturedTemplateDataUrl.value) {
+          console.log('恢复模板显示');
+          // 确保ROI坐标有效，使用lastValidRoiCoords如果可用
+          if (lastValidRoiCoords.value) {
+            roiCoords.value = {...lastValidRoiCoords.value};
+          }
+          isDrawingTemplateOnOverlay.value = true;
+          templateDataUrlForOverlay.value = templateOverlayBackup;
+          
+          // 启用ROI来支持模板显示
+          roiEnabled.value = true;
+        } else {
+          console.log('不再需要恢复模板显示，模板数据已不存在');
+        }
       }, 200);
     }
     
+    console.log('ROI已清除');
     return true;
   }
   
@@ -307,7 +470,64 @@ export const useRoiStore = defineStore('roi', () => {
   
   // 设置ROI坐标
   function setROICoords(coords) {
-    roiCoords.value = coords;
+    // 验证坐标有效性
+    if (!coords) {
+      console.warn('设置ROI坐标失败：提供的坐标为空');
+      return false;
+    }
+
+    // 对于矩形和多边形ROI，确保宽度和高度不为0
+    if (roiType.value === 'rect' || roiType.value === 'polygon') {
+      const width = coords.r - coords.l;
+      const height = coords.b - coords.t;
+      
+      if (width <= 0 || height <= 0) {
+        if (isDrawingROI.value) {
+          // 绘制过程中允许临时的无效值
+          roiCoords.value = coords;
+        } else {
+          console.warn('设置ROI坐标失败：宽度或高度为0', {width, height});
+          // 如果有最后有效值且不是在绘制过程中，则使用最后有效值
+          if (lastValidRoiCoords.value) {
+            roiCoords.value = {...lastValidRoiCoords.value};
+          }
+          return false;
+        }
+      } else {
+        // 有效坐标，保存并更新最后有效值
+        roiCoords.value = coords;
+        lastValidRoiCoords.value = {...coords};
+      }
+    } 
+    // 对于椭圆ROI，验证半径
+    else if (roiType.value === 'ellipse') {
+      if (coords.radius && (coords.radius.x <= 0 || coords.radius.y <= 0)) {
+        if (isDrawingROI.value) {
+          // 绘制过程中允许临时的无效值
+          roiCoords.value = coords;
+        } else {
+          console.warn('设置ROI椭圆坐标失败：半径无效', coords.radius);
+          if (lastValidRoiCoords.value) {
+            roiCoords.value = {...lastValidRoiCoords.value};
+          }
+          return false;
+        }
+      } else {
+        // 有效坐标，保存并更新最后有效值
+        roiCoords.value = coords;
+        lastValidRoiCoords.value = {...coords};
+      }
+    }
+    else {
+      // 其他类型或未知类型，直接设置
+      roiCoords.value = coords;
+      // 如果坐标看起来有效，保存为最后有效值
+      if (coords.l !== undefined && coords.t !== undefined && 
+          coords.r !== undefined && coords.b !== undefined) {
+        lastValidRoiCoords.value = {...coords};
+      }
+    }
+    
     return true;
   }
   
@@ -390,6 +610,7 @@ export const useRoiStore = defineStore('roi', () => {
     isDrawingTemplateOnOverlay, // expose new state
     templateDataUrlForOverlay, // expose new state
     userDefinedTemplateRoiSize, // Expose new state
+    lastValidRoiCoords, // Expose new state
     
     // 方法
     startRoiSelection, // Renamed from startDrawingROI

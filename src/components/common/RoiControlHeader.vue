@@ -7,9 +7,9 @@
         class="roi-button icon-button" 
         :title="visibilityTitle"
         @click="toggleVisibility"
-        :disabled="disabled"
+        :disabled="disabled || (!roiEnabled && !hasTemplate) || isDrawingROI"
       >
-        <i :class="[roiEnabled ? 'fas fa-eye-slash' : 'fas fa-eye']"></i>
+        <i :class="[roiEnabled || isTemplateVisible ? 'fas fa-eye-slash' : 'fas fa-eye']"></i>
       </button>
       <button 
         class="roi-button icon-button" 
@@ -22,9 +22,9 @@
       </button>
       <button 
         class="roi-button icon-button danger-icon" 
-        title="删除"
-        @click="clearRoi"
-        :disabled="disabled"
+        :title="deleteTitle"
+        @click="clearContent"
+        :disabled="disabled || (purpose === 'template' && !hasTemplate && !roiEnabled) || isDrawingROI"
       >
         <i class="fas fa-trash-alt"></i>
       </button>
@@ -57,34 +57,68 @@ const roiStore = useRoiStore();
 
 const isDrawingROI = computed(() => roiStore.isDrawingROI);
 const roiEnabled = computed(() => roiStore.roiEnabled);
+const hasTemplate = computed(() => roiStore.capturedTemplateDataUrl !== null);
+const isTemplateVisible = computed(() => roiStore.isDrawingTemplateOnOverlay);
 
 const visibilityTitle = computed(() => {
-  return roiEnabled.value ? '隐藏' : '显示';
+  if (props.purpose === 'template' && hasTemplate.value) {
+    return isTemplateVisible.value ? '隐藏模板' : '显示模板';
+  }
+  return roiEnabled.value ? '隐藏ROI' : '显示ROI';
+});
+
+const deleteTitle = computed(() => {
+  if (props.purpose === 'template' && hasTemplate.value) {
+    return '删除模板';
+  }
+  return '删除ROI';
 });
 
 function toggleVisibility() {
-  if (props.disabled) return;
+  if (props.disabled || isDrawingROI.value) return;
   
-  roiStore.toggleROIVisibility();
-  emit('visibility-toggle', roiEnabled.value);
+  if (props.purpose === 'template' && hasTemplate.value) {
+    roiStore.toggleTemplateDrawingOnOverlay();
+    emit('visibility-toggle', isTemplateVisible.value);
+  } else {
+    roiStore.toggleROIVisibility();
+    emit('visibility-toggle', roiEnabled.value);
+  }
 }
 
 function editRoi() {
   if (props.disabled) return;
   
-  if (roiStore.isDrawingROI) {
+  if (isDrawingROI.value) {
     roiStore.stopDrawingROI();
   } else {
+    if (props.purpose === 'template' && isTemplateVisible.value) {
+      roiStore.toggleTemplateDrawingOnOverlay();
+    }
+    
+    const wasShowingTemplate = isTemplateVisible.value;
+    const templateDataUrl = roiStore.capturedTemplateDataUrl;
+    
     roiStore.startRoiSelection(props.purpose);
   }
+  
   emit('edit', isDrawingROI.value);
 }
 
-function clearRoi() {
-  if (props.disabled) return;
+function clearContent() {
+  if (props.disabled || isDrawingROI.value) return;
   
-  roiStore.clearROI();
-  emit('clear');
+  if (props.purpose === 'template' && hasTemplate.value) {
+    if (confirm('确定要删除当前模板吗？')) {
+      roiStore.clearCapturedTemplateDataUrl();
+      emit('clear', 'template');
+    }
+  } else {
+    if (confirm('确定要删除当前ROI吗？')) {
+      roiStore.clearROI();
+      emit('clear', 'roi');
+    }
+  }
 }
 </script>
 
