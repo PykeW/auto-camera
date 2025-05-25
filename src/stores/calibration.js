@@ -27,7 +27,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
   const currentCalibrationImageUrl = ref('');
   const allCalibrationImages = ref([]); // 存储所有9张图片的匹配结果
   const ninePointImages = [
-    '/9dian/12_161833.png',
+    '/9dian/12_161825.png',
     '/9dian/12_161827.png',
     '/9dian/12_161829.png',
     '/9dian/12_161831.png',
@@ -46,9 +46,9 @@ export const useCalibrationStore = defineStore('calibration', () => {
   
   // Mark点查找方式
   const markMethod = ref('template'); // 可选: 'template', 'circle', 'cross', 'contourExtraction' 等
-  const markPreviewImg = ref('/9dian/12_161833.png'); // 默认图片
+  const markPreviewImg = ref('/9dian/12_161825.png'); // 默认图片
   const markImages = [
-    '/9dian/12_161833.png',
+    '/9dian/12_161825.png',
     '/9dian/12_161827.png',
     '/9dian/12_161829.png',
     '/9dian/12_161831.png',
@@ -512,6 +512,20 @@ export const useCalibrationStore = defineStore('calibration', () => {
     }
   }
 
+  function setMarkPreviewImgPath(path) {
+    console.log(`[calibrationStore] Setting markPreviewImg from '${markPreviewImg.value}' to '${path}'`);
+    markPreviewImg.value = path;
+    // Optionally, ensure the camera view updates if it's relying on polling
+    const cameraStore = useCameraStore();
+    if (cameraStore.isPollingPaused && path) { // If polling is paused and we set a preview
+      // This might implicitly tell CameraView to update if cameraImageUrl depends on markPreviewImg
+      console.log(`Mark preview image set to: ${path}. Camera polling is paused.`);
+    } else if (!path && !cameraStore.isPollingPaused) {
+      // If preview is cleared, and polling wasn't paused by us, resume if it should be active
+      // This part is tricky, ensure cameraStore.resumePolling() is called appropriately elsewhere
+    }
+  }
+
   // Placeholder for updateMarkPointData
   function updateMarkPointData(data) {
     // This function would typically update the markPoints array or specific point data
@@ -609,5 +623,6 @@ export const useCalibrationStore = defineStore('calibration', () => {
     getCalibrationTableData,
     loadNinePointImages, // 新增：加载9点图片方法
     resetCalibration, // 新增：重置标定结果
+    setMarkPreviewImgPath, // Expose the new action
   };
 });

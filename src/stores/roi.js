@@ -18,18 +18,25 @@ export const useRoiStore = defineStore('roi', () => {
   const isDrawingTemplateOnOverlay = ref(false); // New state for template drawing
   const templateDataUrlForOverlay = ref(null); // New state for template data URL for overlay
 
+  // 用户定义的模板ROI尺寸
+  const userDefinedTemplateRoiSize = ref(null); // { width, height }
+
   // 方法
   // 开始选择ROI，并指定用途
   function startRoiSelection(purpose) {
     const cameraStore = useCameraStore();
-    if (!cameraStore.isConnected && purpose !== 'template') { // Allow template selection on static image
-        console.warn('Camera not connected, cannot start ROI selection unless for template on static image.');
+    const calibStore = useCalibrationStore(); // Moved up for earlier access
+
+    // Allow template selection even if camera not connected, assuming static images are used for template.
+    if (!cameraStore.isConnected && purpose !== 'template') { 
+        console.warn('Camera not connected, cannot start ROI selection unless for template.');
         return false;
     }
     
     selectionPurpose.value = purpose;
     isDrawingROI.value = true;
     roiEnabled.value = false; // Disable existing ROI while drawing a new one
+    
     console.log(`ROI selection started for purpose: ${purpose}`);
     return true;
   }
@@ -110,6 +117,17 @@ export const useRoiStore = defineStore('roi', () => {
         }
       } catch (error) {
         console.error('模板截取过程中出错:', error);
+      }
+      
+      // After successfully capturing template, also save its dimensions
+      if (roiCoords.value) {
+        const width = roiCoords.value.r - roiCoords.value.l;
+        const height = roiCoords.value.b - roiCoords.value.t;
+        if (width > 0 && height > 0) {
+          setUserDefinedTemplateRoiSize({ width, height });
+        } else {
+          console.warn('Confirmed ROI for template has invalid dimensions, not saving size.', {width, height});
+        }
       }
     }
     
@@ -247,6 +265,8 @@ export const useRoiStore = defineStore('roi', () => {
     isDrawingROI.value = false;
     roiCoords.value = { l: 150, t: 100, r: 450, b: 400 };
     polygonPoints.value = [];
+    // Do NOT clear userDefinedTemplateRoiSize here, as it should persist
+    // unless explicitly reset by another action.
     
     // 如果正在绘制模板，先关闭绘制（但保留模板数据）
     if (isDrawingTemplateOnOverlay.value) {
@@ -336,6 +356,26 @@ export const useRoiStore = defineStore('roi', () => {
     return true;
   }
 
+  function setRoiShape(shape) {
+    roiType.value = shape;
+  }
+
+  // Action to set the user-defined template ROI size
+  function setUserDefinedTemplateRoiSize(size) { // size: { width, height }
+    if (size && typeof size.width === 'number' && typeof size.height === 'number') {
+      userDefinedTemplateRoiSize.value = { ...size };
+      console.log('User defined template ROI size set to:', userDefinedTemplateRoiSize.value);
+    } else {
+      console.warn('Invalid size provided for userDefinedTemplateRoiSize:', size);
+    }
+  }
+
+  // Action to clear the user-defined template ROI size
+  function clearUserDefinedTemplateRoiSize() {
+    userDefinedTemplateRoiSize.value = null;
+    console.log('User defined template ROI size cleared.');
+  }
+
   return {
     // 状态
     isDrawingROI,
@@ -349,6 +389,7 @@ export const useRoiStore = defineStore('roi', () => {
     capturedTemplateDataUrl,
     isDrawingTemplateOnOverlay, // expose new state
     templateDataUrlForOverlay, // expose new state
+    userDefinedTemplateRoiSize, // Expose new state
     
     // 方法
     startRoiSelection, // Renamed from startDrawingROI
@@ -362,5 +403,9 @@ export const useRoiStore = defineStore('roi', () => {
     switchROITool,
     clearCapturedTemplateDataUrl,
     toggleTemplateDrawingOnOverlay, // expose new action
+    setRoiShape, // expose setRoiShape
+    setUserDefinedTemplateRoiSize, // Expose new action
+    clearUserDefinedTemplateRoiSize, // Expose new action
+    switchDrawMode,
   };
 });

@@ -2,10 +2,10 @@
     <div 
       id="focus-roi-overlay" 
       class="roi-overlay" 
-      :class="{ drawing: isDrawingROI }"
+      :class="{ drawing: isDrawingROI && !isAutoTargeting }"
       :style="{ 
-        display: roiEnabled || isDrawingROI || roiStore.isDrawingTemplateOnOverlay || calibrationStore.isCalibrating ? 'block' : 'none',
-        pointerEvents: roiStore.isDrawingTemplateOnOverlay || calibrationStore.isCalibrating ? 'none' : 'auto' // 禁用指针事件当模板显示或标定进行时
+        display: roiEnabled || isDrawingROI || roiStore.isDrawingTemplateOnOverlay || calibrationStore.isCalibrating || isAutoTargeting ? 'block' : 'none',
+        pointerEvents: roiStore.isDrawingTemplateOnOverlay || calibrationStore.isCalibrating || isAutoTargeting ? 'none' : 'auto'
       }"
       @mousedown="startRoiDraw"
       @mousemove="updateRoiDraw"
@@ -15,16 +15,23 @@
     >
       <!-- 添加ROI工具面板 -->
       <RoiToolsPanel
+        v-if="!isAutoTargeting"
         @shape-change="handleShapeChange"
         @confirm="handleRoiConfirm"
       />
       
       <!-- ROI矩形 -->
       <div 
-        v-if="roiCoords && (roiType === 'rect' || !roiType) && (roiEnabled || currentRoiRect) && !roiStore.isDrawingTemplateOnOverlay"
+        v-if="(roiCoords && (roiType === 'rect' || !roiType) && (roiEnabled || currentRoiRect) && !roiStore.isDrawingTemplateOnOverlay && !isAutoTargeting) || isAutoTargeting"
         class="roi-rect"
-        :class="{ drawing: isDrawingROI }"
-        :style="{
+        :class="{ drawing: isDrawingROI && !isAutoTargeting }"
+        :style="isAutoTargeting ? {
+          left: `${props.autoTargetCenter.x - props.autoTargetSize.width / 2}px`,
+          top: `${props.autoTargetCenter.y - props.autoTargetSize.height / 2}px`,
+          width: `${props.autoTargetSize.width}px`,
+          height: `${props.autoTargetSize.height}px`,
+          borderColor: 'blue', 
+        } : {
           left: `${roiCoords.l}px`,
           top: `${roiCoords.t}px`,
           width: `${roiCoords.r - roiCoords.l}px`,
@@ -34,7 +41,7 @@
       
       <!-- ROI多边形或椭圆 - 使用SVG -->
       <svg 
-        v-if="(roiType === 'polygon' || roiType === 'ellipse') && !roiStore.isDrawingTemplateOnOverlay"
+        v-if="(roiType === 'polygon' || roiType === 'ellipse') && !roiStore.isDrawingTemplateOnOverlay && !isAutoTargeting"
         style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;"
       >
         <!-- 多边形 -->
@@ -136,6 +143,18 @@
   import { useCalibrationStore } from '../../stores/calibration'; // Import calibration store
   import RoiToolsPanel from './RoiToolsPanel.vue'; // 导入ROI工具面板组件
   
+  // Props for automatic targeting
+  const props = defineProps({
+    autoTargetCenter: { // Mark点中心 { x, y }
+      type: Object,
+      default: null
+    },
+    autoTargetSize: { // ROI 框大小 { width, height }
+      type: Object,
+      default: null // e.g., { width: 50, height: 50 }
+    }
+  });
+  
   // 添加emit定义
   const emit = defineEmits(['roi-confirm', 'shape-change']);
   
@@ -149,6 +168,15 @@
   const roiType = computed(() => roiStore.roiType);
   const polygonPoints = computed(() => roiStore.polygonPoints);
   const activeShapeTool = computed(() => roiStore.activeShapeTool);
+  
+  // Computed property to check if auto-targeting is active
+  const isAutoTargeting = computed(() => {
+    return props.autoTargetCenter && props.autoTargetSize && 
+           typeof props.autoTargetCenter.x === 'number' &&
+           typeof props.autoTargetCenter.y === 'number' &&
+           typeof props.autoTargetSize.width === 'number' &&
+           typeof props.autoTargetSize.height === 'number';
+  });
   
   // 本地状态
   const currentRoiRect = ref(null);
@@ -165,6 +193,7 @@
   
   // 绘制ROI相关函数
   function startRoiDraw(event) {
+    if (isAutoTargeting.value) return; // Disable drawing if auto-targeting
     if (!isDrawingROI.value || isDrawing.value) return;
     
     const rect = event.target.getBoundingClientRect();
@@ -259,6 +288,7 @@
   }
   
   function updateRoiDraw(event) {
+    if (isAutoTargeting.value) return; // Disable drawing if auto-targeting
     if (!isDrawingROI.value) return;
     
     const rect = event.target.getBoundingClientRect();
@@ -335,6 +365,7 @@
   }
   
   function endRoiDraw(event) {
+    if (isAutoTargeting.value) return; // Disable drawing if auto-targeting
     if (!isDrawingROI.value) return;
     
     if (activeShapeTool.value === 'rect' && isDrawing.value) {
@@ -361,6 +392,7 @@
   }
   
   function finishPolygon() {
+    if (isAutoTargeting.value) return; // Disable drawing if auto-targeting
     // 如果是多边形工具且至少有3个点，才完成多边形
     if (activeShapeTool.value === 'polygon' && polygonPoints.value.length >= 3) {
       roiStore.finishPolygon();
@@ -400,6 +432,27 @@
     // 向父组件发送确认事件
     emit('roi-confirm');
   }
+
+  // Watch for autoTarget props and update roiStore if active
+  watch([() => props.autoTargetCenter, () => props.autoTargetSize, isAutoTargeting], 
+    ([newCenter, newSize, autoTargetingActive]) => {
+    if (autoTargetingActive && newCenter && newSize) {
+      const newRoiCoords = {
+        l: newCenter.x - newSize.width / 2,
+        t: newCenter.y - newSize.height / 2,
+        r: newCenter.x + newSize.width / 2,
+        b: newCenter.y + newSize.height / 2,
+      };
+      roiStore.setROICoords(newRoiCoords);
+      roiStore.roiType = 'rect'; // Assume auto-target is always a rect
+      roiStore.roiEnabled = true; // Ensure ROI is visible
+      roiStore.stopDrawingROI(); // Ensure drawing mode is off
+    } else if (!autoTargetingActive) {
+      // Optional: handle what happens when auto-targeting is turned off
+      // For example, clear the ROI or revert to a previous state if needed.
+      // roiStore.clearROI(); // Or some other logic
+    }
+  }, { deep: true });
   </script>
 
 <style scoped>

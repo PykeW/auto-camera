@@ -42,6 +42,13 @@
                     }">
                   <span class="detected-mark-score">{{ match.score.toFixed(2) }}</span>
                 </div>
+
+                <!-- Auto-targeted ROI Overlay -->
+                <RoiOverlay 
+                  v-if="autoTargetPropsForRoi" 
+                  :autoTargetCenter="autoTargetPropsForRoi.center"
+                  :autoTargetSize="autoTargetPropsForRoi.size"
+                />
               </div>
             </div>
           </div>
@@ -95,6 +102,7 @@
   import { useFocusStore } from '../../stores/focus';
   import { useAxisStore } from '../../stores/axis';
   import { useCalibrationStore } from '../../stores/calibration';
+  import { useRoiStore } from '../../stores/roi';
   import RoiOverlay from '../common/RoiOverlay.vue';
   import FocusThumbnails from '../common/FocusThumbnails.vue';
   
@@ -102,6 +110,53 @@
   const focusStore = useFocusStore();
   const axisStore = useAxisStore();
   const calibrationStore = useCalibrationStore();
+  const roiStore = useRoiStore();
+  
+  // 新增：监听轴选择变化，更新calibrationStore.selectedAxes
+  watch(() => [axisStore.assignedCalibrationAxesIds.x, axisStore.assignedCalibrationAxesIds.y, axisStore.assignedCalibrationAxesIds.u], 
+    ([x, y, u]) => {
+      console.log('[CameraView] [watch assignedCalibrationAxesIds] 轴选择变化:', { x, y, u });
+      
+      // 设置选中的轴和对应的ID
+      const axisMapping = {
+        X: x,
+        Y: y,
+        U: u
+      };
+      
+      // 更新selectedAxes和axisMapping，与点击"开始标定"按钮时相同
+      calibrationStore.setSelectedAxes(Object.keys(axisMapping).filter(key => axisMapping[key]));
+      calibrationStore.setAxisMapping(axisMapping);
+      
+      console.log('[CameraView] [watch assignedCalibrationAxesIds] 已更新calibrationStore.selectedAxes:', 
+                  calibrationStore.selectedAxes,
+                  'axisMapping:', calibrationStore.axisMapping);
+    },
+    { immediate: true, deep: true }
+  );
+  
+  // Default size for the auto-targeted ROI
+  const calibrationImagesLoadedFirstTime = ref(true); // Flag for initial load of calibration images
+  
+  // Computed property for the size of the auto-targeted ROI
+  const autoTargetRoiSize = computed(() => {
+    if (roiStore.userDefinedTemplateRoiSize && 
+        roiStore.userDefinedTemplateRoiSize.width > 0 && 
+        roiStore.userDefinedTemplateRoiSize.height > 0) {
+      return roiStore.userDefinedTemplateRoiSize;
+    }
+    // Fallback if user hasn't defined one yet, or if it's invalid
+    // Try to use the size of the detected mark's rectangle as a fallback
+    if (currentViewImage.value && 
+        currentViewImage.value.matches && 
+        currentViewImage.value.matches.length > 0) {
+      const bestMatch = currentViewImage.value.matches[0];
+      if (bestMatch.rect && bestMatch.rect.width > 0 && bestMatch.rect.height > 0) {
+        return { width: bestMatch.rect.width, height: bestMatch.rect.height };
+      }
+    }
+    return { width: 50, height: 50 }; // Absolute default fallback
+  });
   
   // 是否显示所有标定图片
   const showAllCalibrationImages = computed(() => {
@@ -138,6 +193,37 @@
     return { imageUrl: '', matches: [], index: -1 };
   });
   
+  // Computed properties for auto-targeting ROI
+  const autoTargetPropsForRoi = computed(() => {
+    if (showAllCalibrationImages.value && 
+        currentViewImage.value && 
+        currentViewImage.value.matches && 
+        currentViewImage.value.matches.length > 0) {
+      
+      // Assuming the first match is the one we care about, 
+      // or it has been pre-filtered by the store to be the best one.
+      const bestMatch = currentViewImage.value.matches[0];
+
+      // Use match.x and match.y if they are the center points.
+      // calibration.js suggests detectedTemplatedMarks (which populates currentViewImage.matches)
+      // has objects with x, y (center) and rect (bounding box).
+      if (typeof bestMatch.x === 'number' && typeof bestMatch.y === 'number') {
+        return {
+          center: { x: bestMatch.x, y: bestMatch.y },
+          size: autoTargetRoiSize.value
+        };
+      } else if (bestMatch.rect) { // Fallback to rect center if x,y are not present
+        const centerX = bestMatch.rect.x + bestMatch.rect.width / 2;
+        const centerY = bestMatch.rect.y + bestMatch.rect.height / 2;
+        return {
+          center: { x: centerX, y: centerY },
+          size: autoTargetRoiSize.value
+        };
+      }
+    }
+    return null; // Return null if no valid target
+  });
+  
   // 导航到上一张图片
   function prevImage() {
     if (currentViewIndex.value > 0) {
@@ -153,16 +239,23 @@
   }
   
   // 标定结果重置时，重置当前查看索引
-  watch(() => calibrationStore.allCalibrationImages, (newImages) => {
-    // 如果清空了图片，重置索引
+  watch(() => calibrationStore.allCalibrationImages, (newImages, oldImages) => {
     if (newImages.length === 0) {
-      currentViewIndex.value = 0;
+      currentCalibrationImageIndex.value = 0; // Reset to 0 if images are cleared
+      calibrationImagesLoadedFirstTime.value = true; // Reset flag for next load
+    } else if (newImages.length > 0) {
+      if (calibrationImagesLoadedFirstTime.value && newImages.length >= 5) {
+        // On first load of calibration images, if there are at least 5, default to the 5th image.
+        currentCalibrationImageIndex.value = 4; 
+        calibrationImagesLoadedFirstTime.value = false;
+      } else if (currentCalibrationImageIndex.value >= newImages.length || currentCalibrationImageIndex.value < 0) {
+        // If current index is out of bounds (e.g., images were reloaded with fewer items or was initially invalid)
+        // or if it was -1 from store and now we have images.
+        currentCalibrationImageIndex.value = 0;
+      }
+      // Otherwise, the user might have already selected an image, so we keep the current index if it's valid.
     }
-    // 如果新添加了图片，跳转到第一张
-    else if (newImages.length > 0 && currentViewIndex.value >= newImages.length) {
-      currentViewIndex.value = 0;
-    }
-  }, { deep: true });
+  }, { deep: true, immediate: true });
   
   // 选择查看特定标定图片
   function selectCalibrationImage(index) {
@@ -176,31 +269,42 @@
   
   // 计算属性
   const cameraImageUrl = computed(() => {
-    // 首先检查是否有 Mark 点示例图片
+    console.log('[CameraView] [cameraImageUrl] Recomputing...');
+    console.log('[CameraView] [cameraImageUrl] Current markPreviewImg:', calibrationStore.markPreviewImg);
+    // 1. 优先显示 calibrationStore.markPreviewImg (当XY轴选中时, watch会将其设为第5张图)
     if (calibrationStore.markPreviewImg) {
+      console.log('[CameraView] [cameraImageUrl] Returning markPreviewImg:', calibrationStore.markPreviewImg);
       return calibrationStore.markPreviewImg;
     }
 
-    // 其次检查是否正在标定，如果是则显示当前标定图片
+    console.log('[CameraView] [cameraImageUrl] isCalibrating:', calibrationStore.isCalibrating, 'currentCalibrationImageUrl:', calibrationStore.currentCalibrationImageUrl);
+    // 2. 如果正在标定，显示当前标定图片
     if (calibrationStore.isCalibrating && calibrationStore.currentCalibrationImageUrl) {
+      console.log('[CameraView] [cameraImageUrl] Returning currentCalibrationImageUrl:', calibrationStore.currentCalibrationImageUrl);
       return calibrationStore.currentCalibrationImageUrl;
     }
-
-    // 检查是否满足切换图片的条件 (基于 calibrationStore)
-    const xySelected = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
-    if (xySelected) {
-      // 当X和Y轴都被选择时，显示Mark点示例图片
-      return '/9dian/12_161833.png';
-    }
     
-    // 如果正在查看缩略图，显示选中的缩略图
+    console.log('[CameraView] [cameraImageUrl] viewingThumbnail:', focusStore.viewingThumbnail);
+    // 3. 如果正在查看对焦缩略图，显示选中的缩略图
     if (focusStore.viewingThumbnail && 
         focusStore.currentDisplayedImageIndex !== null && 
         focusStore.focusImages[focusStore.currentDisplayedImageIndex]) {
+      console.log('[CameraView] [cameraImageUrl] Returning focus thumbnail.');
       return focusStore.focusImages[focusStore.currentDisplayedImageIndex].imageData;
     }
+
+    const xySelected = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
+    console.log('[CameraView] [cameraImageUrl] xySelected:', xySelected, 'selectedAxes:', calibrationStore.selectedAxes, 'cameraStore.isConnected:', cameraStore.isConnected);
+
+    // 4. 如果XY轴没有都选中 (且相机已连接，且前面条件不满足), 显示 favicon.png
+    if (!xySelected && cameraStore.isConnected) {
+      console.log('[CameraView] [cameraImageUrl] Returning /favicon.png because XY not selected and connected.');
+      return '/favicon.png'; 
+    }
     
-    // 否则显示相机图像
+    console.log('[CameraView] [cameraImageUrl] Defaulting to cameraStore.cameraImageUrl:', cameraStore.cameraImageUrl);
+    // 5. 实时相机画面 (如果其他条件都不满足)
+    //    cameraStore.cameraImageUrl 通常是实时画面或一个默认的"未连接"图像
     return cameraStore.cameraImageUrl;
   });
   
@@ -269,17 +373,33 @@
 
   // 监听 calibrationStore.selectedAxes 的变化，以触发图像更新
   watch(() => calibrationStore.selectedAxes, (newSelectedAxes) => {
-    // 当 selectedAxes 变化时，cameraImageUrl 计算属性会自动更新
-    // 如果需要强制刷新，可以在这里调用 cameraStore.fetchCameraImage()，
-    // 但由于 cameraImageUrl 已经是计算属性，它应该会自动响应依赖项的变化。
-    // 不过，为了确保在条件满足时立即获取新图片（如果 fetchCameraImage 有其他副作用），可以考虑调用。
-    if (newSelectedAxes.includes('X') && newSelectedAxes.includes('Y')) {
-        cameraStore.fetchCameraImage(); // 确保在条件满足时主动获取一次，以防万一
+    const calibStore = useCalibrationStore(); // Get store instance inside watcher
+    console.log('[CameraView] [watch selectedAxes] Current selectedAxes:', newSelectedAxes);
+    console.log('[CameraView] [watch selectedAxes] axisStore.selectedAxisId:', axisStore.selectedAxisId);
+    console.log('[CameraView] [watch selectedAxes] axisMapping:', calibStore.axisMapping);
+    
+    // 检查是否同时选择了X轴和Y轴 - 使用精确的条件
+    const xyAxisSelected = newSelectedAxes.includes('X') && newSelectedAxes.includes('Y');
+    
+    console.log('[CameraView] [watch selectedAxes] xyAxisSelected:', xyAxisSelected);
+    
+    if (xyAxisSelected) {
+      // 使用更通用的条件：只要有2个或更多轴被选中，我们就尝试显示第五张图
+      if (calibStore.ninePointImages && calibStore.ninePointImages.length >= 5) {
+        console.log('[CameraView] [watch selectedAxes] ninePointImages:', calibStore.ninePointImages);
+        calibStore.setMarkPreviewImgPath(calibStore.ninePointImages[4]); 
+        console.log('[CameraView] [watch selectedAxes] X and Y axes selected, switched to 5th image for mark preview.');
+      } else {
+        console.log('[CameraView] [watch selectedAxes] ninePointImages not available or too short:', calibStore.ninePointImages);
+      }
+      cameraStore.pausePolling(); // Pause polling when showing static mark preview
     } else {
-        // 如果条件不再满足，也获取一次，以恢复到正常图像流
-        cameraStore.fetchCameraImage();
+      // If X and Y are not both selected, clear the specific mark preview.
+      calibStore.setMarkPreviewImgPath(null); 
+      console.log('[CameraView] [watch selectedAxes] X and Y axes no longer both selected, cleared mark preview.');
+      cameraStore.resumePolling(); // Resume polling if not showing static mark preview
     }
-  }, { deep: true }); // 使用 deep: true 以侦听数组内部的变化
+  }, { deep: true, immediate: true }); // immediate: true to run on initial load
   
   // 监听 markPreviewImg 的变化，更新相机预览
   watch(() => calibrationStore.markPreviewImg, (newMarkPreviewImg) => {
@@ -301,6 +421,36 @@
     if (cameraStore.isConnected) {
       startImagePolling();
     }
+    
+    // 检查并尝试显示第五张标定图片
+    const calibStore = useCalibrationStore();
+    console.log('[CameraView] [onMounted] 检查轴选择状态:', calibStore.selectedAxes);
+    console.log('[CameraView] [onMounted] 检查轴映射:', calibStore.axisMapping);
+    
+    // 初始同步一次轴选择状态
+    const axisMapping = {
+      X: axisStore.assignedCalibrationAxesIds.x,
+      Y: axisStore.assignedCalibrationAxesIds.y,
+      U: axisStore.assignedCalibrationAxesIds.u
+    };
+    
+    calibStore.setSelectedAxes(Object.keys(axisMapping).filter(key => axisMapping[key]));
+    calibStore.setAxisMapping(axisMapping);
+    
+    console.log('[CameraView] [onMounted] 已更新 selectedAxes:', calibStore.selectedAxes);
+    
+    // 检查是否已经选择了X轴和Y轴
+    const xySelected = calibStore.selectedAxes.includes('X') && calibStore.selectedAxes.includes('Y');
+    
+    if (xySelected && 
+        calibStore.ninePointImages && 
+        calibStore.ninePointImages.length >= 5) {
+      console.log('[CameraView] [onMounted] 检测到已选择X轴和Y轴，设置第五张图片作为预览');
+      calibStore.setMarkPreviewImgPath(calibStore.ninePointImages[4]);
+      cameraStore.pausePolling();
+    } else {
+      console.log('[CameraView] [onMounted] 未选择X轴和Y轴，或标定图片不足');
+    }
   });
   
   // 组件卸载时清除轮询
@@ -319,6 +469,55 @@
   function handleShapeChange(tool) {
     console.log('ROI形状工具已切换:', tool);
     // 可以在这里添加其他处理逻辑
+  }
+
+  // 添加一个全局调试函数，用于强制显示第五张标定图片
+  function forceShowFifthImage() {
+    const calibStore = useCalibrationStore();
+    if (calibStore.ninePointImages && calibStore.ninePointImages.length >= 5) {
+      console.log('强制显示第五张标定图片:', calibStore.ninePointImages[4]);
+      calibStore.setMarkPreviewImgPath(calibStore.ninePointImages[4]);
+      cameraStore.pausePolling();
+      return true;
+    } else {
+      console.error('标定图片不足或不可用');
+      return false;
+    }
+  }
+
+  // 新增：添加调试函数，显示当前轴选择状态
+  function debugAxisSelection() {
+    const calibStore = useCalibrationStore();
+    console.log('-- 调试轴选择状态 --');
+    console.log('axisStore.assignedCalibrationAxesIds:', axisStore.assignedCalibrationAxesIds);
+    console.log('calibrationStore.selectedAxes:', calibStore.selectedAxes);
+    console.log('calibrationStore.axisMapping:', calibStore.axisMapping);
+    
+    // 主动更新一次轴选择
+    const axisMapping = {
+      X: axisStore.assignedCalibrationAxesIds.x,
+      Y: axisStore.assignedCalibrationAxesIds.y,
+      U: axisStore.assignedCalibrationAxesIds.u
+    };
+    
+    calibStore.setSelectedAxes(Object.keys(axisMapping).filter(key => axisMapping[key]));
+    calibStore.setAxisMapping(axisMapping);
+    
+    console.log('更新后 selectedAxes:', calibStore.selectedAxes);
+    console.log('更新后 axisMapping:', calibStore.axisMapping);
+    
+    return {
+      assignedAxes: axisStore.assignedCalibrationAxesIds,
+      selectedAxes: calibStore.selectedAxes,
+      axisMapping: calibStore.axisMapping
+    };
+  }
+
+  // 将调试函数暴露到全局，以便在控制台调用
+  if (typeof window !== 'undefined') {
+    window.forceShowFifthImage = forceShowFifthImage;
+    window.debugAxisSelection = debugAxisSelection;
+    console.log('已注册全局调试函数 forceShowFifthImage() 和 debugAxisSelection()，可在控制台调用');
   }
   </script>
   
