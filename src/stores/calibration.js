@@ -27,7 +27,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
   const currentCalibrationImageUrl = ref('');
   const allCalibrationImages = ref([]); // 存储所有9张图片的匹配结果
   const ninePointImages = [
-    '/9dian/12_161825.png',
+    '/9dian/12_161833.png',
     '/9dian/12_161827.png',
     '/9dian/12_161829.png',
     '/9dian/12_161831.png',
@@ -46,9 +46,9 @@ export const useCalibrationStore = defineStore('calibration', () => {
   
   // Mark点查找方式
   const markMethod = ref('template'); // 可选: 'template', 'circle', 'cross', 'contourExtraction' 等
-  const markPreviewImg = ref('/9dian/12_161825.png'); // 默认图片
+  const markPreviewImg = ref('/9dian/12_161833.png'); // 默认图片
   const markImages = [
-    '/9dian/12_161825.png',
+    '/9dian/12_161833.png',
     '/9dian/12_161827.png',
     '/9dian/12_161829.png',
     '/9dian/12_161831.png',

@@ -77,19 +77,12 @@ export const useCameraStore = defineStore('camera', () => {
 
     const focusStore = useFocusStore();
     const axisStore = useAxisStore();
-    const calibrationStore = useCalibrationStore(); // 新增
-
-    // 条件：当 calibrationStore 中的 selectedAxes 同时包含 'X' 和 'Y' 时，切换图片
-    const xySelected = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
-
-    if (xySelected) {
-      cameraImageUrl.value = '/9dian/12_161833.png';
-      cachedImageUrl.value = '/9dian/12_161833.png';
-      cachedTimestamp.value = Date.now();
-      // focusStore.clarity = someDefaultClarity; // 根据需要处理清晰度
-      return cameraImageUrl.value;
-    }
-
+    
+    // 统一使用指定图片作为相机显示
+    cameraImageUrl.value = '/9dian/12_161833.png';
+    cachedImageUrl.value = '/9dian/12_161833.png';
+    cachedTimestamp.value = Date.now();
+    
     // 获取当前Z轴位置
     const zPosition = axisStore.positions['Z'];
     const zPositionEncoder = axisStore.positionsEncoder['Z'];
@@ -97,90 +90,120 @@ export const useCameraStore = defineStore('camera', () => {
     // 根据当前位置计算清晰度
     let clarity = focusStore.calculateClarity(zPosition, false);
     
-    // 使用对焦过程中的图像集和当前位置来显示实时图像
-    if (focusStore.focusCompleted && focusStore.focusImages.length > 0) {
-      // 在已有的对焦图像中找到最接近当前位置的图像
-      const zPositionToUse = axisStore.displayUnit === 'mm' ? zPosition : zPositionEncoder / 1000.0;
-      
-      // 尝试查找最接近当前位置的图像
-      const nearestImage = focusStore.focusImages
-        .map(img => ({
-          image: img,
-          distance: Math.abs(img.zPosition - zPositionToUse)
-        }))
-        .sort((a, b) => a.distance - b.distance)[0]?.image;
-      
-      // 如果找到了合适的图像，直接使用
-      if (nearestImage && nearestImage.imageData) {
-        cameraImageUrl.value = nearestImage.imageData;
-        cachedImageUrl.value = nearestImage.imageData;
-        cachedTimestamp.value = Date.now();
-        
-        // 更新清晰度
-        focusStore.clarity = nearestImage.clarity;
-        
-        return nearestImage.imageData;
-      }
+    // 仅在活跃对焦过程中才实时更新清晰度
+    if (focusStore.isFocusing) {
+      focusStore.updateClarity(clarity);
     }
     
-    // 如果没有找到匹配的图像或没有对焦过，则生成一个基于当前清晰度的图像
-    const imageData = await generateFocusImage(zPositionEncoder, clarity);
-    cameraImageUrl.value = imageData;
-    cachedImageUrl.value = imageData;
-    cachedTimestamp.value = Date.now();
-    
-    // 更新清晰度
-    focusStore.clarity = clarity;
-    
-    return imageData;
+    return cameraImageUrl.value;
   }
   
-  // 选择配置文件
-  async function selectConfigFile() {
-    if (!isConnected.value) return;
+  // 获取对焦图像
+  async function fetchFocusImages(zPosition) {
+    if (!isConnected.value) return [];
     
-    // 模拟文件选择对话框
-    await new Promise(resolve => setTimeout(resolve, 300));
+    const focusStore = useFocusStore();
     
-    configFile.value = "C:/CameraConfigs/selected_config.cfg";
-    return { success: true, path: configFile.value };
-  }
-  
-  // 选择保存路径
-  async function selectSavePath() {
-    if (!isConnected.value) return;
+    // 基于给定位置和基准位置的距离生成系列清晰度图像
+    const basePosition = focusStore.bestFocusPosition || 50000;
+    const distance = Math.abs(zPosition - basePosition);
     
-    // 模拟文件夹选择对话框
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    savePath.value = "D:/CameraCaptures/Selected/";
-    return { success: true, path: savePath.value };
+    // 统一使用指定图片作为对焦图像
+    return ['/9dian/12_161833.png'];
   }
   
   // 更新相机属性
   function updateProperty(name, value) {
-    if (!isConnected.value || !properties.value[name]) return;
-    properties.value[name].value = value;
+    if (!isConnected.value) return false;
+    
+    if (properties.value[name]) {
+      properties.value[name].value = value;
+      return true;
+    }
+    
+    return false;
   }
   
-  // 暂停/恢复状态轮询
+  // 选择配置文件
+  async function selectConfigFile() {
+    if (!isConnected.value) return null;
+    
+    // 模拟文件选择
+    await new Promise(resolve => setTimeout(resolve, 300));
+    configFile.value = "C:/CameraConfigs/selected_config.cfg";
+    
+    return configFile.value;
+  }
+  
+  // 选择保存路径
+  async function selectSavePath() {
+    if (!isConnected.value) return null;
+    
+    // 模拟文件夹选择
+    await new Promise(resolve => setTimeout(resolve, 300));
+    savePath.value = "D:/Selected/Captures/";
+    
+    return savePath.value;
+  }
+  
+  // 拍摄单张图片
+  async function captureImage() {
+    if (!isConnected.value) return null;
+    
+    isCapturing.value = true;
+    
+    // 模拟拍照
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const timestamp = new Date().toISOString().replace(/:/g, '-');
+    const filename = `${savePath.value || 'D:/Captures/'}image_${timestamp}.png`;
+    
+    isCapturing.value = false;
+    
+    return {
+      path: filename,
+      url: cameraImageUrl.value,
+      timestamp: new Date().toISOString()
+    };
+  }
+  
+  // 开始录制视频
+  async function startRecording() {
+    if (!isConnected.value || isRecording.value) return false;
+    
+    isRecording.value = true;
+    
+    return true;
+  }
+  
+  // 停止录制视频
+  async function stopRecording() {
+    if (!isConnected.value || !isRecording.value) return null;
+    
+    // 模拟停止录制
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const timestamp = new Date().toISOString().replace(/:/g, '-');
+    const filename = `${savePath.value || 'D:/Captures/'}video_${timestamp}.mp4`;
+    
+    isRecording.value = false;
+    
+    return {
+      path: filename,
+      duration: '00:00:05',
+      timestamp: new Date().toISOString()
+    };
+  }
+  
+  // 暂停图像轮询（用于节省资源）
   function pausePolling() {
     isPollingPaused.value = true;
   }
   
+  // 恢复图像轮询
   function resumePolling() {
     isPollingPaused.value = false;
-  }
-  
-  // 防止缩略图自动显示
-  function setPreventThumbnailAutoShow(value, duration = 5000) {
-    preventThumbnailAutoShow.value = value;
-    
-    if (value && duration > 0) {
-      setTimeout(() => {
-        preventThumbnailAutoShow.value = false;
-      }, duration);
-    }
+    fetchCameraImage();
   }
 
   return {
@@ -195,23 +218,22 @@ export const useCameraStore = defineStore('camera', () => {
     cameraModel,
     properties,
     cameraImageUrl,
-    cachedImageUrl,
-    cachedTimestamp,
+    connectionStatus,
     preventThumbnailAutoShow,
     isPollingPaused,
-    
-    // 计算属性
-    connectionStatus,
     
     // 方法
     connect,
     disconnect,
     fetchCameraImage,
+    fetchFocusImages,
+    updateProperty,
     selectConfigFile,
     selectSavePath,
-    updateProperty,
+    captureImage,
+    startRecording,
+    stopRecording,
     pausePolling,
-    resumePolling,
-    setPreventThumbnailAutoShow
+    resumePolling
   };
 });

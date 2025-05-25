@@ -4,7 +4,7 @@
       <div id="camera-display-container">
         <!-- 单张图片显示模式 -->
         <div v-if="!showAllCalibrationImages" class="camera-image">
-          <img id="camera-feed" :src="cameraImageUrl" alt="相机画面" style="width: 100%; height: 100%; object-fit: contain;">
+          <img id="camera-feed" :src="cameraImageUrl" alt="相机画面" style="width: 100%; height: 100%; object-fit: contain; object-position: center center;">
           <RoiOverlay 
             v-if="cameraStore.isConnected" 
             @roi-confirm="handleRoiConfirm"
@@ -28,7 +28,7 @@
           <div class="calibration-image-fullscreen">
             <div class="calibration-image-wrapper">
               <div class="image-container">
-                <img :src="currentViewImage.imageUrl" alt="标定图片" class="calibration-image">
+                <img :src="currentViewImage.imageUrl" alt="标定图片" class="calibration-image" style="object-position: center center;">
                 
                 <!-- 显示匹配框 -->
                 <div v-for="(match, matchIndex) in currentViewImage.matches" :key="matchIndex" 
@@ -55,7 +55,7 @@
               :class="{ 'active': currentCalibrationImageIndex === index }"
               @click="selectCalibrationImage(index)"
             >
-              <img :src="image.imageUrl" :alt="`标定图${index+1}`" />
+              <img :src="image.imageUrl" :alt="`标定图${index+1}`" style="object-position: center center;" />
               <div class="thumbnail-index">{{ index + 1 }}</div>
             </div>
           </div>
@@ -190,7 +190,7 @@
     const xySelected = calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y');
     if (xySelected) {
       // 当X和Y轴都被选择时，显示Mark点示例图片
-      return '/9dian/12_161825.png';
+      return '/9dian/12_161833.png';
     }
     
     // 如果正在查看缩略图，显示选中的缩略图
@@ -342,6 +342,9 @@
     height: 100%;
     position: relative;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .camera-info-overlay {
@@ -421,6 +424,9 @@
     aspect-ratio: 4/3;
     max-width: 640px;
     max-height: 480px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
   .calibration-image {
@@ -429,6 +435,7 @@
     object-fit: contain;
     display: block;
     background: #222;
+    object-position: center center;
   }
   
   .calibration-image-index {
