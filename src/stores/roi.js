@@ -60,6 +60,10 @@ export const useRoiStore = defineStore('roi', () => {
       polygonPoints.value = [];
     }
     
+    // 不要显示默认的ROI框，而是设置隐形的初始点
+    // 只初始化坐标，用户开始绘制时会更新这些值
+    roiCoords.value = { l: 0, t: 0, r: 0, b: 0 };
+    
     console.log(`ROI selection started for purpose: ${purpose}`);
     return true;
   }

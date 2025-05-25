@@ -22,7 +22,7 @@
       
       <!-- ROI矩形 -->
       <div 
-        v-if="(roiCoords && (roiType === 'rect' || !roiType) && (roiEnabled || currentRoiRect) && !roiStore.isDrawingTemplateOnOverlay && !isAutoTargeting) || isAutoTargeting"
+        v-if="shouldShowRoiRect"
         class="roi-rect"
         :class="{ drawing: isDrawingROI && !isAutoTargeting }"
         :style="isAutoTargeting ? {
@@ -41,7 +41,7 @@
       
       <!-- ROI多边形或椭圆 - 使用SVG -->
       <svg 
-        v-if="(roiType === 'polygon' || roiType === 'ellipse') && !roiStore.isDrawingTemplateOnOverlay && !isAutoTargeting"
+        v-if="shouldShowPolygonOrEllipse"
         style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;"
       >
         <!-- 多边形 -->
@@ -169,6 +169,73 @@
   const polygonPoints = computed(() => roiStore.polygonPoints);
   const activeShapeTool = computed(() => roiStore.activeShapeTool);
   
+  // 是否应该显示ROI矩形 - 确保只有在有效绘制或显示ROI时才显示
+  const shouldShowRoiRect = computed(() => {
+    // 自动对焦区域始终显示
+    if (isAutoTargeting.value) {
+      return true;
+    }
+    
+    // 如果模板正在显示，不显示ROI矩形
+    if (roiStore.isDrawingTemplateOnOverlay) {
+      return false;
+    }
+    
+    // 如果ROI已启用且有有效坐标，则显示
+    if (roiEnabled.value && roiCoords.value && 
+        (roiCoords.value.r - roiCoords.value.l > 1) && 
+        (roiCoords.value.b - roiCoords.value.t > 1)) {
+      return true;
+    }
+    
+    // 如果正在绘制并且已经开始拖动，则显示
+    if (isDrawingROI.value && isDrawing.value && currentRoiRect.value) {
+      // 确保宽高大于最小值
+      const width = currentRoiRect.value.r - currentRoiRect.value.l;
+      const height = currentRoiRect.value.b - currentRoiRect.value.t;
+      return width > 1 && height > 1;
+    }
+    
+    // 其他情况不显示
+    return false;
+  });
+  
+  // 是否应该显示多边形或椭圆
+  const shouldShowPolygonOrEllipse = computed(() => {
+    // 如果处于自动对焦模式或模板显示模式，不显示
+    if (isAutoTargeting.value || roiStore.isDrawingTemplateOnOverlay) {
+      return false;
+    }
+    
+    // 如果是多边形且有点
+    if (roiType.value === 'polygon') {
+      // 绘制模式下，显示有任何点的多边形
+      if (isDrawingROI.value && polygonPoints.value.length > 0) {
+        return true;
+      }
+      // 非绘制模式下，只有ROI启用且有足够的点才显示
+      return roiEnabled.value && polygonPoints.value.length >= 3;
+    }
+    
+    // 如果是椭圆且有有效半径
+    if (roiType.value === 'ellipse') {
+      const hasValidRadius = roiCoords.value && 
+                            roiCoords.value.center && 
+                            roiCoords.value.radius && 
+                            roiCoords.value.radius.x > 1 && 
+                            roiCoords.value.radius.y > 1;
+      
+      // 绘制模式下显示有效椭圆
+      if (isDrawingROI.value && isDrawing.value && hasValidRadius) {
+        return true;
+      }
+      // 非绘制模式下只在ROI启用时显示有效椭圆
+      return roiEnabled.value && hasValidRadius;
+    }
+    
+    return false;
+  });
+  
   // Computed property to check if auto-targeting is active
   const isAutoTargeting = computed(() => {
     return props.autoTargetCenter && props.autoTargetSize && 
@@ -222,21 +289,19 @@
     startY.value = event.clientY - rect.top;
     
     if (activeShapeTool.value === 'rect') {
-      // 矩形绘制
+      // 矩形绘制 - 初始时仅记录起始点，不更新实际ROI
       isDrawing.value = true;
+      
+      // 只初始化currentRoiRect，但不立即设置到store
       currentRoiRect.value = {
         l: startX.value,
         t: startY.value,
         r: startX.value,
-        b: startX.value
+        b: startY.value
       };
       
       // 更新ROI信息但不显示
       updateRoiInfo(startX.value, startY.value, startX.value, startY.value);
-      // showRoiInfo.value = true; // 注释掉，不显示ROI信息
-
-      // 实时更新store中的ROI信息
-      roiStore.setROICoords(currentRoiRect.value);
     } 
     else if (activeShapeTool.value === 'polygon') {
       // 多边形绘制 - 添加新点
@@ -251,9 +316,9 @@
         if (points.length === 1) {
           const point = points[0];
           updateRoiInfo(point.x, point.y, point.x, point.y);
-          // showRoiInfo.value = true; // 注释掉，不显示ROI信息
           
-          // 更新store中的ROI信息
+          // 更新store中的ROI信息 - 但不真正设置可见ROI
+          // 仅作为内部状态记录
           roiStore.setROICoords({
             l: point.x,
             t: point.y,
@@ -270,9 +335,8 @@
           const maxY = Math.max(...points.map(p => p.y));
           
           updateRoiInfo(minX, minY, maxX, maxY);
-          // showRoiInfo.value = true; // 注释掉，不显示ROI信息
 
-          // 实时更新store中的ROI多边形信息
+          // 更新store中的ROI多边形信息
           roiStore.setROICoords({
             l: minX,
             t: minY,
@@ -281,29 +345,30 @@
             type: 'polygon',
             points: [...points]
           });
+          
+          // 如果有3个或以上的点，则可以考虑显示多边形
+          roiStore.roiType = 'polygon';
         }
-        
-        roiStore.roiType = 'polygon';
       }
     }
     else if (activeShapeTool.value === 'ellipse') {
-      // 椭圆绘制
+      // 椭圆绘制 - 初始时仅记录起始点，不更新实际ROI
       isDrawing.value = true;
+      
+      // 只初始化currentRoiRect，但不立即设置到store
       currentRoiRect.value = {
         l: startX.value,
         t: startY.value,
         r: startX.value,
-        b: startX.value,
+        b: startY.value,
         center: { x: startX.value, y: startY.value },
         radius: { x: 0, y: 0 }
       };
       
       // 更新ROI信息但不显示
       updateRoiInfo(startX.value, startY.value, startX.value, startY.value);
-      // showRoiInfo.value = true; // 注释掉，不显示ROI信息
-
-      // 实时更新store中的ROI信息
-      roiStore.setROICoords(currentRoiRect.value);
+      
+      // 设置正在绘制椭圆
       roiStore.roiType = 'ellipse';
     }
   }
@@ -333,33 +398,50 @@
       // 更新ROI坐标信息，但不显示
       updateRoiInfo(left, top, left + width, top + height);
 
-      // 实时更新store中的ROI信息
-      roiStore.setROICoords(currentRoiRect.value);
+      // 只有当宽度和高度都大于阈值，才更新实际ROI
+      if (width > 1 && height > 1) {
+        // 实时更新store中的ROI信息
+        roiStore.setROICoords(currentRoiRect.value);
+      }
     }
     else if (activeShapeTool.value === 'polygon') {
       // 多边形绘制 - 只更新信息不显示
-      // if (showRoiInfo.value) { // 注释掉，不以showRoiInfo为条件
-        roiInfoText.value = `多边形 (${polygonPoints.value.length}点)`;
+      roiInfoText.value = `多边形 (${polygonPoints.value.length}点)`;
+      
+      // 从第一个点开始就更新多边形信息
+      if (polygonPoints.value.length >= 1) {
+        const points = [...polygonPoints.value];
         
-        // 从第一个点开始就更新多边形信息
-        if (polygonPoints.value.length >= 1) {
-          const points = [...polygonPoints.value];
+        // 如果只有一个点，使用点的坐标作为边界
+        if (points.length === 1) {
+          const point = points[0];
+          updateRoiInfo(point.x, point.y, point.x, point.y);
+        } else {
+          // 两个或更多点时，计算边界框
+          const minX = Math.min(...points.map(p => p.x));
+          const minY = Math.min(...points.map(p => p.y));
+          const maxX = Math.max(...points.map(p => p.x));
+          const maxY = Math.max(...points.map(p => p.y));
           
-          // 如果只有一个点，使用点的坐标作为边界
-          if (points.length === 1) {
-            const point = points[0];
-            updateRoiInfo(point.x, point.y, point.x, point.y);
-          } else {
-            // 两个或更多点时，计算边界框
-            const minX = Math.min(...points.map(p => p.x));
-            const minY = Math.min(...points.map(p => p.y));
-            const maxX = Math.max(...points.map(p => p.x));
-            const maxY = Math.max(...points.map(p => p.y));
-            
-            updateRoiInfo(minX, minY, maxX, maxY);
+          updateRoiInfo(minX, minY, maxX, maxY);
+          
+          // 计算宽度和高度
+          const width = maxX - minX;
+          const height = maxY - minY;
+          
+          // 只有当形成有效的多边形时才更新实际ROI
+          if (points.length >= 3 && width > 1 && height > 1) {
+            roiStore.setROICoords({
+              l: minX,
+              t: minY,
+              r: maxX,
+              b: maxY,
+              type: 'polygon',
+              points: [...points]
+            });
           }
         }
-      // } // 注释掉，不以showRoiInfo为条件
+      }
     }
     else if (activeShapeTool.value === 'ellipse' && isDrawing.value) {
       // 椭圆绘制更新
@@ -380,8 +462,11 @@
       // 更新ROI坐标信息但不显示
       updateRoiInfo(cx - rx, cy - ry, cx + rx, cy + ry);
 
-      // 实时更新store中的ROI椭圆信息
-      roiStore.setROICoords(currentRoiRect.value);
+      // 只有当半径大于最小值时才更新实际ROI
+      if (rx > 1 && ry > 1) {
+        // 实时更新store中的ROI椭圆信息
+        roiStore.setROICoords(currentRoiRect.value);
+      }
     }
   }
   
@@ -451,12 +536,63 @@
     // 关闭ROI信息显示
     showRoiInfo.value = false;
     
-    // 保存当前ROI坐标的副本，以防确认过程中丢失
-    const currentRoiData = {
-      coords: {...roiCoords.value},
-      type: roiType.value,
-      points: [...polygonPoints.value]
-    };
+    // 检查当前ROI坐标是否有效
+    let validROIData = null;
+    
+    if (roiCoords.value) {
+      // 检查矩形和多边形ROI
+      if (roiType.value === 'rect' || roiType.value === 'polygon') {
+        const width = roiCoords.value.r - roiCoords.value.l;
+        const height = roiCoords.value.b - roiCoords.value.t;
+        
+        if (width > 1 && height > 1) {
+          // 当前坐标有效，可以使用
+          validROIData = {
+            coords: {...roiCoords.value},
+            type: roiType.value,
+            points: [...polygonPoints.value]
+          };
+        }
+      }
+      // 检查椭圆ROI
+      else if (roiType.value === 'ellipse' && roiCoords.value.radius) {
+        if (roiCoords.value.radius.x > 1 && roiCoords.value.radius.y > 1) {
+          // 椭圆半径有效
+          validROIData = {
+            coords: {...roiCoords.value},
+            type: 'ellipse',
+            points: []
+          };
+        }
+      }
+    }
+    
+    // 如果没有有效坐标，尝试使用lastValidRoiCoords
+    if (!validROIData && roiStore.lastValidRoiCoords) {
+      console.log('当前ROI坐标无效，使用最后有效坐标');
+      validROIData = {
+        coords: {...roiStore.lastValidRoiCoords},
+        type: roiType.value,
+        points: [...polygonPoints.value]
+      };
+      
+      // 立即更新为有效坐标
+      roiStore.setROICoords(validROIData.coords);
+    }
+    
+    // 如果仍然没有有效坐标，创建一个默认的ROI坐标
+    if (!validROIData) {
+      console.log('没有有效的ROI坐标，使用默认值');
+      validROIData = {
+        coords: { l: 150, t: 100, r: 450, b: 400 },
+        type: 'rect',
+        points: []
+      };
+      
+      // 立即更新为默认坐标
+      roiStore.setROICoords(validROIData.coords);
+      roiStore.roiType = 'rect';
+    }
     
     // 保存确认前的模板显示状态
     const wasShowingTemplate = roiStore.isDrawingTemplateOnOverlay;
@@ -468,25 +604,25 @@
     // 确保ROI在确认后依然可见，并恢复模板状态
     setTimeout(() => {
       // 确保ROI可见
-      if (!roiStore.roiEnabled && currentRoiData.coords) {
+      if (!roiStore.roiEnabled && validROIData.coords) {
         console.log('确保ROI在确认后依然可见');
         roiStore.roiEnabled = true;
         
-        // 如果坐标被重置，则恢复保存的坐标
+        // 检查ROI坐标是否有效
         const currentCoords = roiStore.roiCoords;
         if (!currentCoords || 
-            (currentCoords.r - currentCoords.l <= 0) || 
-            (currentCoords.b - currentCoords.t <= 0)) {
-          console.log('ROI坐标已被重置，正在恢复');
-          roiStore.setROICoords(currentRoiData.coords);
-          roiStore.roiType = currentRoiData.type;
+            (currentCoords.r - currentCoords.l <= 1) || 
+            (currentCoords.b - currentCoords.t <= 1)) {
+          console.log('ROI坐标已被重置或无效，正在恢复');
+          roiStore.setROICoords(validROIData.coords);
+          roiStore.roiType = validROIData.type;
           
           // 如果是多边形，恢复点
-          if (currentRoiData.type === 'polygon' && currentRoiData.points.length > 0) {
+          if (validROIData.type === 'polygon' && validROIData.points.length > 0) {
             // 清除现有点
             roiStore.polygonPoints = [];
             // 添加保存的点
-            currentRoiData.points.forEach(p => roiStore.addPolygonPoint(p.x, p.y));
+            validROIData.points.forEach(p => roiStore.addPolygonPoint(p.x, p.y));
           }
         }
       }
