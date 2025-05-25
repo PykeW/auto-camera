@@ -2,56 +2,46 @@
 <template>
   <div>
     <!-- Mark点方式选择和参数 -->
-    <SelectDropdown
-      label="Mark点方式"
-      selectId="mark-method"
-      :modelValue="calibrationStore.markMethod"
-      @update:modelValue="onMarkMethodChange"
-      :options="markMethodOptions"
-      v-if="hasAxes"
-      style="margin-top: 8px;"
-    />
+    <div v-if="hasAxes">
+      <SelectDropdown
+        label="Mark点方式"
+        selectId="mark-method"
+        :modelValue="calibrationStore.markMethod"
+        @update:modelValue="onMarkMethodChange"
+        :options="markMethodOptions"
+        style="margin-top: 8px;"
+      />
 
-    <!-- Parameters for Template Matching -->
-    <div v-if="calibrationStore.markMethod === 'template' && hasAxes" class="parameters-group control-group">
-      <h5 class="parameters-title">模板匹配参数</h5>
-      <div class="control-item side-by-side">
-        <label for="capture-template-roi-btn">模板图片:</label>
-        <button id="capture-template-roi-btn" class="secondary-button compact-input" @click="captureTemplateFromROI">
-          <i class="fas fa-crop-alt"></i> 截取模板ROI
-        </button>
-      </div>
-      <div v-if="templateMatchingParams.templateImage" class="control-item side-by-side template-preview-container">
+      <!-- Template Matching Controls - 使用RoiControlHeader -->
+      <RoiControlHeader 
+        v-if="calibrationStore.markMethod === 'template'"
+        title="模板区域ROI"
+        purpose="template"
+        :disabled="false"
+        @visibility-toggle="handleRoiVisibilityToggle"
+        @edit="handleRoiEdit"
+        @clear="handleRoiClear"
+        style="margin-top: 8px;"
+        class="normal-font-heading"
+      />
+      <div v-if="calibrationStore.markMethod === 'template' && templateMatchingParams.templateImage" class="control-item side-by-side template-preview-container">
         <label>模板预览:</label>
         <img :src="templateMatchingParams.templateImage" alt="模板预览" class="template-preview-img">
       </div>
-      <div class="control-item side-by-side">
-        <label for="matching-threshold">匹配阈值:</label>
-        <input type="number" id="matching-threshold" class="compact-input" v-model="templateMatchingParams.threshold" min="0" max="1" step="0.01">
-      </div>
-      <div class="control-item button-group-inline">
-        <button class="secondary-button" @click="drawTemplate" :disabled="!templateMatchingParams.templateImage">
-          <i :class="roiStore.isDrawingTemplateOnOverlay && roiStore.templateDataUrlForOverlay === templateMatchingParams.templateImage ? 'fas fa-eye-slash' : 'fas fa-paint-brush'"></i> 
-          {{ drawTemplateButtonText }}
-        </button>
-        <button class="secondary-button" @click="detectMarkWithTemplate" :disabled="!templateMatchingParams.templateImage">
-          <i class="fas fa-search-location"></i> 检测
-        </button>
-      </div>
-    </div>
 
-    <!-- Parameters for Contour Extraction -->
-    <div v-if="calibrationStore.markMethod === 'contourExtraction' && hasAxes" class="parameters-group control-group">
-      <h5 class="parameters-title">轮廓提取参数</h5>
-      <div class="control-item side-by-side">
-        <label for="contour-min-area">最小面积:</label>
-        <input type="number" id="contour-min-area" class="compact-input" v-model="contourExtractionParams.minArea">
+      <!-- Parameters for Contour Extraction -->
+      <div v-if="calibrationStore.markMethod === 'contourExtraction'" class="parameters-group control-group">
+        <h5 class="parameters-title">轮廓提取参数</h5>
+        <div class="control-item side-by-side">
+          <label for="contour-min-area">最小面积:</label>
+          <input type="number" id="contour-min-area" class="compact-input" v-model="contourExtractionParams.minArea">
+        </div>
+        <div class="control-item side-by-side">
+          <label for="contour-max-area">最大面积:</label>
+          <input type="number" id="contour-max-area" class="compact-input" v-model="contourExtractionParams.maxArea">
+        </div>
+        <!-- Add detect button for contour if needed -->
       </div>
-      <div class="control-item side-by-side">
-        <label for="contour-max-area">最大面积:</label>
-        <input type="number" id="contour-max-area" class="compact-input" v-model="contourExtractionParams.maxArea">
-      </div>
-       <!-- Add detect button for contour if needed -->
     </div>
   </div>
 </template>
@@ -62,6 +52,7 @@ import { useCalibrationStore } from '../../stores/calibration';
 import { useRoiStore } from '../../stores/roi';
 import { showMessage } from '../../utils/helpers';
 import SelectDropdown from '../common/SelectDropdown.vue';
+import RoiControlHeader from '../common/RoiControlHeader.vue';
 
 const props = defineProps({
   assignedX: {
@@ -83,13 +74,6 @@ const roiStore = useRoiStore();
 
 // 计算是否有必要的轴
 const hasAxes = computed(() => props.assignedX && props.assignedY);
-
-// 绘制模板按钮文字
-const drawTemplateButtonText = computed(() => {
-  return roiStore.isDrawingTemplateOnOverlay && 
-         roiStore.templateDataUrlForOverlay === templateMatchingParams.value.templateImage 
-         ? '隐藏模板' : '绘制模板';
-});
 
 // Mark点方法相关参数
 const templateMatchingParams = ref({
@@ -181,88 +165,30 @@ function onMarkMethodChange(value) {
   calibrationStore.setMarkMethod(value);
 }
 
-// 截取模板ROI
-async function captureTemplateFromROI() {
-  showMessage('请在相机画面中绘制模板区域 (ROI)。', 'info');
-  try {
-    // 备份现有模板数据（如果有）
-    const existingTemplate = templateMatchingParams.value.templateImage;
-    
-    // 清除现有ROI
-    if (roiStore.roiEnabled) {
-      roiStore.clearROI();
-      await new Promise(resolve => setTimeout(resolve, 100)); // 短暂延迟确保UI更新
-    }
-    
-    // 如果清除ROI后，模板被意外清除，恢复它
-    if (existingTemplate && !templateMatchingParams.value.templateImage) {
-      console.log('恢复备份的模板数据');
-      templateMatchingParams.value.templateImage = existingTemplate;
-    }
-    
-    // 启动ROI选择模式，指定用途为"template"
-    roiStore.startRoiSelection('template');
-    
-    console.log('已启动模板ROI选择模式');
-  } catch (error) {
-    showMessage(`截取模板ROI失败: ${error.message}`, 'error');
-    console.error('启动模板ROI截取时出错:', error);
-    roiStore.stopDrawingROI(); // 确保退出ROI绘制模式
-  }
+// ROI相关方法
+function handleRoiVisibilityToggle(isVisible) {
+  roiStore.toggleROIVisibility();
+  showMessage(`模板ROI区域已${isVisible ? '显示' : '隐藏'}`, 'info');
 }
 
-// 绘制/隐藏模板
-function drawTemplate() {
-  if (!templateMatchingParams.value.templateImage) {
-    showMessage('没有可用的模板图片。', 'warn');
+function handleRoiEdit(isDrawing) {
+  if (props.isCalibrating) {
+    showMessage('正在标定，无法编辑ROI', 'warning');
     return;
   }
-
-  // 切换模板的显示/隐藏状态
-  try {
-    // 如果当前正在显示此模板，则隐藏它；否则显示它
-    if (roiStore.isDrawingTemplateOnOverlay && 
-        roiStore.templateDataUrlForOverlay === templateMatchingParams.value.templateImage) {
-      roiStore.toggleTemplateDrawingOnOverlay(null); // 传null来关闭显示
-      showMessage('模板已隐藏。', 'info');
-    } else {
-      roiStore.toggleTemplateDrawingOnOverlay(templateMatchingParams.value.templateImage);
-      showMessage('模板已绘制在ROI区域上。', 'info');
-    }
-  } catch (error) {
-    showMessage(`模板绘制出错: ${error.message}`, 'error');
-    console.error('Error toggling template drawing:', error);
-  }
+  roiStore.startRoiSelection('template');
+  showMessage(`ROI编辑模式${isDrawing ? '已开启' : '已关闭'}`, 'info');
 }
 
-// 使用模板进行Mark点检测
-async function detectMarkWithTemplate() {
-  if (!templateMatchingParams.value.templateImage) {
-    showMessage('请先截取模板图片。', 'warn');
+function handleRoiClear() {
+  if (props.isCalibrating) {
+    showMessage('正在标定，无法清除ROI', 'warning');
     return;
   }
-  if (!hasAxes.value) {
-    showMessage('请先选择X和Y轴。', 'error');
-    return;
-  }
-
-  showMessage('开始模板匹配检测...', 'info');
-  try {
-    const success = await calibrationStore.detectMarkWithTemplateMatching({
-      templateImageSrc: templateMatchingParams.value.templateImage,
-      threshold: templateMatchingParams.value.threshold,
-    });
-    if (success && calibrationStore.detectedTemplatedMarks.length > 0) {
-      showMessage(`模板匹配成功，检测到 ${calibrationStore.detectedTemplatedMarks.length} 个标记。`, 'success');
-    } else if (success) {
-      showMessage('模板匹配完成，但未检测到标记。', 'warn');
-    } else {
-      showMessage('模板匹配检测失败。请检查控制台获取更多信息。', 'error');
-    }
-  } catch (error) {
-    showMessage(`模板匹配检测出错: ${error.message}`, 'error');
-    console.error('Error in detectMarkWithTemplate:', error);
-  }
+  roiStore.clearROI();
+  // 清除模板图像
+  templateMatchingParams.value.templateImage = null;
+  showMessage('模板ROI区域已删除', 'info');
 }
 
 // 导出模板参数，让父组件可以访问
@@ -368,5 +294,15 @@ defineExpose({
   background-position: right 5px center;
   background-repeat: no-repeat;
   background-size: .65em auto;
+}
+
+/* 覆盖RoiControlHeader中的标题样式 */
+.normal-font-heading :deep(.roi-heading) {
+  font-weight: normal;
+  font-size: 0.9em;
+  color: var(--text-medium);
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
 }
 </style> 

@@ -76,7 +76,7 @@
   
         <!-- Focus ROI Controls -->
         <ROIControl 
-          title="对焦ROI区域"
+          title="对焦区域ROI"
           purpose="focus"
           :disabled="!isConnected || isFocusing"
           @visibility-toggle="handleRoiVisibilityToggle"
@@ -84,6 +84,7 @@
           @clear="handleRoiClear"
           @shape-change="handleShapeChange"
           @confirm="handleRoiConfirm"
+          class="normal-font-heading"
         />
   
         <div class="control-item focus-controls">
@@ -631,5 +632,15 @@
   input:read-only {
     background-color: #4a4a4a;
     cursor: default;
+  }
+
+  /* 覆盖RoiControlHeader中的标题样式 */
+  .normal-font-heading :deep(.roi-heading) {
+    font-weight: normal;
+    font-size: 0.9em;
+    color: var(--text-medium);
+    margin: 0;
+    padding: 0;
+    white-space: nowrap;
   }
   </style>
