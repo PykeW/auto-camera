@@ -1,17 +1,17 @@
 <!-- src/components/ControlPanel/MatrixConfig.vue -->
 <template>
   <div>
-    <ZAxisSelector
+    <SelectDropdown
       label="矩阵大小"
       selectId="matrix-size"
       :modelValue="matrixSize.toString()"
       @update:modelValue="val => matrixSize = parseInt(val)"
-      :axes="matrixSizeOptions"
+      :options="matrixSizeOptions"
       :disabled="isCalibrating"
     />
     
     <!-- 创建一个输入控件包装点位偏移 -->
-    <div class="z-axis-selector-like">
+    <div class="dropdown-selector-like">
       <div class="control-item side-by-side">
         <label for="point-offset" style="min-width: 80px;">点位偏移:</label>
         <div class="position-display-container">
@@ -34,7 +34,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useCalibrationStore } from '../../stores/calibration';
-import ZAxisSelector from '../FocusPanel/ZAxisSelector.vue';
+import SelectDropdown from '../common/SelectDropdown.vue';
 
 const props = defineProps({
   isCalibrating: {
@@ -67,25 +67,25 @@ const pointOffset = computed({
 </script>
 
 <style scoped>
-/* 为点位偏移添加ZAxisSelector样式 */
-.z-axis-selector-like {
+/* 为点位偏移添加下拉组件样式 */
+.dropdown-selector-like {
   margin-bottom: 8px;
   margin-top: 8px;
 }
-.z-axis-selector-like .control-item.side-by-side label {
+.dropdown-selector-like .control-item.side-by-side label {
   min-width: 80px;
   flex-shrink: 0;
   margin-bottom: 0;
   text-align: left;
   white-space: nowrap;
 }
-.z-axis-selector-like .position-display-container {
+.dropdown-selector-like .position-display-container {
   position: relative;
   display: flex;
   align-items: center;
   flex: 1;
 }
-.z-axis-selector-like .compact-input {
+.dropdown-selector-like .compact-input {
   margin-left: 0;
   width: 65px;
   height: 28px;

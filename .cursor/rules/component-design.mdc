@@ -38,19 +38,141 @@ alwaysApply: false
 - 单位显示应位于输入框内右侧
 
 ### 下拉选择框
-- 下拉框应使用`.compact-select`类
+- 下拉框应使用`.compact-select`类或`.custom-select`类
 - 下拉框应包含在`.position-display-container`容器内以保持与输入框宽度一致
 - 下拉框不应有左边距（`margin-left: 0`）
+- 项目中推荐使用`SelectDropdown`组件或`SelectControl`组件实现下拉功能，根据布局需求选择合适的组件
 
 ## 布局规范
 
 ### 控制面板项
 - 使用`.control-item.side-by-side`类实现标签和控件的水平排列
-- 标签宽度统一为80px
-- 控件应占据剩余空间
+- 标据剩余空间
 
 ### 示例参考
-参考[FocusControl.vue](mdc:src/components/ControlPanel/FocusControl.vue)中的实现作为标准示例。
+参考[FocusControl.vue](mdc:src/components/FocusPanel/FocusControl.vue)中的实现作为标准示例。
+
+## 下拉选择控件 (SelectDropdown)
+
+`SelectDropdown.vue` 是项目中统一的下拉选择框组件，用于创建具有标准布局和样式的下拉菜单。它替代了原有的特定用途组件（如 `ZAxisSelector.vue`），提供了更通用的下拉选择实现。此组件包含在标准布局容器中（使用`control-item side-by-side`类），适合表单布局。
+
+### 文件位置
+[SelectDropdown.vue](mdc:src/components/common/SelectDropdown.vue)
+
+### Props
+- `modelValue`: (String | Number, required) 绑定的选中值，用于 v-model。
+- `options`: (Array, required) 选项列表，每个选项是一个对象，必须包含 `id` 和 `name` 字段，例如 `{ id: 'opt1', name: '选项1' }`。
+- `selectId`: (String, default: 'dropdown-select') 下拉框的 ID 属性，用于标签关联。
+- `label`: (String, required) 显示的标签文本。
+- `placeholder`: (String, default: '') 可选的占位符文本，当未选择值时显示。
+- `disabled`: (Boolean) 是否禁用下拉框。
+
+### 结构
+```html
+<div class="control-item side-by-side">
+  <label :for="selectId">{{ label }}:</label>
+  <div class="position-display-container">
+    <select class="compact-select" ...>
+      <option v-if="placeholder" value="">{{ placeholder }}</option>
+      <option v-for="option in options" :key="option.id" :value="option.id">
+        {{ option.name }}
+      </option>
+    </select>
+  </div>
+</div>
+```
+
+### 样式特点
+- 包含在 `.control-item.side-by-side` 容器内，保持与其他表单控件的布局一致
+- 标签固定宽度为 80px，便于对齐
+- 下拉框容器使用 `.position-display-container` 包装，占据剩余宽度
+- 下拉框本身使用 `.compact-select` 类，具有右侧下拉箭头
+- 重要：覆盖了全局样式中的 `margin-left: 8px` 以确保对齐一致
+
+### 使用示例
+```html
+<SelectDropdown
+  label="选择项目"
+  v-model="selectedItemId"
+  :options="itemOptions"
+  selectId="item-select"
+  placeholder="请选择"
+/>
+```
+
+其中 `itemOptions` 格式为:
+```js
+[
+  { id: '1', name: '选项1' },
+  { id: '2', name: '选项2' },
+  // ...
+]
+```
+
+### 注意事项
+- 对于已存在的 `ZAxisSelector` 组件，请考虑迁移到 `SelectDropdown` 组件
+- 选项对象的属性应使用 `{ id, name }` 格式
+- 组件内部应处理全局样式冲突问题，确保下拉框与其他表单元素对齐一致
+
+## 下拉选择控件 (SelectControl)
+
+`SelectControl.vue` 是项目中的独立下拉选择框组件，相比 `SelectDropdown` 更加轻量，不包含标准表单布局容器，适用于需要自定义布局的场景。
+
+### 文件位置
+[SelectControl.vue](mdc:src/components/common/SelectControl.vue)
+
+### Props
+- `modelValue`: (String | Number | Boolean | Object, required) 绑定的选中值。
+- `options`: (Array, required) 选项列表，每个选项是一个对象，必须包含 `value` 和 `label` 字段，例如 `{ value: 'opt1', label: '选项1' }`。
+- `placeholder`: (String, default: '请选择') 可选的占位符文本。
+- `disabled`: (Boolean, default: false) 是否禁用下拉框。
+
+### 结构
+```html
+<div class="select-control">
+  <select 
+    :value="modelValue" 
+    @change="$emit('update:modelValue', $event.target.value)"
+    :disabled="disabled"
+    class="custom-select"
+  >
+    <option v-if="placeholder" value="">{{ placeholder }}</option>
+    <option 
+      v-for="option in options" 
+      :key="option.value" 
+      :value="option.value"
+    >
+      {{ option.label }}
+    </option>
+  </select>
+</div>
+```
+
+### 样式特点
+- 整体外观类似标准输入框，以便与其他表单元素对齐
+- 使用 `.custom-select` 类，而非 `.compact-select`
+- 自定义下拉箭头使用CSS背景图像实现
+- 高度固定为32px，与其他控件保持一致
+- 宽度默认为100%，可自适应父容器
+
+### 使用示例
+```html
+<SelectControl 
+  v-model="selectedOption"
+  :options="[{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]"
+  placeholder="选择一个字母"
+/>
+```
+
+### 何时使用SelectControl vs SelectDropdown
+- 使用`SelectControl`：
+  - 需要自定义布局
+  - 不需要带标签的标准表单行布局
+  - 选项格式为`{value, label}`
+- 使用`SelectDropdown`：
+  - 需要标准的表单行布局
+  - 需要与其他表单控件保持一致的外观
+  - 选项格式为`{id, name}`
 
 ## 按钮组件规范 (ActionButton)
 
@@ -171,13 +293,11 @@ alwaysApply: false
 - `modelValue`: (Number, required) 绑定的数值。
 - `label`: (String, default: '') 可选的标签。
 - `unit`: (String, default: '') 数值的单位。
-- `min`: (Number, default: -Infinity) 最小值。
-- `max`: (Number, default: Infinity) 最大值。
+default: -Infinity) 最小值。
+- `max`: (Number, defau。
 - `step`: (Number, default: 1) 调整的步长。
 - `readonly`: (Boolean, default: false) 输入框是否只读。
-- `showButtons`: (Boolean, default: true) 是否显示增减按钮。
-
-### 样式与行为
+- `showButtons`: (Boolean, default: true) 是## 样式与行为
 - 如果提供了 `label`，会使用 `LabeledInputRow` 进行布局。
 - 包含一个显示当前值的输入框，右侧可显示单位。
 - 如果 `showButtons` 为 true，输入框两侧会显示增减按钮。
@@ -220,69 +340,48 @@ alwaysApply: false
 />
 ```
 
-## 下拉选择控件 (SelectControl)
-
-`SelectControl.vue` 用于创建下拉选择菜单。
-
-### Props
-- `modelValue`: (any, required) 绑定的选中值。
-- `options`: (Array, required) 选项列表，每个选项是一个对象，至少包含 `value` 和 `label` 字段，例如 `{ value: 'opt1', label: '选项1' }`。
-- `placeholder`: (String, default: '请选择') 占位符文本。
-- `disabled`: (Boolean, default: false) 是否禁用。
-
-### 样式
-- 整体外观类似标准输入框，以便与其他表单元素对齐。
-- 右侧带有下拉箭头。
-
-### 使用
-```html
-<SelectControl 
-  v-model="selectedOption"
-  :options="[{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]"
-  placeholder="选择一个字母"
-/>
-```
-
 ## 组件样式覆盖与对齐问题案例 (`ZAxisSelector.vue`)
 
 ### 问题描述
-在将 "Z轴选择" 功能从 `FocusControl.vue` 抽离为独立的 `ZAxisSelector.vue` ([ZAxisSelector.vue](mdc:src/components/ControlPanel/ZAxisSelector.vue)) 组件后，出现了该组件的标签（“Z轴选择:”）与其在 `FocusControl.vue` ([FocusControl.vue](mdc:src/components/ControlPanel/FocusControl.vue)) 中的同级表单行（如“Z轴位置:”、“Z轴速度:”等）左侧对齐不一致的问题。具体表现为 `ZAxisSelector.vue` 组件看起来比其他行要窄一些，导致视觉上的缩进。
+在将 "Z轴选择" 功能从 `FocusControl.vue` 抽离为独立的 `ZAxisSelector.vue` ([ZAxisSelector.vue](mdc:src/components/FocusPanel/ZAxisSelector.vue)) 组件后，出现了该组件的标签（"Z轴选择:"）与其在 `FocusControl.vue` ([FocusControl.vue](mdc:src/components/FocusPanel/FocusControl.vue)) 中的同级表单行（如"Z轴位置:"、"Z轴速度:"等）左侧对齐不一致的问题。具体表现为 `ZAxisSelector.vue` 组件看起来比其他行要窄一些，导致视觉上的缩进。
 
 ### 原因分析
 经过排查，发现根本原因在于全局样式表 `styles.css` ([styles.css](mdc:src/assets/styles.css)) 中为 `.compact-select` 类定义了 `margin-left: 8px;`。当 `ZAxisSelector.vue` 组件内部的 `<select>` 元素应用了这个类时，这个左边距导致了其在父容器 `div.position-display-container` 内的偏移。
 
-原先在 `FocusControl.vue` 中，存在一个 scoped CSS 规则：
+在 `FocusControl.vue` 中，有以下覆盖规则：
 ```css
-/* FocusControl.vue <style scoped> */
 .position-display-container .compact-select {
   margin-left: 0;
 }
 ```
+
 这条规则有效地抵消了全局样式的 `margin-left`。但当相关HTML结构被移入 `ZAxisSelector.vue` 后，由于Vue的样式作用域机制，这条位于 `FocusControl.vue` 中的 scoped 规则不再对 `ZAxisSelector.vue` 内部的元素生效。
 
-### 解决方案
 为了解决这个问题，并在 `ZAxisSelector.vue` 组件内部保持正确的对齐，我们在 `ZAxisSelector.vue` 的 `<style scoped>` 中添加了针对 `.compact-select` 的样式覆盖规则：
 
-```vue
-<!-- src/components/ControlPanel/ZAxisSelector.vue -->
-// ... template and script ...
+```css
+<!-- src/components/FocusPanel/ZAxisSelector.vue -->
 <style scoped>
-/* ... other styles for label and .position-display-container ... */
-
 /* This rule is crucial to override the global margin-left: 8px on .compact-select */
 .compact-select {
   margin-left: 0;
 }
 </style>
 ```
+
 通过这个 scoped 样式，我们确保了 `ZAxisSelector.vue` 组件内部的 `.compact-select` 不会受到全局 `margin-left` 的影响，从而恢复了与其他表单行的正确对齐。
 
-### 结论与建议
-在将通用UI模式或重复的HTML结构封装成独立组件时，需要特别注意：
-1.  **全局样式的潜在影响**：全局CSS类（如本例中的 `.compact-select`）可能会对组件内部元素的布局和外观产生非预期的副作用。
-2.  **Scoped CSS 的局限性**：父组件的 scoped CSS 规则通常不会穿透到子组件的内部元素（除非使用了 `:deep()` 或类似机制，但这应谨慎使用）。
-3.  **组件内部样式调整**：当遇到对齐或样式不一致问题时，应首先检查组件自身的 props、插槽内容以及其内部的 scoped CSS。如此例所示，通过在组件的 scoped CSS 中精确覆盖或调整特定全局类的样式，是解决此类问题的有效方法。
-4.  **保持一致性**：在进行此类修复时，应参考原始上下文中（如此例中的 `FocusControl.vue`）是如何处理这些样式问题的，以确保新组件的行为和外观与预期一致。
+这个案例提醒我们：
+1. **全局样式的潜在影响**：全局CSS类（如本例中的 `.compact-select`）可能会对组件内部元素的布局和外观产生非预期的副作用。
+2. **组件抽取时的样式问题**：从一个大组件中抽取小组件时，需要确保所有必要的样式覆盖也一同迁移。
+3. **样式作用域的理解**：Vue的scoped样式仅对当前组件有效，不会影响子组件，因此在组件重构时需要注意样式隔离问题。
+
+当创建新的下拉组件时，应确保添加以下样式覆盖：
+```css
+.compact-select {
+  margin-left: 0;
+}
+```
 
 
 

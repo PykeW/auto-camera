@@ -2,15 +2,15 @@
 <template>
   <div>
     <!-- Mark点方式选择和参数 -->
-    <div class="control-item side-by-side" v-if="hasAxes" style="margin-top: 8px;">
-      <label for="mark-method">Mark点方式:</label>
-      <select id="mark-method" class="compact-select" v-model="calibrationStore.markMethod" @change="onMarkMethodChange">
-        <option value="template">模板匹配</option>
-        <option value="contourExtraction">轮廓提取</option>
-        <!-- <option value="circle">圆形检测</option> -->
-        <!-- <option value="cross">十字检测</option> -->
-      </select>
-    </div>
+    <SelectDropdown
+      label="Mark点方式"
+      selectId="mark-method"
+      :modelValue="calibrationStore.markMethod"
+      @update:modelValue="onMarkMethodChange"
+      :options="markMethodOptions"
+      v-if="hasAxes"
+      style="margin-top: 8px;"
+    />
 
     <!-- Parameters for Template Matching -->
     <div v-if="calibrationStore.markMethod === 'template' && hasAxes" class="parameters-group control-group">
@@ -61,6 +61,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useCalibrationStore } from '../../stores/calibration';
 import { useRoiStore } from '../../stores/roi';
 import { showMessage } from '../../utils/helpers';
+import SelectDropdown from '../common/SelectDropdown.vue';
 
 const props = defineProps({
   assignedX: {
@@ -100,6 +101,14 @@ const contourExtractionParams = ref({
   minArea: 100,
   maxArea: 1000,
 });
+
+// Mark点方法选项
+const markMethodOptions = [
+  { id: 'template', name: '模板匹配' },
+  { id: 'contourExtraction', name: '轮廓提取' },
+  // { id: 'circle', name: '圆形检测' },
+  // { id: 'cross', name: '十字检测' },
+];
 
 // 组件挂载后初始化函数
 onMounted(() => {
@@ -168,8 +177,8 @@ watch(() => roiStore.capturedTemplateDataUrl, (newDataUrl) => {
 }, { immediate: true });
 
 // Mark点方式变更处理
-function onMarkMethodChange(e) {
-  calibrationStore.setMarkMethod(e.target.value);
+function onMarkMethodChange(value) {
+  calibrationStore.setMarkMethod(value);
 }
 
 // 截取模板ROI

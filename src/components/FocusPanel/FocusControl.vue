@@ -4,10 +4,10 @@
       <hr class="separator">
       <h4>Z轴控制 / 对焦</h4>
       <div class="focus-section-container">
-        <ZAxisSelector 
+        <SelectDropdown 
           label="对焦轴选择" 
           v-model="selectedFocusAxisId" 
-          :axes="availableFocusAxes" 
+          :options="availableFocusAxes" 
           selectId="focus-axis-select" 
           placeholder="请选择"
         />
@@ -129,7 +129,7 @@
     isAxisLimitReached, 
     adjustValuesByUnit 
   } from '../../utils/inputHelpers';
-  import ZAxisSelector from './ZAxisSelector.vue';
+  import SelectDropdown from '../common/SelectDropdown.vue';
   import ROIControl from '../CameraPanel/ROIControl.vue';
   import ValueInputControl from '../common/ValueInputControl.vue';
   import ActionButton from '../ui/ActionButton.vue';

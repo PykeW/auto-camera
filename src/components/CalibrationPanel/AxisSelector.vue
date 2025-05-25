@@ -3,30 +3,30 @@
   <div class="axis-control-section">
     <!-- 轴选择区域 - 一行显示 -->
     <div class="axes-selection-row">
-      <ZAxisSelector
+      <SelectDropdown
         label="X轴选择"
         selectId="x-axis-select"
         :modelValue="assignedX"
         @update:modelValue="val => handleAxisSelection('x', val)"
-        :axes="availableXAxes"
+        :options="availableXAxes"
         :disabled="isCalibrating"
         placeholder="请选择"
       />
-      <ZAxisSelector
+      <SelectDropdown
         label="Y轴选择"
         selectId="y-axis-select"
         :modelValue="assignedY"
         @update:modelValue="val => handleAxisSelection('y', val)"
-        :axes="availableYAxes"
+        :options="availableYAxes"
         :disabled="isCalibrating"
         placeholder="请选择"
       />
-      <ZAxisSelector
+      <SelectDropdown
         label="U轴选择"
         selectId="u-axis-select"
         :modelValue="assignedU"
         @update:modelValue="val => handleAxisSelection('u', val)"
-        :axes="availableUAxes"
+        :options="availableUAxes"
         :disabled="isCalibrating"
         placeholder="无"
       />
@@ -38,7 +38,7 @@
 import { computed } from 'vue';
 import { useAxisStore } from '../../stores/axis';
 import { showMessage } from '../../utils/helpers';
-import ZAxisSelector from '../FocusPanel/ZAxisSelector.vue';
+import SelectDropdown from '../common/SelectDropdown.vue';
 
 const props = defineProps({
   isCalibrating: {
