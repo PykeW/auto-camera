@@ -65,6 +65,13 @@ export const useCalibrationStore = defineStore('calibration', () => {
     threshold: 0.7,
   });
   
+  // 添加contourExtractionParams
+  const contourExtractionParams = ref({
+    binaryThreshold: 127,
+    minArea: 100,
+    maxArea: 1000
+  });
+  
   // 标定进度百分比
   const calibrationProgress = computed(() => {
     if (totalPoints.value === 0) return 0;
@@ -188,6 +195,117 @@ export const useCalibrationStore = defineStore('calibration', () => {
     }
   }
   
+  // 使用轮廓提取检测Mark点
+  async function detectMarkWithContourExtraction({ binaryThreshold, minArea, maxArea, imageToSearch = null }) {
+    const cameraStore = useCameraStore();
+    const roiStore = useRoiStore();
+
+    if (!cameraStore.isConnected && !(selectedAxes.value.includes('X') && selectedAxes.value.includes('Y')) && !imageToSearch) {
+      console.warn('Camera not connected and not in static image mode for contour extraction.');
+      return false;
+    }
+
+    console.log('开始轮廓提取检测 - 参数:', { binaryThreshold, minArea, maxArea });
+    
+    clearTemplateMatchingResults(); // 复用这个方法清除上一次的结果
+
+    // 如果提供了指定的图片来搜索，则使用它
+    let currentImageSrc = imageToSearch || cameraStore.cameraImageUrl;
+    
+    // 如果没有提供图片且在标定模式，使用当前标定图片
+    if (!currentImageSrc && isCalibrating.value && currentCalibrationImageUrl.value) {
+      currentImageSrc = currentCalibrationImageUrl.value;
+    }
+    // 否则，如果X和Y轴被选中，使用静态9点图像
+    else if (!currentImageSrc && selectedAxes.value.includes('X') && selectedAxes.value.includes('Y')) {
+      currentImageSrc = '/9dian/12_161833.png'; 
+    }
+
+    if (!currentImageSrc) {
+      console.error('Current image source is not available for contour extraction.');
+      return false;
+    }
+
+    console.log(`Starting contour extraction on ${currentImageSrc}. Binary threshold: ${binaryThreshold}. Area range: ${minArea}-${maxArea}. ROI enabled: ${roiStore.roiEnabled}`);
+    
+    // 使用roiStore中的ROI（如果启用），否则搜索整个图像
+    const searchRoi = roiStore.roiEnabled ? roiStore.roiCoords : null;
+    
+    try {
+      // 这里暂时模拟检测结果，实际项目中可以调用实际的轮廓检测函数
+      // 模拟一个随机的轮廓检测结果
+      await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 300)); // 模拟处理延迟
+      
+      // 简单模拟，使用与模板匹配相似的结果
+      if (currentImageSrc.includes('9dian')) {
+        // 提取文件名中的数字
+        const match = currentImageSrc.match(/12_1618(\d+)\.png$/);
+        if (match) {
+          const imageNumber = match[1];
+          // 根据图片编号分配固定坐标（显示坐标，已适应640x480的显示尺寸）
+          const coordinates = {
+            '25': { x: 160, y: 120 },  // 左上
+            '27': { x: 320, y: 120 },  // 上中
+            '29': { x: 480, y: 120 },  // 右上
+            '31': { x: 160, y: 240 },  // 左中
+            '33': { x: 320, y: 240 },  // 中心
+            '35': { x: 480, y: 240 },  // 右中
+            '37': { x: 160, y: 360 },  // 左下
+            '39': { x: 315, y: 358 },  // 下中
+            '41': { x: 480, y: 360 }   // 右下
+          };
+          
+          const centerPoint = coordinates[imageNumber] || { x: 320, y: 240 };
+          const contourSize = 50; // 假设轮廓大小
+          const offsetX = Math.random() * 6 - 3; // 小偏移
+          const offsetY = Math.random() * 6 - 3;
+          
+          const contourResult = {
+            x: Math.round(centerPoint.x + offsetX),
+            y: Math.round(centerPoint.y + offsetY),
+            area: minArea + Math.random() * (maxArea - minArea), // 随机面积
+            rect: {
+              x: Math.round(centerPoint.x - contourSize/2 + offsetX),
+              y: Math.round(centerPoint.y - contourSize/2 + offsetY),
+              width: contourSize,
+              height: contourSize
+            }
+          };
+          
+          markDetected.value = true;
+          detectedTemplatedMarks.value = [{
+            x: contourResult.x,
+            y: contourResult.y,
+            score: 0.85 + Math.random() * 0.15, // 模拟一个匹配分数
+            rect: contourResult.rect,
+            area: contourResult.area
+          }];
+          
+          markPoints.value = [{
+            x: contourResult.x,
+            y: contourResult.y,
+            confidence: 0.9,
+            rect: contourResult.rect,
+            area: contourResult.area
+          }];
+          
+          console.log('Contour extraction successful, marks found:', detectedTemplatedMarks.value);
+          return true;
+        }
+      }
+      
+      // 如果不是9点图片或提取失败
+      markDetected.value = false;
+      console.log('No marks found with contour extraction.');
+      return false;
+      
+    } catch (error) {
+      console.error('Error during contour extraction detection:', error);
+      markDetected.value = false;
+      return false;
+    }
+  }
+  
   // 加载9点图像
   async function loadNinePointImages() {
     // 预加载所有图片到浏览器缓存
@@ -207,47 +325,35 @@ export const useCalibrationStore = defineStore('calibration', () => {
     });
   }
   
-  // 检测Mark点 (this is the generic one, might need to be adjusted or called by specific methods)
+  // 检测Mark点 - 根据当前选择的方法调用相应的检测函数
   async function detectMarkPoint() {
     if (markMethod.value === 'template') {
-      // This case should ideally be handled by UI calling detectMarkWithTemplate直接
-      // Or, this function needs parameters for template matching.
-      // For now, let's assume the main "Detect Mark Point" button might not have template params directly.
-      console.warn('Generic detectMarkPoint called for template method. Ensure params are available or use specific detection function.');
-      // Perhaps call detectMarkWithTemplateMatching with stored/default params if appropriate?
-      // For now, it will just do its old simulation if not handled by a more specific call.
-      // Fallback to old simulation if not called with specific template params:
-      const cameraStore = useCameraStore();
-      if (!cameraStore.isConnected) return false;
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const centerX = 320;
-      const centerY = 240;
-      const offsetX = Math.floor(Math.random() * 200 - 100);
-      const offsetY = Math.floor(Math.random() * 200 - 100);
-      const markX = centerX + offsetX;
-      const markY = centerY + offsetY;
-      const confidence = 0.85 + Math.random() * 0.14;
-      markDetected.value = true;
-      markPoints.value = [{
-        x: markX,
-        y: markY,
-        confidence: confidence
-      }];
-      return true;
-    } else if (markMethod.value === 'contourExtraction') {
-      // TODO: Implement contour extraction detection logic
-      console.log('Contour extraction detection to be implemented.');
-      // Simulate for now
-      markDetected.value = Math.random() > 0.5;
-      if(markDetected.value) {
-        markPoints.value = [{ x: 300 + Math.random()*40, y: 220 + Math.random()*40, confidence: Math.random()*0.3 + 0.6 }];
-      } else {
-        markPoints.value = [];
+      // Template matching
+      if (!templateMatchingParams.value || !templateMatchingParams.value.templateImageSrc) {
+        console.warn('Template not available for template matching.');
+        return false;
       }
-      return markDetected.value;
+      return await detectMarkWithTemplateMatching({
+        templateImageSrc: templateMatchingParams.value.templateImageSrc,
+        threshold: templateMatchingParams.value.threshold
+      });
+    } 
+    else if (markMethod.value === 'contourExtraction') {
+      // Contour extraction
+      if (!contourExtractionParams.value) {
+        console.warn('Contour extraction parameters not available.');
+        return false;
+      }
+      return await detectMarkWithContourExtraction({
+        binaryThreshold: contourExtractionParams.value.binaryThreshold,
+        minArea: contourExtractionParams.value.minArea,
+        maxArea: contourExtractionParams.value.maxArea
+      });
+    } 
+    else {
+      console.warn(`Mark method '${markMethod.value}' not implemented yet.`);
+      return false;
     }
-    // ... other detection methods
-    return false;
   }
   
   // 居中Mark点
@@ -578,6 +684,24 @@ export const useCalibrationStore = defineStore('calibration', () => {
     return [];
   }
 
+  // 设置当前标定图片索引
+  function setCurrentCalibrationImageIndex(index) {
+    // 确保索引在有效范围内
+    if (index < -1) {
+      index = -1;
+    } else if (allCalibrationImages.value.length > 0 && index >= allCalibrationImages.value.length) {
+      index = allCalibrationImages.value.length - 1;
+    }
+    
+    currentCalibrationImageIndex.value = index;
+    console.log(`[calibrationStore] 设置当前标定图片索引: ${index}`);
+    
+    // 如果索引有效，更新当前图片URL
+    if (index >= 0 && index < ninePointImages.length) {
+      currentCalibrationImageUrl.value = ninePointImages[index];
+    }
+  }
+
   return {
     isShowingCalibration,
     calibrationResult,
@@ -598,20 +722,20 @@ export const useCalibrationStore = defineStore('calibration', () => {
     squareSize,
     markMethod,
     markPreviewImg,
-    detectedTemplatedMarks, // expose new state
-    currentCalibrationImageIndex, // 新增：当前标定图片索引
-    currentCalibrationImageUrl, // 新增：当前标定图片URL
-    allCalibrationImages, // 新增：存储所有9张图片的匹配结果
-    ninePointImages, // 新增：9点图片数组
-    templateMatchingParams, // 模板匹配参数
+    detectedTemplatedMarks,
+    currentCalibrationImageIndex,
+    currentCalibrationImageUrl,
+    allCalibrationImages,
+    ninePointImages,
+    templateMatchingParams,
     calibrationProgress,
     setSelectedAxes,
     setAxisMapping,
     toggleCalibrationView,
     calibrateRatio,
-    detectMarkPoint, // Generic detection
-    detectMarkWithTemplateMatching, // Specific for template matching
-    clearTemplateMatchingResults, // Expose new action
+    detectMarkPoint,
+    detectMarkWithTemplateMatching,
+    clearTemplateMatchingResults,
     centerMarkPoint,
     startCalibration,
     stopCalibration,
@@ -621,8 +745,11 @@ export const useCalibrationStore = defineStore('calibration', () => {
     goToNextPoint,
     saveCalibrationResult,
     getCalibrationTableData,
-    loadNinePointImages, // 新增：加载9点图片方法
-    resetCalibration, // 新增：重置标定结果
-    setMarkPreviewImgPath, // Expose the new action
+    loadNinePointImages,
+    resetCalibration,
+    setMarkPreviewImgPath,
+    contourExtractionParams,
+    detectMarkWithContourExtraction,
+    setCurrentCalibrationImageIndex
   };
 });

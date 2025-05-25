@@ -84,20 +84,42 @@ export const useRoiStore = defineStore('roi', () => {
       const height = roiCoords.value.b - roiCoords.value.t;
       
       // 如果宽度或高度无效，不允许确认或恢复到最后有效值
-      if (width <= 0 || height <= 0) {
-        console.warn('无效的ROI尺寸，宽度或高度为0，尝试恢复有效值');
+      if (width <= 1 || height <= 1) { // 增加阈值，避免非常小的ROI
+        console.warn('无效的ROI尺寸，宽度或高度过小:', {width, height});
         
-        // 如果有最后有效值，则恢复
-        if (lastValidRoiCoords.value) {
-          roiCoords.value = {...lastValidRoiCoords.value};
-          console.log('已恢复到最后有效的ROI坐标');
+        // 尝试修复无效的坐标（如果差值小于等于1，可能是舍入误差导致）
+        if (width <= 1 && width > 0) roiCoords.value.r = roiCoords.value.l + 10;
+        if (height <= 1 && height > 0) roiCoords.value.b = roiCoords.value.t + 10;
+        
+        // 再次检查修复后的尺寸
+        const fixedWidth = roiCoords.value.r - roiCoords.value.l;
+        const fixedHeight = roiCoords.value.b - roiCoords.value.t;
+        
+        if (fixedWidth <= 1 || fixedHeight <= 1) {
+          // 如果仍无效，尝试恢复到最后有效值
+          if (lastValidRoiCoords.value) {
+            roiCoords.value = {...lastValidRoiCoords.value};
+            console.log('已恢复到最后有效的ROI坐标:', lastValidRoiCoords.value);
+          } else {
+            // 如果没有有效值可恢复，则设置一个默认的有效ROI
+            roiCoords.value = { l: 150, t: 100, r: 450, b: 400 };
+            console.log('没有可恢复的有效坐标，使用默认ROI坐标');
+          }
         } else {
-          console.warn('无法确认ROI：尺寸无效且没有可恢复的有效坐标');
-          return false;
+          console.log('ROI尺寸已修复:', {width: fixedWidth, height: fixedHeight});
         }
-      } else {
+      } 
+      
+      // 最终检查修正后的ROI是否有效
+      const finalWidth = roiCoords.value.r - roiCoords.value.l;
+      const finalHeight = roiCoords.value.b - roiCoords.value.t;
+      if (finalWidth > 1 && finalHeight > 1) {
         // 保存当前有效坐标作为最后有效值
         lastValidRoiCoords.value = {...roiCoords.value};
+        console.log('保存当前有效ROI坐标:', lastValidRoiCoords.value);
+      } else {
+        console.error('无法确认ROI：经过修复后的尺寸仍然无效');
+        return false;
       }
     } else {
       console.warn('无法确认ROI：坐标不存在');

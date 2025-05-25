@@ -24,23 +24,92 @@
         style="margin-top: 8px;"
         class="normal-font-heading"
       />
-      <div v-if="calibrationStore.markMethod === 'template' && templateMatchingParams.templateImage" class="control-item side-by-side template-preview-container">
-        <label>模板预览:</label>
-        <img :src="templateMatchingParams.templateImage" alt="模板预览" class="template-preview-img">
+      
+      <!-- 添加匹配阈值控件 -->
+      <div v-if="calibrationStore.markMethod === 'template'" class="dropdown-selector-like">
+        <div class="control-item side-by-side">
+          <label for="match-threshold" style="min-width: 80px;">匹配阈值:</label>
+          <div class="position-display-container">
+            <input 
+              type="number" 
+              id="match-threshold" 
+              class="compact-input" 
+              v-model="templateMatchingParams.threshold" 
+              min="0" 
+              max="1" 
+              step="0.01"
+              @wheel.prevent="handleWheel($event, templateMatchingParams, 'threshold', 0.01, 0, 1)"
+            >
+            <span class="unit-display"></span>
+          </div>
+        </div>
       </div>
 
-      <!-- Parameters for Contour Extraction -->
-      <div v-if="calibrationStore.markMethod === 'contourExtraction'" class="parameters-group control-group">
-        <h5 class="parameters-title">轮廓提取参数</h5>
+      <!-- 轮廓提取参数控件 -->
+      <div v-if="calibrationStore.markMethod === 'contourExtraction'" class="dropdown-selector-like">
         <div class="control-item side-by-side">
-          <label for="contour-min-area">最小面积:</label>
-          <input type="number" id="contour-min-area" class="compact-input" v-model="contourExtractionParams.minArea">
+          <label for="binary-threshold" style="min-width: 80px;">二值阈值:</label>
+          <div class="position-display-container">
+            <input 
+              type="number" 
+              id="binary-threshold" 
+              class="compact-input" 
+              v-model="contourExtractionParams.binaryThreshold" 
+              min="0" 
+              max="255" 
+              step="1"
+              @wheel.prevent="handleWheel($event, contourExtractionParams, 'binaryThreshold', 1, 0, 255)"
+              @focus="showBinaryPreview = true; updateBinaryPreview()"
+            >
+            <button 
+              class="preview-toggle-button" 
+              @click="toggleBinaryPreview"
+              :class="{ active: showBinaryPreview }"
+              title="预览二值化效果"
+            >
+              <i :class="[showBinaryPreview ? 'fas fa-eye-slash' : 'fas fa-eye']"></i>
+            </button>
+            <span class="unit-display"></span>
+          </div>
         </div>
+        
+        <!-- 二值化预览区域 -->
+        <div 
+          v-if="showBinaryPreview" 
+          class="binary-preview-container"
+        >
+          <div class="binary-image-container">
+            <canvas ref="binaryPreviewCanvas" class="binary-canvas"></canvas>
+            <div v-if="isBinaryProcessing" class="processing-indicator">
+              <span>处理中...</span>
+            </div>
+          </div>
+        </div>
+
         <div class="control-item side-by-side">
-          <label for="contour-max-area">最大面积:</label>
-          <input type="number" id="contour-max-area" class="compact-input" v-model="contourExtractionParams.maxArea">
+          <label for="area-range" style="min-width: 80px;">面积范围:</label>
+          <div class="position-display-container" style="display: flex; gap: 8px;">
+            <input 
+              type="number" 
+              id="contour-min-area" 
+              class="compact-input" 
+              v-model="contourExtractionParams.minArea"
+              placeholder="最小"
+              min="0"
+              @wheel.prevent="handleWheel($event, contourExtractionParams, 'minArea', 10, 0)"
+            >
+            <span style="color: #888;">-</span>
+            <input 
+              type="number" 
+              id="contour-max-area" 
+              class="compact-input" 
+              v-model="contourExtractionParams.maxArea"
+              placeholder="最大"
+              min="0"
+              @wheel.prevent="handleWheel($event, contourExtractionParams, 'maxArea', 10, 0)"
+            >
+          </div>
         </div>
-        <!-- Add detect button for contour if needed -->
       </div>
     </div>
   </div>
@@ -50,6 +119,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useCalibrationStore } from '../../stores/calibration';
 import { useRoiStore } from '../../stores/roi';
+import { useCameraStore } from '../../stores/camera';
 import { showMessage } from '../../utils/helpers';
 import SelectDropdown from '../common/SelectDropdown.vue';
 import RoiControlHeader from '../common/RoiControlHeader.vue';
@@ -71,6 +141,7 @@ const props = defineProps({
 
 const calibrationStore = useCalibrationStore();
 const roiStore = useRoiStore();
+const cameraStore = useCameraStore();
 
 // 计算是否有必要的轴
 const hasAxes = computed(() => props.assignedX && props.assignedY);
@@ -84,6 +155,7 @@ const templateMatchingParams = ref({
 const contourExtractionParams = ref({
   minArea: 100,
   maxArea: 1000,
+  binaryThreshold: 127,
 });
 
 // Mark点方法选项
@@ -93,6 +165,27 @@ const markMethodOptions = [
   // { id: 'circle', name: '圆形检测' },
   // { id: 'cross', name: '十字检测' },
 ];
+
+// 鼠标滚轮调整数值功能
+function handleWheel(event, obj, prop, step = 1, min = null, max = null) {
+  // 确保元素具有焦点
+  if (document.activeElement !== event.target) return;
+  
+  // 根据滚轮方向调整值
+  const delta = event.deltaY > 0 ? -1 : 1;
+  const currentValue = parseFloat(obj[prop]);
+  let newValue = currentValue + (delta * step);
+  
+  // 应用最小值/最大值限制
+  if (min !== null && newValue < min) newValue = min;
+  if (max !== null && newValue > max) newValue = max;
+  
+  // 更新数值
+  obj[prop] = newValue;
+  
+  // 防止页面滚动
+  event.preventDefault();
+}
 
 // 组件挂载后初始化函数
 onMounted(() => {
@@ -160,6 +253,22 @@ watch(() => roiStore.capturedTemplateDataUrl, (newDataUrl) => {
   }
 }, { immediate: true });
 
+// 监视匹配阈值的变化并同步到calibrationStore
+watch(() => templateMatchingParams.value.threshold, (newThreshold) => {
+  if (calibrationStore.templateMatchingParams) {
+    console.log('同步匹配阈值到calibrationStore:', newThreshold);
+    calibrationStore.templateMatchingParams.threshold = newThreshold;
+  }
+});
+
+// 监视轮廓提取参数的变化并同步到calibrationStore
+watch(() => contourExtractionParams.value, (newParams) => {
+  console.log('同步轮廓提取参数到calibrationStore:', newParams);
+  calibrationStore.contourExtractionParams.binaryThreshold = newParams.binaryThreshold;
+  calibrationStore.contourExtractionParams.minArea = newParams.minArea;
+  calibrationStore.contourExtractionParams.maxArea = newParams.maxArea;
+}, { deep: true });
+
 // Mark点方式变更处理
 function onMarkMethodChange(value) {
   calibrationStore.setMarkMethod(value);
@@ -196,6 +305,149 @@ defineExpose({
   templateMatchingParams,
   contourExtractionParams
 });
+
+// 新增
+// 二值化图像预览相关
+const binaryPreviewCanvas = ref(null);
+const showBinaryPreview = ref(false);
+const isBinaryProcessing = ref(false);
+const lastPreviewTimeout = ref(null);
+
+// 更新二值化预览函数
+async function updateBinaryPreview() {
+  if (!binaryPreviewCanvas.value) return;
+  
+  isBinaryProcessing.value = true;
+  
+  try {
+    // 获取当前图像
+    let imageSource;
+    
+    // 如果在标定模式，使用当前标定图片
+    if (calibrationStore.isCalibrating && calibrationStore.currentCalibrationImageUrl) {
+      imageSource = calibrationStore.currentCalibrationImageUrl;
+    }
+    // 如果X和Y轴被选中，使用静态9点图像
+    else if (calibrationStore.selectedAxes.includes('X') && calibrationStore.selectedAxes.includes('Y')) {
+      imageSource = '/9dian/12_161833.png'; 
+    }
+    // 否则尝试使用相机图像
+    else {
+      imageSource = cameraStore.cameraImageUrl;
+    }
+    
+    if (!imageSource) {
+      console.warn('No image source available for binary preview');
+      isBinaryProcessing.value = false;
+      return;
+    }
+    
+    // 加载图像
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      // 设置画布大小与图像匹配
+      const canvas = binaryPreviewCanvas.value;
+      
+      // 调整画布尺寸以保持原始比例，但适合容器
+      const container = canvas.parentElement;
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      const imageRatio = img.width / img.height;
+      const containerRatio = containerWidth / containerHeight;
+      
+      let canvasWidth, canvasHeight;
+      if (imageRatio > containerRatio) {
+        // 图像较宽，以宽度为基准
+        canvasWidth = containerWidth;
+        canvasHeight = containerWidth / imageRatio;
+      } else {
+        // 图像较高，以高度为基准
+        canvasHeight = containerHeight;
+        canvasWidth = containerHeight * imageRatio;
+      }
+      
+      // 设置画布显示尺寸（CSS尺寸）
+      canvas.style.width = `${canvasWidth}px`;
+      canvas.style.height = `${canvasHeight}px`;
+      
+      // 设置画布内部尺寸（实际像素）- 使用原图尺寸以保持清晰度
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      const ctx = canvas.getContext('2d');
+      
+      // 清除画布
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 先绘制原图
+      ctx.drawImage(img, 0, 0);
+      
+      // 获取图像数据
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      
+      // 应用二值化处理
+      for (let i = 0; i < data.length; i += 4) {
+        // 计算灰度值 (0.299 * R + 0.587 * G + 0.114 * B)
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        
+        // 基于阈值将灰度转换为黑白
+        const binary = gray > contourExtractionParams.value.binaryThreshold ? 255 : 0;
+        
+        // 设置RGB值为二值化结果
+        data[i] = binary;     // R
+        data[i + 1] = binary; // G
+        data[i + 2] = binary; // B
+        // 保持Alpha不变
+      }
+      
+      // 将处理后的数据放回画布
+      ctx.putImageData(imageData, 0, 0);
+      
+      isBinaryProcessing.value = false;
+    };
+    
+    img.onerror = () => {
+      console.error('Error loading image for binary preview');
+      isBinaryProcessing.value = false;
+    };
+    
+    img.src = imageSource;
+    
+  } catch (error) {
+    console.error('Error processing binary preview:', error);
+    isBinaryProcessing.value = false;
+  }
+}
+
+// 监听二值化阈值变化，添加防抖功能
+watch(() => contourExtractionParams.value.binaryThreshold, () => {
+  // 只有当预览显示时才更新
+  if (showBinaryPreview.value) {
+    // 清除上一个定时器
+    if (lastPreviewTimeout.value) {
+      clearTimeout(lastPreviewTimeout.value);
+    }
+    
+    // 设置新的防抖定时器，100ms后更新预览
+    lastPreviewTimeout.value = setTimeout(() => {
+      updateBinaryPreview();
+    }, 100);
+  }
+});
+
+// 切换二值化预览显示/隐藏
+function toggleBinaryPreview() {
+  showBinaryPreview.value = !showBinaryPreview.value;
+  
+  if (showBinaryPreview.value) {
+    // 延迟一点以确保DOM已更新
+    setTimeout(() => {
+      updateBinaryPreview();
+    }, 50);
+  }
+}
 </script>
 
 <style scoped>
@@ -212,26 +464,6 @@ defineExpose({
   color: #c5c5c5;
   margin-bottom: 8px;
   font-weight: bold;
-}
-
-.template-preview-container {
-  display: flex;
-  align-items: center;
-  margin-top: 5px;
-  margin-bottom: 5px;
-}
-
-.template-preview-container label {
-  margin-right: 8px; /* Adjust as needed */
-  min-width: 70px; /* Ensure label alignment */
-}
-
-.template-preview-img {
-  max-width: 100px; /* Adjust as needed */
-  max-height: 50px; /* Adjust as needed */
-  border: 1px solid #555;
-  border-radius: 3px;
-  object-fit: contain;
 }
 
 .button-group-inline {
@@ -296,13 +528,99 @@ defineExpose({
   background-size: .65em auto;
 }
 
+/* 位置显示容器 - 用于匹配阈值和其他输入框 */
+.position-display-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: 32px;
+}
+
+/* 单位显示 */
+.unit-display {
+  position: absolute;
+  right: 8px;
+  color: #888;
+  font-size: 12px;
+  user-select: none;
+  padding: 0 4px;
+}
+
 /* 覆盖RoiControlHeader中的标题样式 */
-.normal-font-heading :deep(.roi-heading) {
+.normal-font-heading :deep(.roi-heading),
+.normal-font-heading :deep(.contour-heading) {
   font-weight: normal;
   font-size: 0.9em;
   color: var(--text-medium);
   margin: 0;
   padding: 0;
   white-space: nowrap;
+}
+
+/* 添加下拉选择器样式 */
+.dropdown-selector-like {
+  margin-top: 8px;
+  padding-left: 4px;
+}
+
+/* 二值化预览相关样式 */
+.binary-preview-container {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background-color: #2e2e2e;
+  width: 100%;
+}
+
+.binary-image-container {
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.binary-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.processing-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.preview-toggle-button {
+  position: absolute;
+  right: 24px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: #9e9e9e;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.preview-toggle-button:hover {
+  color: #ffd700;
+}
+
+.preview-toggle-button.active {
+  color: #4caf50;
 }
 </style> 

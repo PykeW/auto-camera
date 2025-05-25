@@ -171,26 +171,17 @@
   
   // 当前查看的图片数据
   const currentViewImage = computed(() => {
-    // 如果标定过程中，使用当前正在处理的标定图片
-    if (calibrationStore.isCalibrating && calibrationStore.currentCalibrationImageUrl) {
-      const imageIndex = calibrationStore.currentCalibrationImageIndex;
-      return {
-        imageUrl: calibrationStore.currentCalibrationImageUrl,
-        matches: calibrationStore.detectedTemplatedMarks,
-        index: imageIndex
-      };
+    if (!showAllCalibrationImages.value || !calibrationStore.allCalibrationImages || calibrationStore.allCalibrationImages.length === 0) {
+      return null;
     }
     
-    // 如果标定已完成，使用保存的图片结果
-    if (calibrationStore.allCalibrationImages.length > 0) {
-      if (currentCalibrationImageIndex.value >= calibrationStore.allCalibrationImages.length) {
-        currentCalibrationImageIndex.value = 0;
-      }
-      return calibrationStore.allCalibrationImages[currentCalibrationImageIndex.value];
+    const currentIndex = calibrationStore.currentCalibrationImageIndex === -1 ? 0 : calibrationStore.currentCalibrationImageIndex;
+    
+    if (currentIndex >= 0 && currentIndex < calibrationStore.allCalibrationImages.length) {
+      return calibrationStore.allCalibrationImages[currentIndex];
     }
     
-    // 默认返回空结果
-    return { imageUrl: '', matches: [], index: -1 };
+    return null;
   });
   
   // Computed properties for auto-targeting ROI
@@ -200,28 +191,27 @@
         currentViewImage.value.matches && 
         currentViewImage.value.matches.length > 0) {
       
-      // Assuming the first match is the one we care about, 
-      // or it has been pre-filtered by the store to be the best one.
+      // 直接使用来自mark点的固定坐标，不进行缩放或调整
       const bestMatch = currentViewImage.value.matches[0];
-
-      // Use match.x and match.y if they are the center points.
-      // calibration.js suggests detectedTemplatedMarks (which populates currentViewImage.matches)
-      // has objects with x, y (center) and rect (bounding box).
-      if (typeof bestMatch.x === 'number' && typeof bestMatch.y === 'number') {
-        return {
-          center: { x: bestMatch.x, y: bestMatch.y },
-          size: autoTargetRoiSize.value
-        };
-      } else if (bestMatch.rect) { // Fallback to rect center if x,y are not present
-        const centerX = bestMatch.rect.x + bestMatch.rect.width / 2;
-        const centerY = bestMatch.rect.y + bestMatch.rect.height / 2;
-        return {
-          center: { x: centerX, y: centerY },
-          size: autoTargetRoiSize.value
-        };
-      }
+      
+      // 图片文件名，用于调试
+      const imageUrl = currentViewImage.value.imageUrl || '';
+      const fileName = imageUrl.split('/').pop();
+      console.log(`[CameraView] [autoTargetPropsForRoi] 显示图片 ${fileName} 的mark点:`, bestMatch);
+      
+      // 使用精确的mark点坐标
+      return {
+        center: {
+          x: bestMatch.x,
+          y: bestMatch.y
+        },
+        size: {
+          width: bestMatch.rect.width,
+          height: bestMatch.rect.height
+        }
+      };
     }
-    return null; // Return null if no valid target
+    return null;
   });
   
   // 导航到上一张图片
@@ -264,7 +254,14 @@
     } else if (index >= calibrationStore.allCalibrationImages.length) {
       index = calibrationStore.allCalibrationImages.length - 1;
     }
+    
+    // 使用本地状态和store状态保持同步
     currentCalibrationImageIndex.value = index;
+    
+    // 使用store提供的方法设置索引，确保同步
+    calibrationStore.setCurrentCalibrationImageIndex(index);
+    
+    console.log(`[CameraView] 切换到标定图片 ${index + 1}，文件: ${calibrationStore.allCalibrationImages[index].imageUrl}`);
   }
   
   // 计算属性

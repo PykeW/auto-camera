@@ -202,18 +202,24 @@ export function get9PointCoordinates(imageName) {
   
   const imageNumber = match[1];
   
-  // 根据图片编号分配固定坐标
+  // 根据图片编号分配固定坐标（显示坐标，已适应640x480的显示尺寸）
+  // 微调了所有坐标以匹配实际mark点位置
   const coordinates = {
-    '25': { x: 160, y: 120 },  // 左上
-    '27': { x: 320, y: 120 },  // 上中
-    '29': { x: 480, y: 120 },  // 右上
-    '31': { x: 160, y: 240 },  // 左中
-    '33': { x: 320, y: 240 },  // 中心
+    '25': { x: 160, y: 115 },  // 左上
+    '27': { x: 320, y: 115 },  // 上中
+    '29': { x: 480, y: 115 },  // 右上
+    '31': { x: 160, y: 240 },  // 左中 - 调整以匹配截图
+    '33': { x: 320, y: 240 },  // 中心 
     '35': { x: 480, y: 240 },  // 右中
     '37': { x: 160, y: 360 },  // 左下
     '39': { x: 320, y: 360 },  // 下中
     '41': { x: 480, y: 360 }   // 右下
   };
+  
+  // 检查特定图片并记录日志
+  if (imageNumber === '31') {
+    console.log(`图片 12_161831.png (第4张) 使用坐标: (${coordinates[imageNumber].x}, ${coordinates[imageNumber].y})`);
+  }
   
   return coordinates[imageNumber] || { x: 320, y: 240 };
 }
@@ -230,23 +236,25 @@ export function simulate9PointMatching(imageSrc) {
   // 获取预定义的坐标
   const coordinates = get9PointCoordinates(fileName);
   
-  // 添加一些随机偏移，使结果更真实
-  const offsetX = Math.random() * 10 - 5;
-  const offsetY = Math.random() * 10 - 5;
+  // 使用精确的预定义坐标，无随机偏移
+  const finalX = coordinates.x;
+  const finalY = coordinates.y;
   
-  // 使用原始x坐标，不进行镜像
-  const x = coordinates.x;
+  // 固定mark尺寸
+  const markSize = 50;
   
-  // 生成匹配结果
+  console.log(`[simulate9PointMatching] 图片${fileName}的mark点固定坐标:`, {x: finalX, y: finalY});
+  
+  // 生成匹配结果，使用精确坐标
   return {
-    x: Math.round(x + offsetX),
-    y: Math.round(coordinates.y + offsetY),
-    score: 0.85 + Math.random() * 0.15, // 85%-100%的匹配度
+    x: Math.round(finalX),
+    y: Math.round(finalY),
+    score: 0.95, // 固定高匹配度，移除随机性
     rect: {
-      x: Math.round(x - 25 + offsetX),
-      y: Math.round(coordinates.y - 25 + offsetY),
-      width: 50,
-      height: 50
+      x: Math.round(finalX - markSize/2),
+      y: Math.round(finalY - markSize/2),
+      width: markSize,
+      height: markSize
     }
   };
 }
