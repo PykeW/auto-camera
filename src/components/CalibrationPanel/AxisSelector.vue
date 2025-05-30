@@ -105,7 +105,6 @@ defineExpose({
   display: flex;
   flex-direction: column;
   width: 100%;
-  margin-bottom: 8px;
   gap: 8px;
 }
 </style> 

@@ -8,24 +8,18 @@
       
       <!-- 标定参数配置区域 -->
       <div class="control-group">
-        <div class="axis-control-section">
+        <!-- 将轴选择和矩阵配置合并到新的配置组 -->
+        <div class="config-group">
           <!-- 轴选择区域 -->
           <AxisSelector 
             ref="axisSelector"
             :isCalibrating="isCalibrating" 
           />
           
-          <!-- 轴参数区域 -->
-          <AxisParameters 
-            :assignedX="assignedX"
-            :assignedY="assignedY"
-            :assignedU="assignedU"
-            :isCalibrating="isCalibrating"
-          />
+          <!-- 矩阵大小和点位偏移 - 直接放在轴选择后面，减小间距 -->
+          <MatrixConfig :isCalibrating="isCalibrating" />
         </div>
         
-        <!-- 矩阵大小和点位偏移 -->
-        <MatrixConfig :isCalibrating="isCalibrating" />
         
         <!-- Mark点方式选择和参数 -->
         <MarkPointControl 
@@ -57,7 +51,6 @@
   
   // 导入子组件
   import AxisSelector from './AxisSelector.vue';
-  import AxisParameters from './AxisParameters.vue';
   import MatrixConfig from './MatrixConfig.vue';
   import MarkPointControl from './MarkPointControl.vue';
   import CalibrationButtons from './CalibrationButtons.vue';
@@ -100,12 +93,18 @@
   .control-group {
     width: 100%;
     max-width: 100%;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px; /* 统一控制组内各元素的上下间距 */
   }
   
-  .axis-control-section {
+  /* 新的配置组样式 */
+  .config-group {
     width: 100%;
-    margin: 0;
-    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* 添加适当的间距，介于0和12px之间 */
   }
   
   /* 确保分隔线占据全宽 */
@@ -117,7 +116,7 @@
   }
 
   .section-title {
-    margin-bottom: 10px;
+    margin-bottom: 12px; /* 与gap值保持一致 */
     font-size: 1.1em;
   }
   </style>

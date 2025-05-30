@@ -53,7 +53,7 @@ const emit = defineEmits(['update:modelValue']);
 <style scoped>
 /* 组件整体外边距 */
 .control-item.side-by-side {
-  margin-bottom: 8px; /* 确保底部间距一致 */
+  margin-bottom: 0; /* 移除底部间距，由父组件的gap控制 */
 }
 
 /* 标签样式 */

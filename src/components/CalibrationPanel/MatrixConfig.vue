@@ -69,8 +69,8 @@ const pointOffset = computed({
 <style scoped>
 /* 为点位偏移添加下拉组件样式 */
 .dropdown-selector-like {
-  margin-bottom: 8px;
-  margin-top: 8px;
+  margin-bottom: 0;
+  margin-top: 8px; /* 保留与自身控件的间距 */
 }
 .dropdown-selector-like .control-item.side-by-side label {
   min-width: 80px;
@@ -97,7 +97,7 @@ const pointOffset = computed({
   align-items: center;
   gap: 8px;
   height: 32px;
-  margin-bottom: 8px;
+  margin-bottom: 0; /* 移除底部边距 */
   width: 100%;
   flex-wrap: nowrap;
   overflow: visible;

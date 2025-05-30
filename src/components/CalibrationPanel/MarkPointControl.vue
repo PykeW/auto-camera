@@ -9,7 +9,6 @@
         :modelValue="calibrationStore.markMethod"
         @update:modelValue="onMarkMethodChange"
         :options="markMethodOptions"
-        style="margin-top: 8px;"
       />
 
       <!-- Template Matching Controls - 使用RoiControlHeader -->
@@ -21,7 +20,6 @@
         @visibility-toggle="handleRoiVisibilityToggle"
         @edit="handleRoiEdit"
         @clear="handleRoiClear"
-        style="margin-top: 8px;"
         class="normal-font-heading"
       />
       
